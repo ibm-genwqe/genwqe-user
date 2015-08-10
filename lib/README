@@ -1,0 +1,8 @@
+README
+======
+The code in the lib directory contains the main library code for the genwqe
+accellerator.
+
+There are a handful of functions that allow the application to use
+the zlib accelerator in the system.
+The code replaces "zlib"  by using the new libzADC
