@@ -1,8 +1,8 @@
 Genwqe-user
 ===========
 
-GenWQE is a PCIe accleration card. This repository contains the source code to 
-build a generic user level work queue for zlib style compression/decompression 
+GenWQE is a PCIe acceleration card. This repository contains the source code to
+build a generic user level work queue for zlib style compression/decompression
 according to RFC1950, RFC1951 and RFC1952.
 
     /lib
