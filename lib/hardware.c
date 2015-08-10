@@ -1004,6 +1004,255 @@ static inline int __inflate(z_streamp strm, struct hw_state *s, int flush)
 }
 
 /**
+ * FIXME Circumvention for hardware deficiency
+ *
+ * Our hardware does not continue processing input bytes, once it has
+ * no ouput bytes anymore. This causes our hardware missing the FEOB
+ * information which can be in empty blocks which follow the regular
+ * data. Software would return Z_STREAM_END in those cases and not
+ * Z_OK, which is expected by some applications e.g. the MongoDB zlib
+ * compression engine.
+ *
+ * It is possible recall hardware inflate with at least one output
+ * byte, to get the desired Z_STREAM_END information from the
+ * hardware, at the cost of an additional DDCB, which is itself
+ * expensive too.
+ *
+ * Empty blocks are added by hardware support code and the software
+ * implementation in different fashions. Z_SYNC_FLUSH does similar
+ * things too. Hardware support code adds an embly fixed huffman block
+ * followed by another empty fixed huffman block with the BFINAL bit
+ * on. Software uses just the latter.
+ */
+
+//#define CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END
+
+enum stream_state {
+	READ_HDR,
+	COPY_BLOCK,
+	FIXED_HUFFMAN,
+	DYN_HUFFMAN,
+};
+
+static const char *state_str[] = {
+	"READ_HDR", "COPY_BLOCK", "FIXED_HUFFMAN", "DYN_HUFFMAN"
+};
+
+struct stream_ending {
+	uint8_t d[16];
+	unsigned int proc_bits;	/* processed bits in current byte */
+	unsigned int remaining_bytes;
+	unsigned int avail_in;
+	unsigned int idx;
+	unsigned int in_hdr_scratch_len;
+	enum stream_state state;
+};
+
+/**
+ * Retrieve @bits from @e. Without moving the position forward.
+ */
+static inline int get_bits(struct stream_ending *e, unsigned int bits,
+			   uint64_t *d)
+{
+	int rc = 0;
+	unsigned int b, proc_bits, idx;
+	uint64_t data = 0ull;
+
+	for (proc_bits = e->proc_bits, idx = e->idx, b = 0; b < bits; idx++) {
+		for (; proc_bits < 8 && b < bits; proc_bits++, b++) {
+			data <<= 1ull;
+
+			if (idx >= e->avail_in) {
+				rc = 1;
+				continue;  /* no valid bytes anymore */
+			}
+			if (e->d[idx] & (1 << proc_bits))
+				data |= 1ull;
+		}
+		proc_bits = 0;	/* start new byte at bit offset 0 */
+	}
+	*d = data;
+	return rc;
+}
+
+/**
+ * Move the position forward by @bits bits.
+ */
+static inline int drop_bits(struct stream_ending *e, unsigned int bits)
+{
+	unsigned int idx;
+
+	/* hw_trace("proc_bits=%d idx=%d ---> ", e->proc_bits, e->idx); */
+	idx = e->idx + (e->proc_bits + bits) / 8;
+	if (idx >= e->avail_in) {
+		/* hw_trace("EOF\n"); */
+		return 1;	/* we do not have such many bits */
+	}
+
+	e->idx = idx;
+	e->proc_bits = (e->proc_bits + bits) % 8;
+	/* hw_trace("proc_bits=%d idx=%d\n", e->proc_bits, e->idx); */
+	return 0;
+}
+
+/**
+ * Copy blocks have their length information synched on a byte
+ * boundary.  We need this to move the stream forward to a byte
+ * position.
+ */
+static inline int sync_to_byte(struct stream_ending *e)
+{
+	if (e->proc_bits == 0)
+		return 0;
+
+	e->proc_bits = 0;
+	e->idx++;
+	return 0;
+}
+
+/**
+ * There can be leftover input bytes in the scratch section. This is
+ * used to figure out how many bytes are there to be considered.
+ */
+static inline unsigned int __in_hdr_scratch_len(zedc_streamp strm)
+{
+	unsigned int len;
+
+	len = strm->hdr_ib + strm->tree_bits + strm->pad_bits +
+		strm->scratch_ib + strm->scratch_bits;
+
+	return (uint32_t)(len / 8ULL);
+}
+
+/**
+ * NOTES: Missing are reading more data if we run out of space in our
+ * temporary buffer, more testing for corner cases, figuring out if we
+ * are really at a header-start position (talk to hardware team).
+ *
+ * Consider moving this code at the end of DDCB processing. This is
+ * where it really belongs to mimic the exact zlib software
+ * behavior. It could easily be, that this simplifies testing a lot,
+ * since one could use the exact amount of output bytes and insist on
+ * seeing Z_STREAM_END as return code. Now we need to call inflate() a
+ * 2nd time (even with avail_out == 0), to get the Z_STREAM_END return
+ * code.
+ */
+static inline int __check_stream_end(z_streamp strm)
+{
+	int rc, ret = Z_OK;
+	uint64_t d;
+	struct stream_ending e;
+	struct hw_state *s = (struct hw_state *)strm->state;;
+	zedc_stream *h = &s->h;
+	unsigned int len;
+	uint8_t offs;
+
+	/* Copy input data in one contignous buffer before analyzing it */
+	memset(&e, 0, sizeof(e));
+	e.state = READ_HDR;
+	e.proc_bits = h->proc_bits;
+	e.remaining_bytes = sizeof(e.d);
+	e.avail_in = 0;
+	e.idx = 0;
+	e.in_hdr_scratch_len = __in_hdr_scratch_len(h);
+
+	len = MIN(e.in_hdr_scratch_len, e.remaining_bytes);
+	memcpy(&e.d[e.avail_in], h->wsp->tree, len);
+	e.remaining_bytes -= len;
+	e.avail_in += len;
+
+	len = MIN(strm->avail_in, e.remaining_bytes);
+	memcpy(&e.d[e.avail_in], strm->next_in, len);
+	e.remaining_bytes -= len;
+	e.avail_in += len;
+
+	hw_trace("Accumulated input data:\n");
+	if (zlib_hw_trace_enabled())
+		ddcb_hexdump(stderr, e.d, e.avail_in);
+
+	/* Now let us have a look what we have here */
+	while (1) {
+		/* fprintf(stderr, "STATE: %s\n", state_str[e.state]); */
+		switch (e.state) {
+		case READ_HDR:
+			rc = get_bits(&e, 3, &d);
+			hw_trace("    d=%llx\n", (long long)d);
+			if (rc)
+				goto go_home;
+			drop_bits(&e, 3);
+
+			switch (d & 0x3) {
+			case 0x0:
+				e.state = COPY_BLOCK;
+				break;
+			case 0x1:
+				e.state = DYN_HUFFMAN;
+				goto go_home;
+			case 0x2:
+				e.state = FIXED_HUFFMAN;
+				break;
+			case 0x3:  /* error */
+			default:
+				goto go_home;
+			}
+			if (d & 0x4) {
+				hw_trace("  Z_STREAM_END seen!\n");
+				ret = Z_STREAM_END;
+			}
+			break;
+
+		case FIXED_HUFFMAN:
+			rc = get_bits(&e, 7, &d);
+			hw_trace("    d=%llx, 0 is goodness\n",
+				 (long long)d);
+			if (rc)
+				goto go_home;
+			drop_bits(&e, 7);
+
+			if (d != 0x0)  /* end of stream required here */
+				goto go_home;
+
+			e.state = READ_HDR;
+
+			/* If we saw the BFINAL bit, we can safely exit */
+			if (ret == Z_STREAM_END)
+				goto sync_avail_in;
+			break;
+
+		case COPY_BLOCK:
+			sync_to_byte(&e);
+			rc = get_bits(&e, 32, &d);
+			hw_trace("    d=%llx, 0000ffff is goodness\n",
+				 (long long)d);
+			if (rc)
+				goto go_home;
+			drop_bits(&e, 32);
+
+			if (d != 0x0000ffff)  /* 0000ffff required here */
+				goto go_home;
+
+			e.state = READ_HDR;
+
+			/* If we saw the BFINAL bit, we can safely exit */
+			if (ret == Z_STREAM_END)
+				goto sync_avail_in;
+
+			break;
+
+		default:
+			hw_trace("Brrr STATE: %s\n", state_str[e.state]);
+			goto go_home;
+		}
+	}
+ sync_avail_in:
+	offs = e.idx - e.in_hdr_scratch_len;
+	strm->avail_in -= offs;
+	strm->next_in += offs;
+ go_home:
+	return ret;
+}
+
+/**
  * FIXME We use always the internal buffer. Using the external one
  *       results in minimal performance gain when using sgl-described
  *       buffers, but flat buffers are better anyways.
@@ -1065,8 +1314,25 @@ int h_inflate(z_streamp strm, int flush)
 		    (obuf_bytes == 0))		/* no more outp data in buf */
 			return Z_STREAM_END;	/* nothing to do anymore */
 
-		if (strm->avail_out == 0)	/* need more ouput space */
-			return Z_OK;
+		if (strm->avail_out == 0) {	/* need more ouput space */
+			rc = Z_OK;
+#ifdef CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END /* EXPERIMENTAL for MongoDB PoC */
+			/*
+			 * fprintf(stderr, "SCRATCH\n");
+			 * ddcb_hexdump(stderr, h->wsp->tree,
+			 *	     __in_hdr_scratch_len(h));
+			 * fprintf(stderr, "NEXT_IN\n");
+			 * ddcb_hexdump(stderr, strm->next_in,
+			 *	     MIN(strm->avail_in, (unsigned int)0x20));
+			 * fprintf(stderr,
+			 *	"  in_hdr_scratch_len = %d\n"
+			 *	"  proc_bits = %d\n",
+			 *	__in_hdr_scratch_len(h), h->proc_bits);
+			 */
+			rc = __check_stream_end(strm);
+#endif
+			return rc;
+		}
 
 		if (s->obuf_avail != s->obuf_total) {
 			pr_err("[%p] obuf should be empty here!\n", strm);

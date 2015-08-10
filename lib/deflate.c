@@ -306,13 +306,21 @@ int zedc_deflateSetDictionary(zedc_streamp strm,
 int zedc_deflateCopy(zedc_streamp dest, zedc_streamp source)
 {
 	int rc;
+	unsigned int p;
 
 	memcpy(dest, source, sizeof(*dest));
 	rc = zedc_alloc_workspace(dest);
 	if (rc != ZEDC_OK)
 		return rc;
 
-	memcpy(dest->wsp, source->wsp, sizeof(*dest->wsp));
+	/* Try only to copy what is really needed ... */
+	/* memcpy(dest->wsp, source->wsp, sizeof(*dest->wsp)); */
+
+	p = dest->wsp_page;
+	memcpy(dest->wsp->tree, source->wsp->tree, sizeof(*dest->wsp->tree));
+	memcpy(dest->wsp->dict[p], source->wsp->dict[p],
+	       sizeof(*dest->wsp->dict[p]));
+
 	return ZEDC_OK;
 }
 
