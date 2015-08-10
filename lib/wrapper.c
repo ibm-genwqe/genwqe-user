@@ -684,9 +684,14 @@ int deflateCopy(z_streamp dest, z_streamp source)
 
 int deflate(z_streamp strm, int flush)
 {
-	int rc;
+	int rc = 0;
 	struct _internal_state *w;
 	unsigned int avail_in_slot, avail_out_slot;
+
+	if (0 == has_wrapper_state(strm)) {
+		rc = z_deflate(strm, flush);
+		return rc;
+	}
 
 	if (strm == NULL)
 		return Z_STREAM_ERROR;
@@ -711,14 +716,24 @@ int deflate(z_streamp strm, int flush)
 	}
 
 	pr_trace("[%p] deflate:   flush=%d %s next_in=%p avail_in=%d "
-		 "next_out=%p avail_out=%d total_out=%ld crc/adler=%08lx\n",
+		 "next_out=%p avail_out=%d total_out=%ld crc/adler=%08lx impl=%d\n",
 		 strm, flush, flush_to_str(flush), strm->next_in,
 		 strm->avail_in, strm->next_out, strm->avail_out,
-		 strm->total_out, strm->adler);
+		 strm->total_out, strm->adler, w->impl);
 
 	strm->state = w->priv_data;
-	rc = w->impl ? h_deflate(strm, flush) :
-		       z_deflate(strm, flush);
+	/* impl can only be ZLIB_HW_IMPL or ZLIB_SW_IMPL */
+	switch (w->impl) {
+	case ZLIB_HW_IMPL:
+		rc = h_deflate(strm, flush);
+		break;
+	case ZLIB_SW_IMPL:
+		rc = z_deflate(strm, flush);
+		break;
+	default:
+		pr_trace("[%p] deflate: impl (%d) is not valid for me\n", strm, w->impl);
+		break;
+	}
 	strm->state = (void *)w;
 
 	pr_trace("[%p]            flush=%d %s next_in=%p avail_in=%d "
@@ -808,11 +823,12 @@ int deflateParams(z_streamp strm, int level, int strategy)
 		pthread_mutex_unlock(&stats_mutex);
 	}
 
-	pr_trace("[%p] deflateParams level=%d strategy=%d\n",
-		 strm, level, strategy);
+	pr_trace("[%p] deflateParams level=%d strategy=%d impl=%d\n",
+		 strm, level, strategy, w->impl);
 
 	strm->state = w->priv_data;
-	if (w->impl == ZLIB_HW_IMPL) {
+	switch (w->impl) {
+	case ZLIB_HW_IMPL:
 		/*
                  * For the Z_NO_COMPRESSION case, implement fallback
                  * to software. This is for the case where w->level
@@ -839,8 +855,14 @@ int deflateParams(z_streamp strm, int level, int strategy)
 			goto err;
 
 		w->priv_data = strm->state; /* backup sublevel state */
-	} else
+		break;
+	case ZLIB_SW_IMPL:
 		rc = z_deflateParams(strm, level, strategy);
+		break;
+	default:
+		pr_err("[%p] deflateParams impl=%d invalid\n", strm, w->impl);
+		break;
+	}
 
  err:
 	strm->state = (void *)w;
