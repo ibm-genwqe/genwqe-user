@@ -496,6 +496,8 @@ static int ddcb_execute(void *card_data, struct ddcb_cmd *cmd)
 	int rc;
 
 	rc = __ddcb_execute_multi(card_data, cmd);
+	if (DDCB_OK != rc)
+		errno = EINTR;
 	return rc;
 }
 
@@ -577,15 +579,42 @@ static void *__ddcb_done_thread(void *card_data)
 			continue;
 		}
 
-		rc = cxl_read_expected_event(ctx->afu_h, &ctx->event, CXL_EVENT_AFU_INTERRUPT, 1);
-		if (0 != rc)
-			VERBOSE0("failed reading expected event! rc: %d\n", rc);
-		VERBOSE2("\tcxl_read_expected_event(...) = %d\n"
-			"  event.header.type = %d event.header.size = %d\n",
+		rc = cxl_read_event(ctx->afu_h, &ctx->event);
+		if (0 != rc) {
+			VERBOSE0("\tERROR cxl_read_event() rc: %d errno: %d\n", rc, errno);
+			continue;
+		}
+		VERBOSE2("\tcxl_read_event(...) = %d\n"
+			"\tevent.header.type = %d event.header.size = %d\n",
 			rc, ctx->event.header.type, ctx->event.header.size);
 
-		/* Process all ddcb's */
-		while (__ddcb_done_post(ctx, DDCB_OK)) {};
+		switch (ctx->event.header.type) {
+		case CXL_EVENT_AFU_INTERRUPT:
+			/* Process all ddcb's */
+			VERBOSE1("\tCXL_EVENT_AFU_INTERRUPT: flags: 0x%x irq: 0x%x\n",
+				ctx->event.irq.flags,
+				ctx->event.irq.irq);
+			while (__ddcb_done_post(ctx, DDCB_OK)) {};
+			break;
+		case CXL_EVENT_DATA_STORAGE:
+			VERBOSE0("\tCXL_EVENT_DATA_STORAGE: flags: 0x%x addr: 0x%016llx dsisr: 0x%016llx\n",
+				ctx->event.fault.flags,
+				(long long)ctx->event.fault.addr,
+				(long long)ctx->event.fault.dsisr);
+			__ddcb_done_post(ctx, DDCB_ERR_EVENTFAIL);
+			break;
+		case CXL_EVENT_AFU_ERROR:
+			VERBOSE0("\tCXL_EVENT_AFU_ERROR: flags: 0x%x error: 0x%016llx\n",
+				ctx->event.afu_error.flags,
+				(long long)ctx->event.afu_error.error);
+			__ddcb_done_post(ctx, DDCB_ERR_EVENTFAIL);
+			break;
+		default:
+			VERBOSE0("\tcxl_read_event() %d unknown header type\n",
+				ctx->event.header.type);
+			__ddcb_done_post(ctx, DDCB_ERR_EVENTFAIL);
+			break;
+		}
 	}
 	return NULL;
 }
