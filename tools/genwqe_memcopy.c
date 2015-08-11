@@ -839,11 +839,11 @@ int main(int argc, char *argv[])
 				/* FIXME: this is not 100 % good code, i know the format_flag is bad */
 				if (pt->total_usec < 100000) {
 					kibs = ((pt->bytes_copied * 1000000) / 1024) / pt->total_usec;
-					VERBOSE1("%d KiB, in %ld usec, %ld KiB/sec", kib, pt->total_usec, kibs);
+					VERBOSE1("%d KiB, in %llu usec, %lu KiB/sec", kib, (long long)pt->total_usec, kibs);
 				} else {
 					total_msec = pt->total_usec / 1000;	/* now msec */
 					mibs = (pt->bytes_copied * 1000) / (1024 * 1024) / total_msec;
-					VERBOSE1("%d MiB, in %ld msec, %ld MiB/sec", mib, total_msec, mibs);
+					VERBOSE1("%d MiB, in %llu msec, %lu MiB/sec", mib, (long long)total_msec, mibs);
 				}
 				VERBOSE1(" %d errors.\n", pt->errors);
 			}
@@ -875,11 +875,11 @@ int main(int argc, char *argv[])
 		if (total_usec) {
 			if (total_usec < 100000) {
 				kibs = ((bytes_copied * 1000000) / 1024) / total_usec;
-				VERBOSE0("%d KiB, in %ld usec, %ld KiB/sec", kib, total_usec, kibs);
+				VERBOSE0("%d KiB, in %llu usec, %lu KiB/sec", kib, (long long)total_usec, kibs);
 			} else {
 				total_msec = total_usec / 1000;	/* now msec */
 				mibs = (bytes_copied * 1000) / (1024 * 1024) / total_msec;
-				VERBOSE0("%d MiB, in %ld msec, %ld MiB/sec", mib, total_msec, mibs);
+				VERBOSE0("%d MiB, in %llu msec, %lu MiB/sec", mib, (long long)total_msec, mibs);
 			}
 		}
 		VERBOSE0(" %d errors.\n", errors);
