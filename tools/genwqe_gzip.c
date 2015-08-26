@@ -311,7 +311,7 @@ static inline uint64_t str_to_num(char *str)
 
 static void userinfo(FILE *fp, char *prog, const char *version)
 {
-	fprintf(fp, "%s %s\n(c) Copyright IBM Corp. 2014\n",
+	fprintf(fp, "%s %s\n(c) Copyright IBM Corp. 2015\n",
 		basename(prog), version);
 }
 
@@ -359,8 +359,8 @@ static void usage(FILE *fp, char *prog, int argc, char *argv[])
 		"NOTE: Not all options are supported in this limited version!\n"
 		"Suggestions or patches are welcome!\n"
 		"\n"
-		"Report bugs to <haver@linux.vnet.ibm.com>.\n\n",
-		prog, CHUNK_i/1024, CHUNK_o/1024);
+		"Report bugs via https://github.com/ibm-genwqe/genwqe-user.\n"
+		"\n", prog, CHUNK_i/1024, CHUNK_o/1024);
 
 	print_args(fp, argc, argv);
 }
