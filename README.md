@@ -20,7 +20,7 @@ currently be aquired as an option to the latest IBM System p machines (see also 
         libcard.c           Low level API for GenWQE card
         libddcb.c           Functions on top of ddcb_card.c
         libzADC.map         Map file to build so files
-        libzHW.c            De/Compression supporting RFC1950, RFC1951 and RFC1952
+        libzHW.c            De/compression supporting RFC1950, RFC1951 and RFC1952
         software.c          Interface to call system libz
         wrapper.c           Wrapper for soft- and hardware-zlib
         wrapper.h
@@ -50,6 +50,11 @@ currently be aquired as an option to the latest IBM System p machines (see also 
     /licenses
         cla-corporate.txt
         cla-individual.txt
+
+    /spec
+        genwqe-libz.spec    Spec file for building the tools RPM
+        genwqe-tools.spec   Spec file for building the libz RPM
+
 
 On modern PowerPC server the accelerator card can use the new CAPI interface.
 Install the [libcxl](https://github.com/ibm-capi/libcxl.git) library into the toplevel ````genwqe-user```` directory and build the library via ````make```` before compiling the genwqe tools.
