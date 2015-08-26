@@ -70,8 +70,6 @@ genwqe-tools genwqe-libz:
 	@mkdir -p /tmp/$@-$(rpmversion)
 	@cp -ar .git /tmp/$@-$(rpmversion)/
 	@cp -ar * /tmp/$@-$(rpmversion)/
-	@find /tmp/$@-$(rpmversion)/ \
-		-depth -name 'CVS' -exec rm -rf '{}' \; -print
 	(cd /tmp && tar cfz $@-$(rpmversion).tgz $@-$(rpmversion))
 	@cp /tmp/$@-$(rpmversion).tgz ~/rpmbuild/SOURCES/
 	@cp spec/$@.spec ~/rpmbuild/SPECS/
