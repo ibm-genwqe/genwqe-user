@@ -462,15 +462,15 @@ static void usage(char *prog)
 {
 	char *b = basename(prog);
 
-	fprintf(stderr, "%s usage: %s "
-		"    [-X, --pin_cpu - pin each thread to own cpu]\n"
-		"    [-t, --threads <threads>] # of threads in parallel\n"
-		"    [-c, --count <count>]     # of files to comp/decomp\n"
-		"    [-i, --i_bufsize <i_bufsize>]\n"
-		"    [-o, --o_bufsize <o_bufsize>]\n"
-		"    [-D, --deflate - execute deflate. default: inflate]\n"
-		"    [-f  --filename <filename>]\n"
-		"\n", b, b);
+	printf("%s usage: %s [OPTIONS]\n"
+	       "  -X, --pin_cpu - pin each thread to own cpu\n"
+	       "  -t, --threads <threads> threads in parallel\n"
+	       "  -c, --count <count> files to comp/decomp\n"
+	       "  -i, --i_bufsize <i_bufsize>\n"
+	       "  -o, --o_bufsize <o_bufsize>\n"
+	       "  -D, --deflate - execute deflate. default: inflate\n"
+	       "  -f  --filename <filename>\n"
+	       "\n", b, b);
 }
 
 static void *libz_thread_defl(void *data)

@@ -32,21 +32,12 @@ ifeq ($(V),1)
 endif
 
 version = $(shell git describe --abbrev=4 --dirty --always --tags)
+rpmversion = $(shell git describe --abbrev=0)
 
 instdir = /opt/genwqe
 
 distro = $(shell lsb_release -d | cut -f2)
 subdirs += lib tools
-
-# We do not want to build our driver for ancient distributions ...
-ifneq ($(distro),Red Hat Enterprise Linux Client release 5.6 (Tikanga))
-#ifneq ($(distro),Red Hat Enterprise Linux Workstation release 6.2 (Santiago))
-#ifneq ($(distro),Red Hat Enterprise Linux Workstation release 6.4 (Santiago))
-subdirs += driver
-#endif
-#endif
-endif
-
 targets += $(subdirs)
 
 UDEV_RULES_D ?= /etc/udev/rules.d
@@ -69,62 +60,25 @@ rpmbuild_setup:
 	$(RM) ~/.rpmmacros
 	echo '%_topdir %(echo $$HOME)/rpmbuild' >  ~/.rpmmacros
 
-rpmbuild: genwqe-tools genwqe-libz genwqe-test-package genwqe-vpd
+rpmbuild: genwqe-tools genwqe-libz
 
-genwqe-tools genwqe-driver genwqe-libz:
+genwqe-tools genwqe-libz:
 	@$(MAKE) -s distclean
-	@$(RM) -r /tmp/$@-$(version) /tmp/$@-$(version).tgz  \
+	@$(RM) -r /tmp/$@-$(rpmversion) /tmp/$@-$(rpmversion).tgz  \
 		~/rpmbuild/SOURCES/${@}* ~/rpmbuild/BUILD/${@}* \
-		~/tmp/$@-$(version)
-	@mkdir -p /tmp/$@-$(version)
-	@cp -ar * /tmp/$@-$(version)/
-	@find /tmp/$@-$(version)/ \
+		~/tmp/$@-$(rpmversion)
+	@mkdir -p /tmp/$@-$(rpmversion)
+	@cp -ar .git /tmp/$@-$(rpmversion)/
+	@cp -ar * /tmp/$@-$(rpmversion)/
+	@find /tmp/$@-$(rpmversion)/ \
 		-depth -name 'CVS' -exec rm -rf '{}' \; -print
-	(cd /tmp && tar cfz $@-$(version).tgz $@-$(version))
-	@cp /tmp/$@-$(version).tgz ~/rpmbuild/SOURCES/
+	(cd /tmp && tar cfz $@-$(rpmversion).tgz $@-$(rpmversion))
+	@cp /tmp/$@-$(rpmversion).tgz ~/rpmbuild/SOURCES/
 	@cp spec/$@.spec ~/rpmbuild/SPECS/
-	rpmbuild -ba -v --define 'srcVersion $(version)' \
+	rpmbuild -ba -v --define 'srcVersion $(rpmversion)' \
 		--define 'srcRelease 1'			\
-		--buildroot ~/tmp/$@-$(version)		\
+		--buildroot ~/tmp/$@-$(rpmversion)	\
 		~/rpmbuild/SPECS/$@.spec
-
-genwqe-vpd:
-	@$(MAKE) -s distclean
-	@$(RM) -r /tmp/$@-$(version) /tmp/$@-$(version).tgz  \
-		~/rpmbuild/SOURCES/${@}* ~/rpmbuild/BUILD/${@}* \
-		~/tmp/$@-$(version)
-	@mkdir -p /tmp/$@-$(version)
-	@cp -ar  etc/genwqe_vpd.csv			\
-		include/genwqe_vpd.h			\
-		tools/genwqe_vpd_common.c		\
-		tools/genwqe_vpd_converter.c		\
-		tools/genwqe_tools.h			\
-		/tmp/$@-$(version)/
-	@cp -ar  spec/genwqe_vpdconv.mk	/tmp/$@-$(version)/Makefile
-	(cd /tmp && tar cfz $@-$(version).tgz $@-$(version))
-	@cp /tmp/$@-$(version).tgz ~/rpmbuild/SOURCES/
-	@cp spec/$@.spec ~/rpmbuild/SPECS/
-	rpmbuild -ba -v --define 'srcVersion $(version)' \
-		--define 'srcRelease 1'			\
-		--buildroot ~/tmp/$@-$(version)		\
-		~/rpmbuild/SPECS/$@.spec
-
-genwqe-test-package:
-	@$(RM) -r ~/rpmbuild/SOURCES/${@}* ~/rpmbuild/BUILD/${@}*
-	@mkdir -p /tmp/$@-$(version)
-	@cp -ar  tests/zedc/scripts/test_gz.sh          \
-		tests/zedc/data/testdata.tar.gz              \
-		/tmp/$@-$(version)/
-	(cd /tmp && tar cfz $@-$(version).tgz $@-$(version))
-	@cp /tmp/$@-$(version).tgz ~/rpmbuild/SOURCES/
-	@cp spec/$@.spec ~/rpmbuild/SPECS/
-	rpmbuild -bb -v --define 'srcVersion $(version)' \
-		--define 'srcRelease 1'                 \
-		--buildroot ~/tmp/$@-$(version)         \
-		~/rpmbuild/SPECS/$@.spec
-    # clean up temporary data again
-	@$(RM) -r /tmp/$@-$(version) /tmp/$@-$(version).tgz  \
-              /tmp/$@-$(version) ~/tmp
 
 # Install/Uninstall
 install uninstall:
@@ -148,35 +102,6 @@ install_modprobe_d:
 uninstall_modprobe_d:
 	$(RM) $(MODPROBE_D)/genwqe.conf
 
-install_src uninstall_src:
-	@if [ -z $(KERNELSRC) ]; then					\
-		echo "Please set KERNELSRC. Aborting.";			\
-	elif [ -z $(GENWQETOOLSSRC) ]; then				\
-		echo "Please set GENWQETOOLSSRC. Aborting.";		\
-	else								\
-		if [ $@ == "install_src" ]; then			\
-			mkdir -p $(KERNELSRC)/include/linux/uapi/linux/genwqe/;	\
-			cp include/linux/uapi/linux/genwqe/*.h		\
-				$(KERNELSRC)/include/linux/uapi/linux/genwqe/;\
-			mkdir -p $(GENWQETOOLSSRC)/include/linux/genwqe/;\
-			cp include/*.h $(GENWQETOOLSSRC)/include/;	\
-			cp include/linux/uapi/linux/genwqe/*.h		\
-				$(GENWQETOOLSSRC)/include/linux/genwqe/;\
-			cp Makefile config.mk $(GENWQETOOLSSRC);        \
-			for dir in $(subdirs); do			\
-				$(MAKE) -C $$dir $@ || exit 1;		\
-			done;						\
-		else							\
-			rm -f $(KERNELSRC)/include/linux/uapi/linux/genwqe/*.h;	\
-			rm -f $(GENWQETOOLSSRC)/include/linux/genwqe/*.h;\
-			rm -f $(GENWQETOOLSSRC)/include/*.h;		\
-			rm -f $(GENWQETOOLSSRC)/Makefile;		\
-			for dir in $(subdirs); do			\
-				$(MAKE) -C $$dir $@ || exit 1;		\
-			done;						\
-		fi							\
-	fi
-
 # FIXME This is a problem which occurs on distributions which have a
 # genwqe_card.h header file which is different from our local one.  If
 # there is a better solution than renaming it to get it out of the way
@@ -195,11 +120,9 @@ clean:
 			$(MAKE) -C $$dir $@ || exit 1;	\
 		fi					\
 	done
-	@$(RM) *~ */*~ \
-		GenWQETools-$(version).tgz \
-		GenWQELibZ-$(version).tgz \
-		GenWQEVpd-$(version).tgz \
-		/tmp/genwqe-test-package-$(version).tgz
+	@$(RM) *~ */*~ 					\
+		genwqe-tools-$(rpmversion).tgz 		\
+		genwqe-zlib-$(rpmversion).tgz
 	@find . -depth -name '*~'  -exec rm -rf '{}' \; -print
 	@find . -depth -name '.#*' -exec rm -rf '{}' \; -print
 

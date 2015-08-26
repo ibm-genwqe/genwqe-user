@@ -112,9 +112,11 @@ $(libname)-$(libversion).so: __$(libname).o
 	$(CC) $(LDFLAGS) -shared -Wl,-soname,$@ \
 		 -Wl,--version-script=libzADC.map -o $@ $^
 
-install: all
+install: all install_zlib
 	mkdir -p $(instdir)/lib
 	cp $(projs) $(instdir)/lib
+
+install_zlib: all
 	mkdir -p $(instdir)/lib/genwqe
 	cp -a $(projs) $(instdir)/lib/genwqe/
 	(cd $(instdir)/lib/genwqe/ && \
@@ -122,8 +124,7 @@ install: all
 		ln -sf $(libname)-$(libversion).so libz.so && \
 		ln -sf $(libname)-$(libversion).so libz.so.1)
 	mkdir -p $(instdir)/include/genwqe
-	cp ../include/zaddons.h 		$(instdir)/include/genwqe/
-	#cp ../include/zlib.h ../include/zconf.h $(instdir)/include/genwqe/
+	cp -a ../include/zaddons.h $(instdir)/include/genwqe/
 
 uninstall:
 	@for f in $(projs) ; do				\
