@@ -1,9 +1,13 @@
 Genwqe-user
 ===========
 
-GenWQE is a PCIe acceleration card. This repository contains the source code to
-build a generic user level work queue for zlib style compression/decompression
-according to RFC1950, RFC1951 and RFC1952.
+GenWQE (Generic Work Queue Engine) is a PCIe acceleration card. This
+repository contains the source code to test, maintain and update the
+GenWQE PCIe card. Furthermore a zlib version with hardware
+acceleration is provided to do zlib style compression/decompression
+according to RFC1950, RFC1951 and RFC1952. This can be used as
+alternative to the traditional software zlib. The GenWQE PCIe card can
+currently be aquired as an option to the latest IBM System p machines (see also here [PCIe3 LP FPGA Accelerator Adapter (FC EJ13; CCIN 59AB)](http://www-01.ibm.com/support/knowledgecenter/8247-22L/p8hcd/fcej13.htm?lang=en).
 
     /lib
         card_defs.h         Some Macros to debug libcard.c
@@ -43,8 +47,15 @@ according to RFC1950, RFC1951 and RFC1952.
         genwqe_vpd_common.c Helper utilities
         zlib_mt_perf.c      Sample program for inflate / deflate
 
+    /licenses
+        cla-corporate.txt
+        cla-individual.txt
 
 On modern PowerPC server the accelerator card can use the new CAPI interface.
 Install the [Libcxl](https://github.com/ibm-capi/libcxl.git) library into the toplevel ````genwqe-user```` directory and build the library via ````make```` before compiling the genwqe tools.
 
-Additional documentation can be found at the  [IBM Knowledgecenter](http://www-01.ibm.com/support/knowledgecenter/linuxonibm/liabt/liabtkickoff.htm).
+If you like to contribute to this project, please fill out and sign
+one of our contributor license agreements to be found in /licenses and
+send this back to us before sending us contributions.
+
+Additional documentation can be found at the  [IBM Knowledgecenter](http://www-01.ibm.com/support/knowledgecenter/linuxonibm/liabt/liabtkickoff.htm). A programming and usage guide for the hardware accelerated zlib can be downloaded here [Generic Work Queue Engine (GenWQE) Application Programming Guide](https://www.ibm.com/developerworks/community/blogs/fe313521-2e95-46f2-817d-44a4f27eba32/entry/Generic_Work_Queue_Engine_GenWQE_Application_Programming_Guide?lang=en).
