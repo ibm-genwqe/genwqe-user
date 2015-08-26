@@ -37,11 +37,9 @@ genwqe_gunzip_libs = ../lib/libzADC.a -ldl
 zlib_mt_perf_libs = ../lib/libzADC.a -ldl
 
 projs = genwqe_update genwqe_gzip genwqe_gunzip zlib_mt_perf genwqe_memcopy genwqe_echo
-
 objs = force_cpu.o genwqe_vpd_common.o $(projs:=.o)
 
 manpages = $(projs:=.1)
-manpages := $(filter-out zpipe.1 zpipe2.1 sglist_test.1, $(manpages))
 
 all:  $(libs) $(objs) $(projs)
 
@@ -85,27 +83,17 @@ uninstall_gzip_tools:
 
 install_manpages: $(manpages)
 	@mkdir -p $(instdir)/man/man1
-	cp -uv genwqe_echo genwqe_update $(instdir)/man/man1
-
-uninstall_manpages:
-	@for f in genwqe_echo genwqe_update ; do		\
-		echo "removing $(instdir)/man/man1/$$f ...";	\
-		$(RM) $(instdir)/man/man1/$$f;			\
-	done
+	cp -uv $(manpages) $(instdir)/man/man1
 
 install_release_manpages: $(manpages)
 	@mkdir -p $(instdir)/man/man1
-	cp -uv $(man3) $(man4) $(instdir)/man/man1
+	cp -uv genwqe_memcopy.1 genwqe_echo.1 genwqe_update.1 $(instdir)/man/man1
 
-install_src:
-	@mkdir -p $(GENWQETOOLSSRC)/tools
-	cp *.c *.h Makefile $(GENWQETOOLSSRC)/tools
-
-uninstall_src:
-	$(RM) $(GENWQETOOLSSRC)/tools/*.c \
-		$(GENWQETOOLSSRC)/tools/*.h \
-		$(GENWQETOOLSSRC)/tools/Makefile
-
+uninstall_manpages:
+	@for f in $(manpages) ; do				\
+		echo "removing $(instdir)/man/man1/$$f ...";	\
+		$(RM) $(instdir)/man/man1/$$f;			\
+	done
 
 install: $(projs)
 	@mkdir -p $(instdir)/bin
@@ -118,6 +106,6 @@ uninstall:
 	done
 
 clean:
-	$(RM) *.o $(projs) $(objs:.o=.d) $(manpages) *.gcov *.gcda *.gcno gmon.out
+	$(RM) *.o $(projs) $(objs:.o=.d) $(manpages)
 
 -include $(objs:.o=.d)
