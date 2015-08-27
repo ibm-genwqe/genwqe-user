@@ -27,6 +27,8 @@ endif
 LDLIBS += $(libs) -lpthread -lrt
 
 genwqe_memcopy_objs = force_cpu.o
+genwqe_peek_objs = force_cpu.o
+genwqe_poke_objs = force_cpu.o
 genwqe_echo_objs = force_cpu.o
 genwqe_vpdupdate_objs = genwqe_vpd_common.o
 genwqe_vpdconv_objs = genwqe_vpd_common.o
@@ -36,7 +38,9 @@ genwqe_gzip_libs = ../lib/libzADC.a -ldl
 genwqe_gunzip_libs = ../lib/libzADC.a -ldl
 zlib_mt_perf_libs = ../lib/libzADC.a -ldl
 
-projs = genwqe_update genwqe_gzip genwqe_gunzip zlib_mt_perf genwqe_memcopy genwqe_echo
+projs = genwqe_update genwqe_gzip genwqe_gunzip zlib_mt_perf genwqe_memcopy \
+	genwqe_echo genwqe_peek genwqe_poke
+
 objs = force_cpu.o genwqe_vpd_common.o $(projs:=.o)
 
 manpages = $(projs:=.1)
