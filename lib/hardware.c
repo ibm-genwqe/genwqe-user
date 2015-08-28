@@ -1348,6 +1348,10 @@ int h_inflate(z_streamp strm, int flush)
 			return Z_DATA_ERROR;
 		}
 
+		/* do not send 0 data to HW */
+		if ((0 == strm->avail_in) && (Z_NO_FLUSH == flush))
+			return Z_OK;
+
 		/*
 		 * Here we start the hardware to do the decompression
 		 * job. We need to use hardware in any case to
