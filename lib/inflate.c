@@ -206,15 +206,15 @@ static int setup_tree(zedc_streamp strm)
 	 * If End-Of-Block has been passed or reached, all tree
 	 * parameters are obsolete, a new tree is expected.
 	 */
-	if (strm->infl_stat & 0x01) {
+	if (strm->infl_stat & INFL_STAT_PASSED_EOB) {
 		strm->tree_bits    = 0;
 		strm->pad_bits     = 0;
 		strm->hdr_ib       = 0;
-		if (strm->infl_stat & 0x08) {  /* exactly on eob */
+		if (strm->infl_stat & INFL_STAT_REACHED_EOB) { /* on eob */
 		     strm->out_hdr_bits = 0;
 		     strm->out_hdr_start_bits = 0;	/* got from DDCB */
 		}
-		if (strm->infl_stat & 0x04) {
+		if (strm->infl_stat & INFL_STAT_FINAL_EOB) {
 			strm->inp_data_offs = strm->in_data_used;
 			strm->scratch_bits = 0;
 			strm->eob_seen = 1;	/* final EOB seen */
@@ -302,14 +302,15 @@ static int post_scratch_upd(zedc_streamp strm, struct zedc_asv_infl *asv)
 	 * boundary. OUT_HDR_BITS will always be 40 header type must
 	 * be checked (HW 243728).
 	 */
-	if ((strm->copyblock_len) && ((strm->infl_stat & 0x60) == 0) &&
-					(strm->out_hdr_bits != 0)) {
+	if ((strm->copyblock_len) &&
+	    ((strm->infl_stat & INFL_STAT_HDR_TYPE) == 0) &&
+	    (strm->out_hdr_bits != 0)) {
 
 		target = strm->wsp->tree;
 
 		len  = strm->copyblock_len;
 		nlen = ~len;
-		if (strm->infl_stat & 0x80)	/* was final block ? */
+		if (strm->infl_stat & INFL_STAT_HDR_BFINAL) /* final block? */
 			target[0] = 0x01;	/* restore final block */
 		else
 			target[0] = 0x00;
@@ -1015,7 +1016,7 @@ int zedc_inflate(zedc_streamp strm, int flush)
 	}
 
 	/* Did we reach End-Of-Final-Block (or seen it before) ? */
-	if (strm->infl_stat & 0x04)
+	if (strm->infl_stat & INFL_STAT_FINAL_EOB)
 		strm->eob_seen = 1; /* final EOB seen */
 
 	if (strm->eob_seen) {
@@ -1224,7 +1225,7 @@ int zedc_inflate(zedc_streamp strm, int flush)
 	zrc = ZEDC_OK;		/* preset 0 */
 
 	/* Did we reach End-Of-Final-Block (or seen it before) ? */
-	if (strm->infl_stat & 0x04)
+	if (strm->infl_stat & INFL_STAT_FINAL_EOB)
 		strm->eob_seen = 1; /* final EOB seen */
 
 	if (strm->eob_seen) {
@@ -1251,7 +1252,8 @@ int zedc_inflate(zedc_streamp strm, int flush)
 
  chk_ret:
 	/* End of final block and no dict data to copy */
-	if ((strm->infl_stat & 0x04) && (strm->obytes_in_dict == 0))
+	if ((strm->infl_stat & INFL_STAT_FINAL_EOB) &&
+	    (strm->obytes_in_dict == 0))
 		return ZEDC_STREAM_END;	/* done */
 
 	return ZEDC_OK;			/* must re-enter */
