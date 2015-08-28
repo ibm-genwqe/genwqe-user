@@ -55,7 +55,7 @@
  * @brief	estimate the amount of bytes consumed
  *		solely from the input stream
  */
-static int inp_proc_check(zedc_streamp strm, struct zedc_asv_infl *asv)
+static void inp_proc_check(zedc_streamp strm, struct zedc_asv_infl *asv)
 {
 	uint64_t in_total;
 
@@ -66,7 +66,6 @@ static int inp_proc_check(zedc_streamp strm, struct zedc_asv_infl *asv)
 	/* total amount of bytes consumed from input stream */
 	strm->in_data_used = (uint32_t)(in_total -
 				strm->pre_scratch_bits + 7ULL) / 8ULL;
-	return ZEDC_OK;
 }
 
 static void extract_new_tree(zedc_streamp strm)
@@ -198,7 +197,7 @@ static void scratch_update(zedc_streamp strm)
  * TREE + SCRATCH + INPUT_STREAM Copy header to start of tree area in
  * workspace.
  */
-static int setup_tree(zedc_streamp strm)
+static void setup_tree(zedc_streamp strm)
 {
 	uint64_t hdr_start_total_bits;
 
@@ -218,7 +217,7 @@ static int setup_tree(zedc_streamp strm)
 			strm->inp_data_offs = strm->in_data_used;
 			strm->scratch_bits = 0;
 			strm->eob_seen = 1;	/* final EOB seen */
-			return ZEDC_OK;
+			return;
 		}
 	}
 
@@ -237,7 +236,6 @@ static int setup_tree(zedc_streamp strm)
 		extract_new_tree(strm);
 	}
 	scratch_update(strm);
-	return ZEDC_OK;
 }
 
 /**
@@ -258,17 +256,12 @@ static int post_scratch_upd(zedc_streamp strm, struct zedc_asv_infl *asv)
 	uint8_t *target;
 	uint16_t len, nlen;
 	unsigned i, count;
-	int rc;
 	zedc_handle_t zedc = (zedc_handle_t)strm->device;
 
 	/* anything processed ? */
 	if (strm->inp_processed || strm->proc_bits) {
-		rc = inp_proc_check(strm, asv);
-		if (rc)
-			return rc;
-		rc = setup_tree(strm);
-		if (rc)
-			return rc;
+		inp_proc_check(strm, asv);
+		setup_tree(strm);
 	}
 
 	/* if no input data processed copy input-data to tree area */

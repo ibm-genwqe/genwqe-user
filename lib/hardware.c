@@ -536,18 +536,18 @@ static int h_read_ibuf(z_streamp strm)
 /**
  * Flush available output bytes
  */
-static int h_flush_obuf(z_streamp strm)
+static void h_flush_obuf(z_streamp strm)
 {
 	int tocopy;
 	unsigned int obuf_bytes;
 	struct hw_state *s = (struct hw_state *)strm->state;
 
 	if (strm->avail_out == 0)		/* no output space available */
-		return 0;
+		return;
 
 	obuf_bytes = s->obuf - s->obuf_next;    /* remaining bytes in obuf */
 	if (obuf_bytes == 0)			/* give out what is there */
-		return 0;
+		return;
 
 	tocopy = MIN(strm->avail_out, obuf_bytes);
 
@@ -560,8 +560,6 @@ static int h_flush_obuf(z_streamp strm)
 	strm->avail_out -= tocopy;
 	strm->next_out += tocopy;
 	strm->total_out += tocopy;
-
-	return tocopy;
 }
 
 /**
