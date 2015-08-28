@@ -1296,8 +1296,19 @@ int h_inflate(z_streamp strm, int flush)
 		if (s->rc == Z_STREAM_END)   /* hardware saw FEOB */
 			return Z_STREAM_END; /* nothing to do anymore */
 
-		if (strm->avail_in == 0)
-			return Z_BUF_ERROR;
+		/*
+		 * NOTE: strm->avail_in can be 0 but some bytes might
+		 *       still be in the scratch buffer. This causes
+		 *       one of our test-cases to fail. So the criteria
+		 *       when to return Z_BUF_ERROR is currently wrong.
+		 *       Therefore disabling Z_BUF_ERROR return here.
+		 *       This causes a small deviation from what software zlib
+		 *       does in situations when there is no input data
+		 *       available.
+		 */
+		/* if (strm->avail_in == 0)
+		 *        return Z_BUF_ERROR;
+		 */
 	}
 
 	do {
