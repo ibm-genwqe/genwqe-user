@@ -55,18 +55,18 @@
  * @brief	estimate the amount of bytes consumed
  *		solely from the input stream
  */
-static int inp_proc_check(zedc_streamp strm, struct zedc_asv_infl *asv)
+static uint32_t inp_proc_update(uint32_t inp_processed, uint32_t proc_bits,
+				uint32_t pre_scratch_bits)
 {
-	uint64_t in_total;
+	uint64_t in_total;	/* Bits total */
 
 	/* total amount of bits consumed by decompressor */
-	in_total  = (uint64_t)strm->inp_processed * 8;
-	in_total += (uint64_t)asv->proc_bits;
+	in_total  = (uint64_t)inp_processed * 8;
+	in_total += (uint64_t)proc_bits;
+	in_total -= (uint64_t)pre_scratch_bits;
+	in_total = (in_total + 7ULL) / 8ULL;
 
-	/* total amount of bytes consumed from input stream */
-	strm->in_data_used = (uint32_t)(in_total -
-				strm->pre_scratch_bits + 7ULL) / 8ULL;
-	return ZEDC_OK;
+	return (uint32_t)in_total; /* Return number of bytes consumed */
 }
 
 static void extract_new_tree(zedc_streamp strm)
@@ -111,14 +111,13 @@ static void extract_new_tree(zedc_streamp strm)
 			cnt = 0;
 	}
 
-	while (cnt--) {
+	/* NOTE: This is the same as in scratch_update() */
+	if (cnt) {
 		if (src_offs >= 0)
-			src = strm->next_in + src_offs;
-		else
-			src = strm->wsp->tree + strm->in_hdr_scratch_len +
-						src_offs;
-		*target++ = *src;
-		src_offs++;
+			src = (uint8_t*)strm->next_in;
+		else	src = strm->wsp->tree + strm->in_hdr_scratch_len;
+		src += src_offs;
+		memmove(target, src, cnt);
 	}
 
 	strm->tree_bits = strm->out_hdr_bits;
@@ -176,14 +175,13 @@ static void scratch_update(zedc_streamp strm)
 	strm->scratch_bits = cnt * 8 - (scratch_offs % 8);
 	strm->scratch_ib = scratch_offs % 8;
 
-	while (cnt--) {
-		if (src_offs < 0)
-			src = strm->wsp->tree +
-			      strm->in_hdr_scratch_len + src_offs;
-		else
-			src = strm->next_in + src_offs;
-		*target++ = *src;
-		src_offs++;
+	/* NOTE: This is the same as in extract_new_tree() */
+	if (cnt) {
+		if (src_offs >= 0)
+			src = strm->next_in;
+		else	src = strm->wsp->tree + strm->in_hdr_scratch_len;
+		src += src_offs;
+		memmove(target, src, cnt);
 	}
 }
 
@@ -198,7 +196,7 @@ static void scratch_update(zedc_streamp strm)
  * TREE + SCRATCH + INPUT_STREAM Copy header to start of tree area in
  * workspace.
  */
-static int setup_tree(zedc_streamp strm)
+static void setup_tree(zedc_streamp strm)
 {
 	uint64_t hdr_start_total_bits;
 
@@ -206,19 +204,19 @@ static int setup_tree(zedc_streamp strm)
 	 * If End-Of-Block has been passed or reached, all tree
 	 * parameters are obsolete, a new tree is expected.
 	 */
-	if (strm->infl_stat & 0x01) {
+	if (strm->infl_stat & INFL_STAT_PASSED_EOB) {
 		strm->tree_bits    = 0;
 		strm->pad_bits     = 0;
 		strm->hdr_ib       = 0;
-		if (strm->infl_stat & 0x08) {  /* exactly on eob */
+		if (strm->infl_stat & INFL_STAT_REACHED_EOB) { /* on eob */
 		     strm->out_hdr_bits = 0;
 		     strm->out_hdr_start_bits = 0;	/* got from DDCB */
 		}
-		if (strm->infl_stat & 0x04) {
+		if (strm->infl_stat & INFL_STAT_FINAL_EOB) {
 			strm->inp_data_offs = strm->in_data_used;
 			strm->scratch_bits = 0;
 			strm->eob_seen = 1;	/* final EOB seen */
-			return ZEDC_OK;
+			return;
 		}
 	}
 
@@ -237,7 +235,6 @@ static int setup_tree(zedc_streamp strm)
 		extract_new_tree(strm);
 	}
 	scratch_update(strm);
-	return ZEDC_OK;
 }
 
 /**
@@ -252,46 +249,38 @@ static int setup_tree(zedc_streamp strm)
  * @param strm	inflate job context
  * @param asv	pointer to ASV part of DDCB
  */
-static int post_scratch_upd(zedc_streamp strm, struct zedc_asv_infl *asv)
+static int post_scratch_upd(zedc_streamp strm)
 {
 	const uint8_t *src;
 	uint8_t *target;
-	uint16_t len, nlen;
-	unsigned i, count;
-	int rc;
+	uint16_t len;
+	uint64_t count;
 	zedc_handle_t zedc = (zedc_handle_t)strm->device;
 
 	/* anything processed ? */
 	if (strm->inp_processed || strm->proc_bits) {
-		rc = inp_proc_check(strm, asv);
-		if (rc)
-			return rc;
-		rc = setup_tree(strm);
-		if (rc)
-			return rc;
+		count = inp_proc_update(strm->inp_processed,
+					strm->proc_bits,
+					strm->pre_scratch_bits);
+		strm->in_data_used = count;
+		setup_tree(strm);
 	}
 
 	/* if no input data processed copy input-data to tree area */
 	if ((strm->inp_processed == 0) && (strm->proc_bits == 0)) {
 		/* Special CASE: empty Input */
-		target = strm->wsp->tree + strm->in_hdr_scratch_len;
-		src = strm->next_in;
-
-		i = strm->avail_in; /* rest bytes */
-		if (i > (ZEDC_TREE_LEN - strm->in_hdr_scratch_len)) {
+		if (strm->avail_in > (ZEDC_TREE_LEN - strm->in_hdr_scratch_len)) {
 
 			pr_err("scratch buffer too small\n");
 			zedc->zedc_rc = ZEDC_ERR_TREE_OVERRUN;
 			return zedc->zedc_rc;
 		}
-		if (i) {
-			count = i;
-			while (count != 0ULL) {
-				*target++ = *src++;
-				count--;
-			}
-			strm->inp_data_offs += i;
-			strm->scratch_bits  += i * 8;
+		if (strm->avail_in) {
+			target = strm->wsp->tree + strm->in_hdr_scratch_len;
+			src = (uint8_t *)strm->next_in;
+			memcpy(target, src, strm->avail_in);
+			strm->inp_data_offs += strm->avail_in;
+			strm->scratch_bits  += strm->avail_in * 8;
 		}
 	}
 
@@ -302,19 +291,20 @@ static int post_scratch_upd(zedc_streamp strm, struct zedc_asv_infl *asv)
 	 * boundary. OUT_HDR_BITS will always be 40 header type must
 	 * be checked (HW 243728).
 	 */
-	if ((strm->copyblock_len) && ((strm->infl_stat & 0x60) == 0) &&
-					(strm->out_hdr_bits != 0)) {
+	if ((strm->copyblock_len) &&
+	    ((strm->infl_stat & INFL_STAT_HDR_TYPE) == 0) &&
+	    (strm->out_hdr_bits != 0)) {
 
 		target = strm->wsp->tree;
 
 		len  = strm->copyblock_len;
-		nlen = ~len;
-		if (strm->infl_stat & 0x80)	/* was final block ? */
+		if (strm->infl_stat & INFL_STAT_HDR_BFINAL) /* final block? */
 			target[0] = 0x01;	/* restore final block */
 		else
 			target[0] = 0x00;
+
 		*(uint16_t *)(target + 1) = __cpu_to_le16(len);
-		*(uint16_t *)(target + 3) = __cpu_to_le16(nlen);
+		*(uint16_t *)(target + 3) = __cpu_to_le16(~len);
 		*(uint16_t *)(target + 5) = 0xaaaa;	/* dummy */
 
 		strm->hdr_ib    = 0;
@@ -790,15 +780,15 @@ static void get_inflate_asv(struct zedc_stream_s *strm,
 	 * Invert condition. Condition means hw processed some data.
 	 * If hardware was unable to process data, we need more input!
 	 */
-	if (asv->inp_processed != 0 || asv->proc_bits != 0) {
+	if ((asv->inp_processed != 0) || (asv->proc_bits != 0)) {
 		strm->out_hdr_bits = __be16_to_cpu(asv->out_hdr_bits);
 		strm->hdr_start = __be32_to_cpu(asv->hdr_start);
 		strm->out_hdr_start_bits = asv->hdr_start_bits;
 	}
 
 	strm->copyblock_len = __be16_to_cpu(asv->copyblock_len);
-	strm->crc32	    = __be32_to_cpu(asv->out_crc32);
-	strm->adler32       = __be32_to_cpu(asv->out_adler32);
+	strm->crc32 = __be32_to_cpu(asv->out_crc32);
+	strm->adler32 = __be32_to_cpu(asv->out_adler32);
 
 	/* prepare dictionary for next call */
 	strm->dict_len = __be16_to_cpu(asv->out_dict_used);
@@ -808,7 +798,7 @@ static void get_inflate_asv(struct zedc_stream_s *strm,
 	strm->proc_bits = asv->proc_bits;
 
 	/* store values needed for next call */
-	strm->obytes_in_dict	= __be16_to_cpu(asv->obytes_in_dict);
+	strm->obytes_in_dict = __be16_to_cpu(asv->obytes_in_dict);
 	strm->infl_stat	= asv->infl_stat;
 }
 /**
@@ -1015,7 +1005,7 @@ int zedc_inflate(zedc_streamp strm, int flush)
 	}
 
 	/* Did we reach End-Of-Final-Block (or seen it before) ? */
-	if (strm->infl_stat & 0x04)
+	if (strm->infl_stat & INFL_STAT_FINAL_EOB)
 		strm->eob_seen = 1; /* final EOB seen */
 
 	if (strm->eob_seen) {
@@ -1181,7 +1171,7 @@ int zedc_inflate(zedc_streamp strm, int flush)
 	}
 
 	get_inflate_asv(strm, asv);
-	rc = post_scratch_upd(strm, asv);
+	rc = post_scratch_upd(strm);
 	if (rc < 0) {
 		pr_err("inflate scratch update failed rc=%d\n", rc);
 		return ZEDC_STREAM_ERROR;
@@ -1224,7 +1214,7 @@ int zedc_inflate(zedc_streamp strm, int flush)
 	zrc = ZEDC_OK;		/* preset 0 */
 
 	/* Did we reach End-Of-Final-Block (or seen it before) ? */
-	if (strm->infl_stat & 0x04)
+	if (strm->infl_stat & INFL_STAT_FINAL_EOB)
 		strm->eob_seen = 1; /* final EOB seen */
 
 	if (strm->eob_seen) {
@@ -1251,7 +1241,8 @@ int zedc_inflate(zedc_streamp strm, int flush)
 
  chk_ret:
 	/* End of final block and no dict data to copy */
-	if ((strm->infl_stat & 0x04) && (strm->obytes_in_dict == 0))
+	if ((strm->infl_stat & INFL_STAT_FINAL_EOB) &&
+	    (strm->obytes_in_dict == 0))
 		return ZEDC_STREAM_END;	/* done */
 
 	return ZEDC_OK;			/* must re-enter */

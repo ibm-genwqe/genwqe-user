@@ -536,18 +536,18 @@ static int h_read_ibuf(z_streamp strm)
 /**
  * Flush available output bytes
  */
-static int h_flush_obuf(z_streamp strm)
+static void h_flush_obuf(z_streamp strm)
 {
 	int tocopy;
 	unsigned int obuf_bytes;
 	struct hw_state *s = (struct hw_state *)strm->state;
 
 	if (strm->avail_out == 0)		/* no output space available */
-		return 0;
+		return;
 
 	obuf_bytes = s->obuf - s->obuf_next;    /* remaining bytes in obuf */
 	if (obuf_bytes == 0)			/* give out what is there */
-		return 0;
+		return;
 
 	tocopy = MIN(strm->avail_out, obuf_bytes);
 
@@ -560,8 +560,6 @@ static int h_flush_obuf(z_streamp strm)
 	strm->avail_out -= tocopy;
 	strm->next_out += tocopy;
 	strm->total_out += tocopy;
-
-	return tocopy;
 }
 
 /**
@@ -1298,8 +1296,19 @@ int h_inflate(z_streamp strm, int flush)
 		if (s->rc == Z_STREAM_END)   /* hardware saw FEOB */
 			return Z_STREAM_END; /* nothing to do anymore */
 
-		if (strm->avail_in == 0)
-			return Z_BUF_ERROR;
+		/*
+		 * NOTE: strm->avail_in can be 0 but some bytes might
+		 *       still be in the scratch buffer. This causes
+		 *       one of our test-cases to fail. So the criteria
+		 *       when to return Z_BUF_ERROR is currently wrong.
+		 *       Therefore disabling Z_BUF_ERROR return here.
+		 *       This causes a small deviation from what software zlib
+		 *       does in situations when there is no input data
+		 *       available.
+		 */
+		/* if (strm->avail_in == 0)
+		 *        return Z_BUF_ERROR;
+		 */
 	}
 
 	do {
@@ -1338,6 +1347,10 @@ int h_inflate(z_streamp strm, int flush)
 			pr_err("[%p] obuf should be empty here!\n", strm);
 			return Z_DATA_ERROR;
 		}
+
+		/* do not send 0 data to HW */
+		if ((0 == strm->avail_in) && (Z_NO_FLUSH == flush))
+			return Z_OK;
 
 		/*
 		 * Here we start the hardware to do the decompression

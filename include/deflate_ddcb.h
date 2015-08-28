@@ -134,6 +134,17 @@ struct zedc_asiv_infl {
 	uint64_t rsvd_3;			/**< 0x78 reserved */
 } __attribute__((__packed__)) __attribute__((__may_alias__));
 
+#define INFL_STAT_PASSED_EOB	0x01
+#define INFL_STAT_RESERVED1	0x02
+#define INFL_STAT_FINAL_EOB	0x04
+#define INFL_STAT_REACHED_EOB	0x08
+#define INFL_STAT_RESERVED2	0x10
+#define INFL_STAT_HDR_TYPE1	0x20	/* Bit 5, see spec */
+#define INFL_STAT_HDR_TYPE2	0x40	/* Bit 6, see spec */
+#define INFL_STAT_HDR_TYPE	(INFL_STAT_HDR_TYPE1 | INFL_STAT_HDR_TYPE2)
+#define INFL_STAT_HDR_BFINAL	0x80
+
+
 /* DDCB range: 0x80 ... 0xbf */
 struct zedc_asv_infl {
 	uint16_t out_dict_used;			/**> 0x80  */
