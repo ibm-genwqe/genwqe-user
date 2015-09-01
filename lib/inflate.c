@@ -112,6 +112,20 @@ static void extract_new_tree(zedc_streamp strm)
 	}
 
 	/* NOTE: This is the same as in scratch_update() */
+	/* copy abs(src_offs) bytes behind the tree ... */
+	if (cnt > 0 && src_offs < 0) {
+		src = strm->wsp->tree + strm->in_hdr_scratch_len + src_offs;
+		memmove(target, src, abs(src_offs));
+		target += abs(src_offs);
+		cnt -= abs(src_offs);
+		src_offs = 0;
+	}
+	/* copy remaining cnt bytes ... */
+	if (cnt) {
+		src = strm->next_in + src_offs;
+		memmove(target, src, cnt);
+	}
+
 	if (cnt) {
 		if (src_offs >= 0)
 			src = (uint8_t*)strm->next_in;
@@ -176,11 +190,17 @@ static void scratch_update(zedc_streamp strm)
 	strm->scratch_ib = scratch_offs % 8;
 
 	/* NOTE: This is the same as in extract_new_tree() */
+	/* copy abs(src_offs) bytes behind the tree ... */
+	if (cnt > 0 && src_offs < 0) {
+		src = strm->wsp->tree + strm->in_hdr_scratch_len + src_offs;
+		memmove(target, src, abs(src_offs));
+		target += abs(src_offs);
+		cnt -= abs(src_offs);
+		src_offs = 0;
+	}
+	/* copy remaining cnt bytes ... */
 	if (cnt) {
-		if (src_offs >= 0)
-			src = strm->next_in;
-		else	src = strm->wsp->tree + strm->in_hdr_scratch_len;
-		src += src_offs;
+		src = strm->next_in + src_offs;
 		memmove(target, src, cnt);
 	}
 }
