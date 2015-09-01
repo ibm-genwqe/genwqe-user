@@ -126,14 +126,6 @@ static void extract_new_tree(zedc_streamp strm)
 		memmove(target, src, cnt);
 	}
 
-	if (cnt) {
-		if (src_offs >= 0)
-			src = (uint8_t*)strm->next_in;
-		else	src = strm->wsp->tree + strm->in_hdr_scratch_len;
-		src += src_offs;
-		memmove(target, src, cnt);
-	}
-
 	strm->tree_bits = strm->out_hdr_bits;
 
 	/* padding bits derived from actual tree */
