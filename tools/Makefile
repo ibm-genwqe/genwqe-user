@@ -60,7 +60,7 @@ $(libs):
 
 ### Generic rule to build a tool
 %: %.o
-	$(CC) $@.o $($(@)_objs) $($(@)_libs) $(LDLIBS) -o $@
+	$(CC) $(LDFLAGS) $@.o $($(@)_objs) $($(@)_libs) $(LDLIBS) -o $@
 
 %.o: %.c $(libs)
 	$(CC) -c $(CPPFLAGS) $(CFLAGS) $< -o $@
