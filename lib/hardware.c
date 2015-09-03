@@ -1023,7 +1023,7 @@ static inline int __inflate(z_streamp strm, struct hw_state *s, int flush)
  * on. Software uses just the latter.
  */
 
-//#define CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END
+#define CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END
 
 enum stream_state {
 	READ_HDR,
@@ -1243,7 +1243,17 @@ static inline int __check_stream_end(z_streamp strm)
 		}
 	}
  sync_avail_in:
-	offs = e.idx - e.in_hdr_scratch_len;
+	/*
+	 * e.idx:                  number of bytes which were analyzed
+	 * e.in_hdr_scratch_len:   bytes taken from scratch buffer
+	 */
+	if (e.idx <= e.in_hdr_scratch_len)
+		offs = 0;       /* no avail_in adjustment needed */
+	else			/* do not consider bytes from scratch area */
+		offs = e.idx - e.in_hdr_scratch_len;
+
+	hw_trace("    e.idx=%d e.in_hdr_scratch_len=%d offs=%d\n",
+		 e.idx, e.in_hdr_scratch_len, offs);
 	strm->avail_in -= offs;
 	strm->next_in += offs;
  go_home:
@@ -1339,6 +1349,11 @@ int h_inflate(z_streamp strm, int flush)
 			 *	__in_hdr_scratch_len(h), h->proc_bits);
 			 */
 			rc = __check_stream_end(strm);
+
+			hw_trace("[%p]            flush=%d %s avail_in=%d "
+				 "avail_out=%d\n", strm, flush,
+				 flush_to_str(flush),
+				 strm->avail_in, strm->avail_out);
 #endif
 			return rc;
 		}
@@ -1425,6 +1440,10 @@ int h_inflate(z_streamp strm, int flush)
 
 		loops++;
 	} while (strm->avail_in != 0); /* strm->avail_out == 0 handled above */
+
+	hw_trace("[%p]            flush=%d %s avail_in=%d avail_out=%d\n",
+		 strm, flush, flush_to_str(flush), strm->avail_in,
+		 strm->avail_out);
 
 	return rc_zedc_to_libz(rc);
 }
