@@ -21,7 +21,7 @@ libversion = $(shell git describe --abbrev=4 --dirty --always --tags)
 zlibver=1.2.8
 
 CFLAGS += -fPIC -I. -I/opt/genwqe/include -fno-strict-aliasing \
-	-DCONFIG_ZLIB_PATH=\"/lib64/libz.so\"
+	-DCONFIG_ZLIB_PATH=\"/opt/genwqe/lib/libz.so\"
 
 LDFLAGS += -L/opt/genwqe/lib
 
