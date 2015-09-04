@@ -422,33 +422,38 @@ void zedc_sw_init(void)
 	char *error;
 	const char *zlib_path = getenv("ZLIB_PATH");
 
-	if (zlib_path == NULL)
-		zlib_path = CONFIG_ZLIB_PATH;
-
-	sw_trace("Try loading software zlib %s\n", zlib_path);
-
-	dlerror();
-	handle = dlopen(zlib_path, RTLD_LAZY);
-	if (!handle) {
-		zlib_path = "libz.so";
-		sw_trace("%s\n"
-			 "Try loading software zlib %s\n",
-			 dlerror(), zlib_path);
-
+	/* user has setup environment variable to find libz.so */
+	if (zlib_path != NULL) {
+		sw_trace("Try loading software zlib \"%s\"\n", zlib_path);
 		dlerror();
 		handle = dlopen(zlib_path, RTLD_LAZY);
-		if (!handle) {
-			pr_err("%s\n", dlerror());
-			return;
-		}
+		if (handle != NULL)
+			goto load_syms;
 	}
 
+	/* try loading private zlib.so in /opt/genwqe/lib */
+	sw_trace("Try loading software zlib \"%s\"\n", CONFIG_ZLIB_PATH);
+	dlerror();
+	handle = dlopen(CONFIG_ZLIB_PATH, RTLD_LAZY);
+	if (handle != NULL)
+		goto load_syms;
+
+	/* try loading system zlib.so */
+	sw_trace("Try loading system software zlib \"libz.so\"\n");
+	dlerror();
+	handle = dlopen("libz.so", RTLD_LAZY);
+	if (handle == NULL) {
+		pr_err("  %s\n", dlerror());
+		return;
+	}
+
+load_syms:
 	register_sym(zlibVersion);
-	sw_trace("  ZLIB_VERSION %s\n", ZLIB_VERSION);
-	sw_trace("  zlibVersion  %s\n", z_zlibVersion());
+	sw_trace("  ZLIB_VERSION %s (header version)\n", ZLIB_VERSION);
+	sw_trace("  zlibVersion  %s (libz.so version)\n", z_zlibVersion());
 
 	if (strcmp(ZLIB_VERSION, z_zlibVersion()) != 0) {
-		pr_err("Software zlib %s and header %s do not match!\n",
+		pr_err("libz.so %s and zlib.h %s do not match!\n",
 		       z_zlibVersion(), ZLIB_VERSION);
 		return;
 	}

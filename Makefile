@@ -60,9 +60,9 @@ rpmbuild_setup:
 	$(RM) ~/.rpmmacros
 	echo '%_topdir %(echo $$HOME)/rpmbuild' >  ~/.rpmmacros
 
-rpmbuild: genwqe-tools genwqe-libz
+rpmbuild: genwqe-tools genwqe-libz genwqe-vpd
 
-genwqe-tools genwqe-libz:
+genwqe-tools genwqe-libz genwqe-vpd:
 	@$(MAKE) -s distclean
 	@$(RM) -r /tmp/$@-$(rpmversion) /tmp/$@-$(rpmversion).tgz  \
 		~/rpmbuild/SOURCES/${@}* ~/rpmbuild/BUILD/${@}* \
