@@ -26,20 +26,23 @@ endif
 
 LDLIBS += $(libs) -lpthread -lrt
 
-genwqe_memcopy_objs = force_cpu.o
 genwqe_peek_objs = force_cpu.o
 genwqe_poke_objs = force_cpu.o
+genwqe_memcopy_objs = force_cpu.o
+genwqe_cksum_objs = force_cpu.o
 genwqe_echo_objs = force_cpu.o
 genwqe_vpdupdate_objs = genwqe_vpd_common.o
 genwqe_vpdconv_objs = genwqe_vpd_common.o
 
 genwqe_memcopy_libs = -lz
+genwqe_cksum_libs = -lz
 genwqe_gzip_libs = ../lib/libzADC.a -ldl
 genwqe_gunzip_libs = ../lib/libzADC.a -ldl
 zlib_mt_perf_libs = ../lib/libzADC.a -ldl
 
 projs = genwqe_update genwqe_gzip genwqe_gunzip zlib_mt_perf genwqe_memcopy \
-	genwqe_echo genwqe_peek genwqe_poke
+	genwqe_echo genwqe_peek genwqe_poke genwqe_cksum \
+	genwqe_vpdconv genwqe_vpdupdate csv2bin
 
 objs = force_cpu.o genwqe_vpd_common.o $(projs:=.o)
 
@@ -82,6 +85,10 @@ install_gzip_tools: all
 	cp zlib_mt_perf $(instdir)/bin/genwqe/
 	cp zlib_mt_perf.sh $(instdir)/bin/genwqe/
 
+install_vpd_tools: all
+	@mkdir -p $(instdir)/bin
+	cp -uv genwqe_vpdconv genwqe_vpdupdate csv2bin $(instdir)/bin
+
 uninstall_gzip_tools:
 	$(RM) -r $(instdir)/bin/genwqe
 
@@ -92,6 +99,10 @@ install_manpages: $(manpages)
 install_release_manpages: $(manpages)
 	@mkdir -p $(instdir)/man/man1
 	cp -uv genwqe_memcopy.1 genwqe_echo.1 genwqe_update.1 $(instdir)/man/man1
+
+install_vpd_manpages: $(manpages)
+	@mkdir -p $(instdir)/man/man1
+	cp -uv genwqe_vpdconv.1 genwqe_vpdupdate.1 csv2bin.1 $(instdir)/man/man1
 
 uninstall_manpages:
 	@for f in $(manpages) ; do				\

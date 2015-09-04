@@ -1,0 +1,12 @@
+// Example VPD for GenWQE PCIe card
+"RV",2,"X",102," VPD Revision Fied",,,
+"PN",7,"A","0ABCDE"," Card Part Number",,,
+"EC",7,"A","D77TBDX"," Card EC",,,
+"FN",7,"A","00ABCDE"," FRU Part Number",,,
+"SN",13,"A","0000Coxxx1111"," Serial Number",,,
+"FC",5,"A","FCTBD"," Feature Code",,,
+"CC",4,"A","CCIN"," IBM CCIN",,,
+"M0",6,"X","D1B2C3E4F5F6"," MAC 0",,,
+"M1",6,"X","A1A2A3A4A5A6"," This is MAC 1 Address",,,
+"CS",4,"X",7abc8b0e," Check Sum","more "," more "," more test"
+"// END of VPD",101,,,,,,
