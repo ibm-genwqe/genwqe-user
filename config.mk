@@ -21,7 +21,6 @@
 #
 V		?= 1
 CC		= $(CROSS)gcc
-CXX		= $(CROSS)g++
 AS		= $(CROSS)as
 LD		= $(CROSS)ld
 AR		= $(CROSS)ar
@@ -42,7 +41,6 @@ ifeq ($(V),1)
 MAKEFLAGS	+= --silent
 MAKE		+= -s
 CC		= printf "\t[CC]\t%s\n" `basename "$@"`; $(CROSS)gcc
-CXX		= printf "\t[CXX]\t%s\n" `basename "$@"`; $(CROSS)g++
 AS		= printf "\t[AS]\t%s\n" `basename "$@"`; $(CROSS)as
 LD		= printf "\t[LD]\t%s\n" `basename "$@"`; $(CROSS)ld
 else
@@ -57,9 +55,6 @@ CFLAGS = -W -Wall -Werror -Wwrite-strings -Wextra -Os -g \
 	-I../include -I../include/linux/uapi \
 	-Wmissing-prototypes # -Wstrict-prototypes -Warray-bounds
 
-CXXFLAGS = -Os -g -Wall -Werror -pipe -fno-rtti -fno-exceptions \
-	-DGIT_VERSION=\"$(GIT_VERSION)\"
-
 # Force 32-bit build
 #   This is needed to generate the code for special environments. We have
 #   some 64-bit machines where we need to support binaries compiled for
@@ -72,17 +67,41 @@ ifeq ($(PLATFORM),x86_64)
 FORCE_32BIT     ?= 0
 ifeq ($(FORCE_32BIT),1)
 CFLAGS += -m32
-CXXFLAGS += -m32
 LDFLAGS += -m32
 XLDFLAGS = -melf_i386
 ARFLAGS =
 else
 CFLAGS += -m64
-CXXFLAGS += -m64
 LDFLAGS += -m64
 XLDFLAGS = -melf_x86_64
 ARFLAGS =
 endif
 else
 ARFLAGS =
+endif
+
+# Libcxl is required to run the CAPI version of this code. Libcxl is
+# available for normal CAPI/PCIe device usage, but also as simulation
+# version, which connects to the pslse server, which talks to the
+# hardware simulator.
+#
+# Enabling BUILD_SIMCODE=1 enables simulation version which builds and
+# links against the pslse version of libcxl.
+#
+
+ifeq ($(PLATFORM),ppc64le)              # Enable libcxl by default
+CONFIG_LIBCXL_PATH ?= ../../libcxl
+endif
+
+BUILD_SIMCODE ?= 0
+
+ifeq ($(BUILD_SIMCODE),1)               # Use simulation version of libcxl
+CONFIG_LIBCXL_PATH = ../../pslse/libcxl
+CFLAGS += -DCONFIG_BUILD_SIMCODE
+endif
+
+ifneq ($(CONFIG_LIBCXL_PATH),)          # Use libcxl
+CFLAGS += -I$(CONFIG_LIBCXL_PATH) -I$(CONFIG_LIBCXL_PATH)/include
+LDFLAGS += -L$(CONFIG_LIBCXL_PATH)
+libcxl_a = $(CONFIG_LIBCXL_PATH)/libcxl.a
 endif

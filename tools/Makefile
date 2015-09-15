@@ -17,14 +17,8 @@
 include ../config.mk
 
 instdir ?= /opt/genwqe
-
-libs = ../lib/libDDCB.a ../lib/libzHW.a ../lib/libcard.a
-
-ifeq ($(PLATFORM),ppc64le)
-	libs += ../../libcxl/libcxl.a
-endif
-
-LDLIBS += $(libs) -lpthread -lrt
+libs = ../lib/libDDCB.a ../lib/libzHW.a ../lib/libcard.a $(libcxl_a) # static
+LDLIBS += $(libs) -lpthread -lrt                                     # dynamic
 
 genwqe_peek_objs = force_cpu.o
 genwqe_poke_objs = force_cpu.o

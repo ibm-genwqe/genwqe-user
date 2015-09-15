@@ -46,9 +46,8 @@ objs1 = $(src1:.c=.o)
 ###libDDCB
 src2 += libddcb.c ddcb_card.c
 
-ifeq ($(PLATFORM),ppc64le)
-	CFLAGS += -I../../libcxl
-	src2 += ddcb_capi.c
+ifneq ($(CONFIG_LIBCXL_PATH),)
+src2 += ddcb_capi.c
 endif
 
 libname2 = libDDCB
@@ -57,7 +56,23 @@ objs2 = $(src2:.c=.o)
 
 projs += $(proj0) $(proj1) $(proj2)
 
-all: $(projs)
+all: ..check_libcxl $(projs)
+
+.PHONY: ..check_libcxl
+..check_libcxl:
+ifneq ($(CONFIG_LIBCXL_PATH),)
+	@printf "\t[INFO]\tUsing $(libcxl_a).\n"
+	@if [ ! -f $(libcxl_a) ]; then 					\
+	  printf  "\t[ERROR]\t$(libcxl_a) not found!\n"; 		\
+	  echo;								\
+	  echo "  Please clone libcxl git before continuing. E.g.:";	\
+	  echo "    git clone https://github.com/ibm-capi/libcxl";	\
+	  echo;                                                         \
+	  exit 1; \
+	fi
+else
+	# @printf "\t[INFO]\tNot using libcxl.a.\n"
+endif
 
 ### libzHW
 __$(libname0).o: $(objs0)
