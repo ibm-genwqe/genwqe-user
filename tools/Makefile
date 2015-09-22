@@ -78,12 +78,14 @@ install_gzip_tools: all
 	cp genwqe_gzip $(instdir)/bin/genwqe/gunzip
 	cp zlib_mt_perf $(instdir)/bin/genwqe/
 	cp zlib_mt_perf.sh $(instdir)/bin/genwqe/
+	cp zlib_test_gz.sh $(instdir)/bin/genwqe/
 
 uninstall_gzip_tools:
 	$(RM) $(instdir)/bin/genwqe/gzip		\
 	      $(instdir)/bin/genwqe/gunzip		\
 	      $(instdir)/bin/genwqe/zlib_mt_perf	\
-	      $(instdir)/bin/genwqe/zlib_mt_perf.sh
+	      $(instdir)/bin/genwqe/zlib_mt_perf.sh	\
+	      $(instdir)/bin/genwqe/zlib_test_gz.sh
 
 install_vpd_tools: all
 	@mkdir -p $(instdir)/bin
