@@ -42,7 +42,7 @@ objs = force_cpu.o genwqe_vpd_common.o $(projs:=.o)
 
 manpages = $(projs:=.1)
 
-all:  $(libs) $(objs) $(projs)
+all: $(libs) $(objs) $(projs)
 
 manpages: all $(manpages)
 
@@ -53,7 +53,7 @@ $(libs):
 	$(MAKE) -C ../lib
 
 ### Deactivate existing implicit rule
-% : %.c
+%: %.c
 
 ### Generic rule to build a tool
 %: %.o
@@ -79,12 +79,16 @@ install_gzip_tools: all
 	cp zlib_mt_perf $(instdir)/bin/genwqe/
 	cp zlib_mt_perf.sh $(instdir)/bin/genwqe/
 
+uninstall_gzip_tools:
+	$(RM) $(instdir)/bin/genwqe/gzip		\
+	      $(instdir)/bin/genwqe/gunzip		\
+	      $(instdir)/bin/genwqe/zlib_mt_perf	\
+	      $(instdir)/bin/genwqe/zlib_mt_perf.sh
+
 install_vpd_tools: all
 	@mkdir -p $(instdir)/bin
-	cp -uv genwqe_vpdconv genwqe_vpdupdate csv2bin $(instdir)/bin
-
-uninstall_gzip_tools:
-	$(RM) -r $(instdir)/bin/genwqe
+	cp -uv genwqe_vpdconv genwqe_vpdupdate csv2bin \
+		$(instdir)/bin
 
 install_manpages: $(manpages)
 	@mkdir -p $(instdir)/man/man1
@@ -92,11 +96,13 @@ install_manpages: $(manpages)
 
 install_release_manpages: $(manpages)
 	@mkdir -p $(instdir)/man/man1
-	cp -uv genwqe_memcopy.1 genwqe_echo.1 genwqe_update.1 $(instdir)/man/man1
+	cp -uv genwqe_memcopy.1 genwqe_echo.1 genwqe_update.1 \
+		$(instdir)/man/man1
 
 install_vpd_manpages: $(manpages)
 	@mkdir -p $(instdir)/man/man1
-	cp -uv genwqe_vpdconv.1 genwqe_vpdupdate.1 csv2bin.1 $(instdir)/man/man1
+	cp -uv genwqe_vpdconv.1 genwqe_vpdupdate.1 csv2bin.1 \
+		$(instdir)/man/man1
 
 uninstall_manpages:
 	@for f in $(manpages) ; do				\
@@ -104,11 +110,11 @@ uninstall_manpages:
 		$(RM) $(instdir)/man/man1/$$f;			\
 	done
 
-install: $(projs)
+install: all install_gzip_tools install_manpages
 	@mkdir -p $(instdir)/bin
 	cp -uv $(projs) $(instdir)/bin
 
-uninstall:
+uninstall: uninstall_gzip_tools uninstall_manpages
 	@for f in $(projs) ; do					\
 		echo "removing $(instdir)/bin/$$f ...";		\
 		$(RM) $(instdir)/bin/$$f;			\
