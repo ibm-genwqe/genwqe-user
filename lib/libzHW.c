@@ -55,7 +55,6 @@ static struct err_lookup zedc_errlist[] = {
 	{ ZEDC_MEM_ERROR, "out of memory" },
 	{ ZEDC_BUF_ERROR, "no progress is possible (for example avail_in or "
 				"avail_out was zero)" },
-	{ ZEDC_VERSION_ERROR, "libzedc/zlib version mismatch" },
 	{ ZEDC_ERR_CARD, "problem with the accelerator card detected, please "
 				"see errno, carderr and returned data" },
 	{ ZEDC_ERR_INVAL, "invalid parameter" },
@@ -77,7 +76,7 @@ static int zedc_nerr = ARRAY_SIZE(zedc_errlist);
 
 const char *zedc_Version(void)
 {
-	return ZEDC_VERSION;
+	return GIT_VERSION;
 }
 
 int zedc_clearerr(zedc_handle_t zedc)

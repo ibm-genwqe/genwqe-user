@@ -51,13 +51,32 @@
 #include <libcxl.h>
 #include <memcopy_ddcb.h>
 
-#define MMIO_IMP_VERSION_REG 0x3F00000ull
-#define MMIO_APP_VERSION_REG 0x3F00008ull
-#define MMIO_DDCBQ_START_REG 0x3F00010ull
-#define MMIO_CONFIG_REG      0x3F00018ull
-#define MMIO_CONTROL_REG     0x3F00020ull
-#define MMIO_STATUS_REG      0x3F00028ull
-#define MMIO_SCRATCH_REG     0x3FFFF98ull
+#define MMIO_IMP_VERSION_REG	0x0000000ull
+#define MMIO_APP_VERSION_REG	0x0000008ull
+#define MMIO_AFU_CONFIG_REG	0x0000010ull
+#define MMIO_AFU_STATUS_REG	0x0000018ull
+#define MMIO_AFU_COMMAND_REG	0x0000020ull
+#define MMIO_FRT_REG		0x0000080ull
+
+#define MMIO_DDCBQ_START_REG	0x0000100ull
+#define MMIO_DDCBQ_CONFIG_REG	0x0000108ull
+#define MMIO_DDCBQ_COMMAND_REG	0x0000110ull
+#define MMIO_DDCBQ_STATUS_REG	0x0000118ull
+#define MMIO_DDCBQ_WT_REG	0x0000180ull
+
+#define MMIO_FIR_REGS_BASE	0x0001000ull	/* FIR: 1000...1028 */
+#define MMIO_FIR_REGS_NUM	6
+
+#define MMIO_ERRINJ_MMIO_REG	0x0001800ull
+#define MMIO_ERRINJ_GZIP_REG	0x0001808ull
+
+#define	MMIO_AGRV_REGS_BASE	0x0002000ull
+#define	MMIO_AGRV_REGS_NUM	16
+
+#define	MMIO_GZIP_REGS_BASE	0x0002100ull
+#define	MMIO_GZIP_REGS_NUM	16
+
+#define MMIO_DEBUG_REG		0x000FF00ull
 
 #define	NUM_DDCBS	16
 
@@ -83,11 +102,11 @@ enum waitq_status {DDCB_FREE, DDCB_IN, DDCB_OUT, DDCB_ERR};
 /* Thread wait Queue, allocate one entry per ddcb */
 struct  tx_waitq {
 	int	compl_code;		/* Completion Code */
-	enum	waitq_status status;
+	enum	waitq_status	status;
 	int	seqnum;
 	bool	wait_sem;
 	sem_t	sem;
-	struct	ddcb_cmd	*cmd;;
+	struct	ddcb_cmd	*cmd;
 };
 
 /**
@@ -247,7 +266,7 @@ static int __afu_open(struct dev_ctx *ctx)
 			     ctx->ddcb_num * sizeof(ddcb_t));
 	if (NULL == ctx->ddcb) {
 		rc = DDCB_ERR_ENOMEM;
-		goto err_afu_free_ddcb;
+		goto err_afu_free;
 	}
 	memset(ctx->ddcb, 0, ctx->ddcb_num * sizeof(ddcb_t));
 
@@ -255,13 +274,19 @@ static int __afu_open(struct dev_ctx *ctx)
 			    (__u64)(unsigned long)(void *)ctx->ddcb);
 	if (0 != rc) {
 		rc = DDCB_ERR_CARD;
-		goto err_free_ddcb;
+		goto err_afu_free;
 	}
 
 	if (cxl_mmio_map(ctx->afu_h, CXL_MMIO_BIG_ENDIAN) == -1) {
 		VERBOSE0("Error: Unable to map problem state registers");
 		rc = DDCB_ERR_CARD;
 		goto err_free_ddcb;
+	}
+
+	if (afu_clear_firs(ctx->afu_h) == false) {
+		VERBOSE0("Error: Unable clear Pending FIRs!\n");
+		rc = DDCB_ERR_CARD;
+		goto err_mmio_unmap;
 	}
 
 	/* | 63..48 | 47....32 | 31........24 | 23....16 | 15.....0 | */
@@ -289,6 +314,7 @@ static int __afu_open(struct dev_ctx *ctx)
 	cxl_mmio_unmap(ctx->afu_h);
  err_free_ddcb:
 	free(ctx->ddcb);
+ err_afu_free:
 	cxl_afu_free(ctx->afu_h);
 	return rc;
 }

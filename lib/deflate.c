@@ -248,9 +248,6 @@ int zedc_deflateInit2(zedc_streamp strm,
 	int rc;
 	zedc_handle_t zedc;
 
-	if (strcmp(zedc_Version(), ZEDC_VERSION) != 0)
-		return ZEDC_VERSION_ERROR;
-
 	if (!strm)
 		return ZEDC_STREAM_ERROR;
 
