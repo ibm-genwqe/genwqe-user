@@ -51,13 +51,32 @@
 #include <libcxl.h>
 #include <memcopy_ddcb.h>
 
-#define MMIO_IMP_VERSION_REG 0x3F00000ull
-#define MMIO_APP_VERSION_REG 0x3F00008ull
-#define MMIO_DDCBQ_START_REG 0x3F00010ull
-#define MMIO_CONFIG_REG      0x3F00018ull
-#define MMIO_CONTROL_REG     0x3F00020ull
-#define MMIO_STATUS_REG      0x3F00028ull
-#define MMIO_SCRATCH_REG     0x3FFFF98ull
+#define MMIO_IMP_VERSION_REG	0x0000000ull
+#define MMIO_APP_VERSION_REG	0x0000008ull
+#define MMIO_AFU_CONFIG_REG	0x0000010ull
+#define MMIO_AFU_STATUS_REG	0x0000018ull
+#define MMIO_AFU_COMMAND_REG	0x0000020ull
+#define MMIO_FRT_REG		0x0000080ull
+
+#define MMIO_DDCBQ_START_REG	0x0000100ull
+#define MMIO_DDCBQ_CONFIG_REG	0x0000108ull
+#define MMIO_DDCBQ_COMMAND_REG	0x0000110ull
+#define MMIO_DDCBQ_STATUS_REG	0x0000118ull
+#define MMIO_DDCBQ_WT_REG	0x0000180ull
+
+#define MMIO_FIR_REGS_BASE	0x0001000ull	/* FIR: 1000...1028 */
+#define MMIO_FIR_REGS_NUM	6
+
+#define MMIO_ERRINJ_MMIO_REG	0x0001800ull
+#define MMIO_ERRINJ_GZIP_REG	0x0001808ull
+
+#define	MMIO_AGRV_REGS_BASE	0x0002000ull
+#define	MMIO_AGRV_REGS_NUM	16
+
+#define	MMIO_GZIP_REGS_BASE	0x0002100ull
+#define	MMIO_GZIP_REGS_NUM	16
+
+#define MMIO_DEBUG_REG		0x000FF00ull
 
 #define	NUM_DDCBS	16
 
@@ -83,11 +102,11 @@ enum waitq_status {DDCB_FREE, DDCB_IN, DDCB_OUT, DDCB_ERR};
 /* Thread wait Queue, allocate one entry per ddcb */
 struct  tx_waitq {
 	int	compl_code;		/* Completion Code */
-	enum	waitq_status status;
+	enum	waitq_status	status;
 	int	seqnum;
 	bool	wait_sem;
 	sem_t	sem;
-	struct	ddcb_cmd	*cmd;;
+	struct	ddcb_cmd	*cmd;
 };
 
 /**
@@ -125,7 +144,6 @@ static struct dev_ctx my_ctx;	/* My Card */
 static inline void cmd_2_ddcb(ddcb_t *pddcb, struct ddcb_cmd *cmd,
 			      uint16_t seqnum)
 {
-	//uint16_t icrc;
 
 	pddcb->pre = DDCB_PRESET_PRE;
 	pddcb->cmdopts_16 = __cpu_to_be16(cmd->cmdopts);
@@ -147,7 +165,6 @@ static inline void cmd_2_ddcb(ddcb_t *pddcb, struct ddcb_cmd *cmd,
 			(long long)(unsigned long)(void *)pddcb, seqnum);
 		ddcb_hexdump(stderr, pddcb, sizeof(ddcb_t));
 	}
-	/* Note: setup seqnum as last field */
 	pddcb->seqnum = __cpu_to_be16(seqnum);
 }
 
@@ -166,47 +183,87 @@ static void ddcb_2_cmd(ddcb_t *ddcb, struct ddcb_cmd *cmd)
 	cmd->attn = __be16_to_cpu(ddcb->attn_16);
 	cmd->progress = __be32_to_cpu(ddcb->progress_32);
 	cmd->retc = __be16_to_cpu(ddcb->retc_16);
-	if (0 != ddcb->deque_ts_64) {
-		VERBOSE0("DDCB [%016llx] Seqnum 0x%x bad:\n",
-			(long long)(unsigned long)(void *)ddcb, __be16_to_cpu(ddcb->seqnum));
-		ddcb_hexdump(stderr, ddcb, sizeof(ddcb_t));
-	}
 }
 
 static void afu_print_status(struct cxl_afu_h *afu_h)
 {
+	uint64_t	addr;
 	uint64_t	reg;
+	int	i;
 
 	cxl_mmio_read64(afu_h, MMIO_IMP_VERSION_REG, &reg);
 	VERBOSE0(" Version Reg:    0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_APP_VERSION_REG, &reg);
 	VERBOSE0(" Appl. Reg:      0x%016llx\n", (long long)reg);
+	cxl_mmio_read64(afu_h, MMIO_AFU_CONFIG_REG, &reg);
+	VERBOSE0(" Afu Config Reg: 0x%016llx\n", (long long)reg);
+	cxl_mmio_read64(afu_h, MMIO_AFU_STATUS_REG, &reg);
+	VERBOSE0(" Afu Status Reg: 0x%016llx\n", (long long)reg);
+	cxl_mmio_read64(afu_h, MMIO_AFU_COMMAND_REG, &reg);
+	VERBOSE0(" Afu Cmd Reg:    0x%016llx\n", (long long)reg);
+	cxl_mmio_read64(afu_h, MMIO_FRT_REG, &reg);
+	VERBOSE0(" Free Run Timer: 0x%016llx\n", (long long)reg);
+
 	cxl_mmio_read64(afu_h, MMIO_DDCBQ_START_REG, &reg);
-	VERBOSE0(" Ddcbq Start Reg:0x%016llx\n", (long long)reg);
-	cxl_mmio_read64(afu_h, MMIO_CONFIG_REG, &reg);
-	VERBOSE0(" Mmio Conf. Reg: 0x%016llx\n", (long long)reg);
-	cxl_mmio_read64(afu_h, MMIO_CONTROL_REG, &reg);
-	VERBOSE0(" Mmio Cont. Reg: 0x%016llx\n", (long long)reg);
-	cxl_mmio_read64(afu_h, MMIO_STATUS_REG, &reg);
-	VERBOSE0(" Status Reg:     0x%016llx\n", (long long)reg);
-	cxl_mmio_read64(afu_h, MMIO_SCRATCH_REG, &reg);
-	VERBOSE0(" Scratch Reg:    0x%016llx\n", (long long)reg);
+	VERBOSE0(" DDCBQ Reg:      0x%016llx\n", (long long)reg);
+	cxl_mmio_read64(afu_h, MMIO_DDCBQ_CONFIG_REG, &reg);
+	VERBOSE0(" DDCBQ Conf Reg: 0x%016llx\n", (long long)reg);
+	cxl_mmio_read64(afu_h, MMIO_DDCBQ_COMMAND_REG, &reg);
+	VERBOSE0(" DDCBQ Cmd Reg:  0x%016llx\n", (long long)reg);
+	cxl_mmio_read64(afu_h, MMIO_DDCBQ_STATUS_REG, &reg);
+	VERBOSE0(" DDCBQ Stat Reg: 0x%016llx\n", (long long)reg);
+	cxl_mmio_read64(afu_h, MMIO_DDCBQ_WT_REG, &reg);
+	VERBOSE0(" DDCBQ WT Reg:   0x%016llx\n", (long long)reg);
+
+	for (i = 0; i < MMIO_FIR_REGS_NUM; i++) {
+		addr = MMIO_FIR_REGS_BASE + (uint64_t)(i * 8);
+		cxl_mmio_read64(afu_h, addr, &reg);
+		VERBOSE0(" FIR Reg [%08llx]:     0x%016llx\n",
+			 (long long)addr, (long long)reg);
+	}
+}
+
+static bool afu_clear_firs(struct cxl_afu_h *afu_h)
+{
+	uint64_t	addr;
+	uint64_t	reg;
+	int	i;
+
+	for (i = 0; i < MMIO_FIR_REGS_NUM; i++) {
+		addr = MMIO_FIR_REGS_BASE + (uint64_t)(i * 8);
+		cxl_mmio_read64(afu_h, addr, &reg);
+		if (reg != 0ull) {
+			/* Pending Firs from prev execution */
+			VERBOSE0(" [%08llx]:     0x%016llx\n",
+				 (long long)addr, (long long)reg);
+			cxl_mmio_write64(afu_h, addr, 0xffffffffffffffffull);
+			/* Read again, this time it must be 0 */
+			cxl_mmio_read64(afu_h, addr, &reg);
+			if (reg != 0ull) {
+				VERBOSE0(" [%08llx]:     0x%016llx cannot be cleared!\n",
+					(long long)addr, (long long)reg);
+				return false;
+			}
+		}
+	}
+	return true;
 }
 
 static int __afu_open(struct dev_ctx *ctx)
 {
 	int	rc = DDCB_OK;
 	char	device[64];
-	uint64_t mmio_dat;
+	uint64_t	mmio_dat;
 
 	sprintf(device, "/dev/cxl/afu%d.0d", ctx->card_no);
 	ctx->afu_h = cxl_afu_open_dev(device);
 	if (NULL == ctx->afu_h) {
-		VERBOSE0("cxl_afu_open_dev: %s\n", device);
+		VERBOSE0("Error: cxl_afu_open_dev: %s\n", device);
 		return DDCB_ERR_CARD;
 	}
 	ctx->afu_fd = cxl_afu_fd(ctx->afu_h);
-	ctx->ddcb = memalign(sysconf(_SC_PAGESIZE), ctx->ddcb_num * sizeof(ddcb_t));
+	ctx->ddcb = memalign(sysconf(_SC_PAGESIZE),
+			     ctx->ddcb_num * sizeof(ddcb_t));
 	if (NULL == ctx->ddcb) {
 		rc = DDCB_ERR_ENOMEM;
 		goto err_afu_free;
@@ -217,20 +274,29 @@ static int __afu_open(struct dev_ctx *ctx)
 			    (__u64)(unsigned long)(void *)ctx->ddcb);
 	if (0 != rc) {
 		rc = DDCB_ERR_CARD;
-		goto err_free_ddcb;
+		goto err_afu_free;
 	}
 
 	if (cxl_mmio_map(ctx->afu_h, CXL_MMIO_BIG_ENDIAN) == -1) {
-		VERBOSE0("Unable to map problem state registers");
+		VERBOSE0("Error: Unable to map problem state registers");
 		rc = DDCB_ERR_CARD;
 		goto err_free_ddcb;
 	}
 
+	if (afu_clear_firs(ctx->afu_h) == false) {
+		VERBOSE0("Error: Unable clear Pending FIRs!\n");
+		rc = DDCB_ERR_CARD;
+		goto err_mmio_unmap;
+	}
+
+	/* | 63..48 | 47....32 | 31........24 | 23....16 | 15.....0 | */
+	/* | Seqnum | Reserved | 1st ddcb num | max ddcb | Reserved | */
 	mmio_dat = (((uint64_t)ctx->ddcb_seqnum << 48) |
-		    ((uint64_t)(ctx->ddcb_num - 1) << 40) |
-		    ((uint64_t)ctx->ddcb_in  << 32));
-	rc = cxl_mmio_write64(ctx->afu_h, MMIO_CONFIG_REG, mmio_dat);
+		    ((uint64_t)ctx->ddcb_in  << 24)    |
+		    ((uint64_t)(ctx->ddcb_num - 1) << 16));
+	rc = cxl_mmio_write64(ctx->afu_h, MMIO_DDCBQ_CONFIG_REG, mmio_dat);
 	if (rc != 0) {
+		VERBOSE0("Error: Unable to write Config Register");
 		rc = DDCB_ERR_CARD;
 		goto err_mmio_unmap;
 	}
@@ -239,12 +305,6 @@ static int __afu_open(struct dev_ctx *ctx)
 	cxl_mmio_read64(ctx->afu_h, MMIO_APP_VERSION_REG, &mmio_dat);
 	ctx->app_id = mmio_dat;		/* Save it */
 
-	mmio_dat = 0x1ull;
-	rc = cxl_mmio_write64(ctx->afu_h, MMIO_CONTROL_REG, mmio_dat);
-	if (rc != 0) {
-		rc = DDCB_ERR_CARD;
-		goto err_mmio_unmap;
-	}
 	if (libddcb_verbose > 1)
 		afu_print_status(ctx->afu_h);
 
@@ -271,35 +331,49 @@ static int __afu_close(struct dev_ctx *ctx)
 	if (ctx->verify != ctx)
 		return DDCB_ERR_INVAL;
 	afu_h = ctx->afu_h;
+
 	if (NULL == afu_h)
 		return DDCB_OK;
+
 	if (false == ctx->dev_open)
 		perror("Closing Afu without open\n");
+
 	if (0 != ctx->clients)
-		VERBOSE0("ERROR: Closing Afu while %d pending opens !\n", ctx->clients);
+		VERBOSE0("ERROR: Closing Afu while %d pending opens !\n",
+			 ctx->clients);
+
 	VERBOSE2("__afu_close %p Afu %d pending opens\n", ctx, ctx->clients);
-	mmio_dat = 0x2ull;
-	cxl_mmio_write64(afu_h, MMIO_CONTROL_REG, mmio_dat);
+	mmio_dat = 0x2ull;	/* Stop !! */
+	cxl_mmio_write64(afu_h, MMIO_DDCBQ_COMMAND_REG, mmio_dat);
 	while (1) {
-		cxl_mmio_read64(afu_h, MMIO_STATUS_REG, &mmio_dat);
-		if (0x02ull == (mmio_dat & 0x3))
+		cxl_mmio_read64(afu_h, MMIO_DDCBQ_STATUS_REG, &mmio_dat);
+		if (0x0ull == (mmio_dat & 0x4))
 			break;
 		usleep(100);
 		i++;
 		if (1000 == i) {
-			VERBOSE0("ERROR: Timeout wait_afu_stop STATUS_REG: 0x%016llx\n",
-				(long long)mmio_dat);
+			VERBOSE0("ERROR: Timeout wait_afu_stop STATUS_REG: "
+				 "0x%016llx\n",	(long long)mmio_dat);
 			rc = DDCB_ERR_CARD;
 			break;
 		}
 	}
 	if (libddcb_verbose > 1)
 		afu_print_status(ctx->afu_h);
+
 	cxl_mmio_unmap(afu_h);
 	cxl_afu_free(afu_h);
 	ctx->afu_h = NULL;
 	ctx->dev_open = false;
 	ctx->clients = 0;
+	if (ctx->waitq) {
+		free(ctx->waitq);
+		ctx->waitq = NULL;
+	}
+	if (ctx->ddcb) {
+		free(ctx->ddcb);
+		ctx->ddcb = NULL;
+	}
 	return rc;
 }
 
@@ -339,7 +413,7 @@ static int card_dev_open(int card_no)
 		return rc;
 	}
 	ctx->card_no = card_no;
-	ctx->tout = 5;			/* Set timeout to 5 sec on HW, and 5 min on SIM */
+	ctx->tout = 5;			/* Set timeout to 5 sec */
 	const char *ttt = getenv("DDCB_TIMEOUT");
 	if (ttt)
 		ctx->tout = strtoul(ttt, (char **) NULL, 0);
@@ -355,7 +429,8 @@ static int card_dev_open(int card_no)
 		if (DDCB_OK == __afu_open(ctx)) {
 			ctx->verify = ctx;		/* Set Verify field */
 			ctx->dev_open = true;		/* Open done */
-			rc = pthread_create(&tid, NULL, &__ddcb_done_thread, ctx);
+			rc = pthread_create(&tid, NULL,
+					    &__ddcb_done_thread, ctx);
 			if (0 == rc) {
 				ctx->ddcb_done_tid = tid;
 				ctx->dev_open = true;	/* Set to done */
@@ -451,7 +526,8 @@ static int __ddcb_execute_multi(void *card_data, struct ddcb_cmd *cmd)
 	ddcb_t	*ddcb;
 	int	idx = 0;
 	int	seq;
-	struct ddcb_cmd *my_cmd = cmd;
+	struct	ddcb_cmd *my_cmd = cmd;
+	uint64_t	reg;
 
 	if (NULL == ttx)
 		return DDCB_ERR_INVAL;
@@ -481,6 +557,8 @@ static int __ddcb_execute_multi(void *card_data, struct ddcb_cmd *cmd)
 				txq->wait_sem = true;
 			pthread_mutex_unlock(&ctx->lock);
 			cmd_2_ddcb(ddcb, cmd, seq);
+			reg = (uint64_t)seq << 48 | 1;	/* Set Seq. Number + Start Bit */
+			cxl_mmio_write64(ctx->afu_h, MMIO_DDCBQ_COMMAND_REG, reg);
 		} else {
 			ctx->busy_wait++;
 			pthread_mutex_unlock(&ctx->lock);
@@ -518,9 +596,9 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 
 	if (DDCB_OK == compl_code) {
 		if (0 == ddcb->retc_16) {
-			VERBOSE2("\t__ddcb_done_thread seq: 0x%x slot: %d retc d wait\n",
-				txq->seqnum, idx);
-			return false;		/* do not continue */
+			VERBOSE2("\t__ddcb_done_thread seq: 0x%x slot: %d "
+				 "retc: 0 wait\n", txq->seqnum, idx);
+			return false; /* do not continue */
 		}
 	}
 	if (DDCB_IN == txq->status) {
@@ -531,8 +609,9 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 		ddcb->retc_16 = 0;
 		if (txq->wait_sem) {
 			txq->compl_code = compl_code;
-			VERBOSE2("\t__ddcb_done_thread seq: 0x%x slot: %d cmd: %p POST rc: %d\n",
-				txq->seqnum, idx, txq->cmd, compl_code);
+			VERBOSE2("\t__ddcb_done_thread seq: 0x%x slot: %d "
+				 "cmd: %p POST compl_code: %d\n",
+				 txq->seqnum, idx, txq->cmd, compl_code);
 			sem_post(&txq->sem);
 			txq->wait_sem = false;
 		}
@@ -548,7 +627,11 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 		pthread_mutex_unlock(&ctx->lock);
 		return true;		/* Continue */
 	}
-	VERBOSE0("\t__ddcb_done_thread FIXME\n");
+	/* This can happen if i did get a Event and no ddcb is active
+	   at this time */
+	VERBOSE0("\t__ddcb_done_thread FIXME compl_code: %d Set errno to "
+		 "EINTR\n", compl_code);
+	errno = EINTR;
 	return false;			/* do not continue */
 }
 
@@ -568,20 +651,41 @@ static void *__ddcb_done_thread(void *card_data)
 		timeout.tv_usec = 0;
 		rc = select(ctx->afu_fd + 1, &set, NULL, NULL, &timeout);
 		if (0 == rc) {
-			VERBOSE0("WARNING: %d sec timeout while waiting for interrupt! "
-				"rc: %d --> %d\n", ctx->tout, rc, DDCB_ERR_IRQTIMEOUT);
+			VERBOSE0("WARNING: %d sec timeout while waiting "
+				 "for interrupt! rc: %d --> %d\n",
+				 ctx->tout, rc, DDCB_ERR_IRQTIMEOUT);
 			__ddcb_done_post(ctx, DDCB_ERR_IRQTIMEOUT);
 			continue;
 		}
+		if ((rc == -1) && (errno == EINTR)) {
+			VERBOSE0("WARNING: select returned -1 "
+				 "and errno was EINTR, retrying\n");
+			afu_print_status(ctx->afu_h);
+			continue;
+		}
+
+		/*
+		 * FIXME I wonder if we must exit in this
+		 * case. select() returning a negative value is
+		 * clearly a critical issue. Only if errno == EINTR,
+		 * we should rety.
+		 *
+		 * At least we should wakeup potential DDCB execution
+		 * requestors, such that the error will be passed to
+		 * the layers above and the application can be stopped
+		 * if needed.
+		 */
 		if (rc < 0) {
 			VERBOSE0("ERROR: waiting for interrupt! rc: %d\n", rc);
 			afu_print_status(ctx->afu_h);
+			__ddcb_done_post(ctx, DDCB_ERR_SELECTFAIL);
 			continue;
 		}
 
 		rc = cxl_read_event(ctx->afu_h, &ctx->event);
 		if (0 != rc) {
-			VERBOSE0("\tERROR cxl_read_event() rc: %d errno: %d\n", rc, errno);
+			VERBOSE0("\tERROR cxl_read_event() rc: %d errno: %d\n",
+				 rc, errno);
 			continue;
 		}
 		VERBOSE2("\tcxl_read_event(...) = %d\n"
@@ -591,22 +695,29 @@ static void *__ddcb_done_thread(void *card_data)
 		switch (ctx->event.header.type) {
 		case CXL_EVENT_AFU_INTERRUPT:
 			/* Process all ddcb's */
-			VERBOSE1("\tCXL_EVENT_AFU_INTERRUPT: flags: 0x%x irq: 0x%x\n",
+			VERBOSE1("\tCXL_EVENT_AFU_INTERRUPT: flags: 0x%x "
+				 "irq: 0x%x\n",
 				ctx->event.irq.flags,
 				ctx->event.irq.irq);
 			while (__ddcb_done_post(ctx, DDCB_OK)) {};
 			break;
 		case CXL_EVENT_DATA_STORAGE:
-			VERBOSE0("\tCXL_EVENT_DATA_STORAGE: flags: 0x%x addr: 0x%016llx dsisr: 0x%016llx\n",
+			VERBOSE0("\tCXL_EVENT_DATA_STORAGE: flags: 0x%x "
+				 "addr: 0x%016llx dsisr: 0x%016llx\n",
 				ctx->event.fault.flags,
 				(long long)ctx->event.fault.addr,
 				(long long)ctx->event.fault.dsisr);
+			afu_print_status(ctx->afu_h);
+
 			__ddcb_done_post(ctx, DDCB_ERR_EVENTFAIL);
 			break;
 		case CXL_EVENT_AFU_ERROR:
-			VERBOSE0("\tCXL_EVENT_AFU_ERROR: flags: 0x%x error: 0x%016llx\n",
+			VERBOSE0("\tCXL_EVENT_AFU_ERROR: flags: 0x%x "
+				 "error: 0x%016llx\n",
 				ctx->event.afu_error.flags,
 				(long long)ctx->event.afu_error.error);
+			afu_print_status(ctx->afu_h);
+
 			__ddcb_done_post(ctx, DDCB_ERR_EVENTFAIL);
 			break;
 		default:
@@ -682,7 +793,8 @@ static int card_write_reg64(void *card_data, uint32_t offs, uint64_t data)
 		if (ttx->verify == ttx) {
 			ctx = ttx->ctx;
 			if (ctx->afu_h)
-				return cxl_mmio_write64(ctx->afu_h, offs, data);
+				return cxl_mmio_write64(ctx->afu_h,
+							offs, data);
 		}
 	}
 	return DDCB_ERR_INVAL;
@@ -697,7 +809,8 @@ static int card_write_reg32(void *card_data, uint32_t offs, uint32_t data)
 		if (ttx->verify == ttx) {
 			ctx = ttx->ctx;
 			if (ctx->afu_h)
-				return cxl_mmio_write32(ctx->afu_h, offs, data);
+				return cxl_mmio_write32(ctx->afu_h,
+							offs, data);
 		}
 	}
 	return DDCB_ERR_INVAL;
@@ -786,5 +899,6 @@ static void capi_card_exit(void)
 {
 	struct dev_ctx *ctx = &my_ctx;
 
+	/* FIXME kill thread, just in case?? */
 	__afu_close(ctx);
 }

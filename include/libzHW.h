@@ -44,7 +44,6 @@
 extern "C" {
 #endif
 
-#define ZEDC_VERSION		LIBDDCB_VERS_STRING
 #define DDCB_APPL_ID_GZIP	0x00000000475a4950 /* The GZIP	APPL id */
 #define DDCB_APPL_ID_GZIP2	0x00000002475a4950 /* The GZIP 2 APPL id */
 
@@ -76,7 +75,6 @@ extern "C" {
 #define ZEDC_DATA_ERROR		(-3)  /* see zedc_carderr for more details */
 #define ZEDC_MEM_ERROR		(-4)
 #define ZEDC_BUF_ERROR		(-5)
-#define ZEDC_VERSION_ERROR	(-6)
 
 /* zEDC specific enhancements */
 #define ZEDC_ERR_CARD		(-307)	/* see zedc_carderr for details */

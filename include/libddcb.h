@@ -41,8 +41,6 @@ extern "C" {
 /** Version Information and Error Codes					     */
 /*****************************************************************************/
 
-#define LIBDDCB_VERS_STRING		"3.0.23"
-
 #define DDCB_TYPE_GENWQE		0x0000
 #define DDCB_TYPE_CAPI			0x0002
 
@@ -71,6 +69,7 @@ extern "C" {
 #define DDCB_ERR_ENOENT			-417
 #define DDCB_ERR_IRQTIMEOUT		-418
 #define DDCB_ERR_EVENTFAIL		-419
+#define DDCB_ERR_SELECTFAIL		-420  /* e.g. socket problems in sim */
 
 /* Genwqe chip Units */
 #define DDCB_ACFUNC_SLU			0x00  /* chip service layer unit */
