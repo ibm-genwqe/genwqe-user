@@ -173,11 +173,6 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	if (geteuid() != 0) {
-		printf("must be root to write to zEDC\n");
-		exit(EXIT_FAILURE);
-	}
-
 	offs = strtoull(argv[optind++], NULL, 0);
 	val  = strtoull(argv[optind++], NULL, 0);
 	rbval = ~val;
