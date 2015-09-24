@@ -51,7 +51,13 @@ static void usage(const char *prog)
 	       "\n"
 	       "Example:\n"
 	       "  genwqe_peek 0x0000\n"
-	       "  [00000000] 000000021032a178\n\n",
+	       "  [00000000] 000000021032a178\n\n"
+	       "  for CAPI card (-A CAPI)\n"
+	       "      Reg 0x0000 CAPI Card Version Reg 1 (RO)\n"
+	       "      Reg 0x0008 CAPI Card Version Reg 2 (RO)\n"
+	       "      Reg 0x0080 CAPI Card Free Run Timer in 4 nsec (RO)\n"
+	       "      Reg 0x0180 Queue Work Time in 4 nsec (RO)\n"
+	       "      Reg 0x1000 ... 0x1028  6 Fir Regsiters (RW)\n",
 	       prog);
 }
 
