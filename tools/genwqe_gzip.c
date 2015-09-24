@@ -48,8 +48,8 @@
 #define __USE_GNU
 #include <sched.h>
 
-#include "zlib.h"		/* Our version of zlib */
-#include "zaddons.h"		/* zlib extensions */
+#include <zlib.h>
+#include <zaddons.h>
 
 #define SET_BINARY_MODE(file)
 

@@ -52,8 +52,10 @@ PLATFORM = $(shell uname -i)
 
 CFLAGS = -W -Wall -Werror -Wwrite-strings -Wextra -Os -g \
 	-DGIT_VERSION=\"$(GIT_VERSION)\" \
-	-I../include -I../include/linux/uapi \
+	-I. -I/opt/genwqe/include -I../include -I../include/linux/uapi \
 	-Wmissing-prototypes # -Wstrict-prototypes -Warray-bounds
+
+LDFLAGS += -L/opt/genwqe/lib
 
 # Force 32-bit build
 #   This is needed to generate the code for special environments. We have

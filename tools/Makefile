@@ -30,9 +30,9 @@ genwqe_vpdconv_objs = genwqe_vpd_common.o
 
 genwqe_memcopy_libs = -lz
 genwqe_cksum_libs = -lz
-genwqe_gzip_libs = ../lib/libzADC.a -ldl
-genwqe_gunzip_libs = ../lib/libzADC.a -ldl
-zlib_mt_perf_libs = ../lib/libzADC.a -ldl
+genwqe_gzip_libs = ../lib/libzADC.a -ldl	# statically link our libz
+genwqe_gunzip_libs = ../lib/libzADC.a -ldl	# statically link our libz
+zlib_mt_perf_libs = ../lib/libzADC.a -ldl	# statically link our libz
 
 projs = genwqe_update genwqe_gzip genwqe_gunzip zlib_mt_perf genwqe_memcopy \
 	genwqe_echo genwqe_peek genwqe_poke genwqe_cksum \
