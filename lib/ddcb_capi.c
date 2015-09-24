@@ -629,9 +629,6 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 	}
 	/* This can happen if i did get a Event and no ddcb is active
 	   at this time */
-	VERBOSE0("\t__ddcb_done_thread FIXME compl_code: %d Set errno to "
-		 "EINTR\n", compl_code);
-	errno = EINTR;
 	return false;			/* do not continue */
 }
 
@@ -651,7 +648,7 @@ static void *__ddcb_done_thread(void *card_data)
 		timeout.tv_usec = 0;
 		rc = select(ctx->afu_fd + 1, &set, NULL, NULL, &timeout);
 		if (0 == rc) {
-			VERBOSE0("WARNING: %d sec timeout while waiting "
+			VERBOSE2("WARNING: %d sec timeout while waiting "
 				 "for interrupt! rc: %d --> %d\n",
 				 ctx->tout, rc, DDCB_ERR_IRQTIMEOUT);
 			__ddcb_done_post(ctx, DDCB_ERR_IRQTIMEOUT);
