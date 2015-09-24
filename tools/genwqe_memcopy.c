@@ -156,6 +156,8 @@ static inline uint64_t str_to_num(char *str)
 	else {
 		num = ULLONG_MAX;
 		errno = ERANGE;
+		pr_err("--size or -s out of Range, Used KiB/MiB or GiB only\n");
+		exit(EXIT_FAILURE);
 	}
 
 	return num;
