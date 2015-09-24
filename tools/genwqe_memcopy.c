@@ -834,16 +834,28 @@ int main(int argc, char *argv[])
 			if (false == ip.quiet) {
 				kib = (int)(pt->bytes_copied / 1024);
 				mib = kib / 1024;
-				VERBOSE1("Thread: %d, memcopies: %d, done, %lld bytes, %lld usec, ",
-					thread, pt->memcopies, pt->bytes_copied, (long long)pt->total_usec);
-				/* FIXME: this is not 100 % good code, i know the format_flag is bad */
+				VERBOSE1("Thread: %d, memcopies: %d, done, "
+					 "%lld bytes, %lld usec, ",
+					 thread, pt->memcopies,
+					 (long long)pt->bytes_copied,
+					 (long long)pt->total_usec);
+				/* FIXME: this is not 100 % good code,
+				   i know the format_flag is bad */
 				if (pt->total_usec < 100000) {
-					kibs = ((pt->bytes_copied * 1000000) / 1024) / pt->total_usec;
-					VERBOSE1("%d KiB, in %llu usec, %lu KiB/sec", kib, (long long)pt->total_usec, kibs);
+					kibs = ((pt->bytes_copied * 1000000) /
+						1024) / pt->total_usec;
+					VERBOSE1("%d KiB, in %lld usec, "
+						 "%ld KiB/sec", kib,
+						 (long long)pt->total_usec,
+						 kibs);
 				} else {
-					total_msec = pt->total_usec / 1000;	/* now msec */
-					mibs = (pt->bytes_copied * 1000) / (1024 * 1024) / total_msec;
-					VERBOSE1("%d MiB, in %llu msec, %lu MiB/sec", mib, (long long)total_msec, mibs);
+					total_msec = pt->total_usec / 1000;
+					/* now msec */
+					mibs = (pt->bytes_copied * 1000) /
+						(1024 * 1024) / total_msec;
+					VERBOSE1("%d MiB, in %lld msec, "
+						 "%ld MiB/sec", mib,
+						 (long long)total_msec, mibs);
 				}
 				VERBOSE1(" %d errors.\n", pt->errors);
 			}
@@ -874,12 +886,16 @@ int main(int argc, char *argv[])
 		/* Avoid div fault */
 		if (total_usec) {
 			if (total_usec < 100000) {
-				kibs = ((bytes_copied * 1000000) / 1024) / total_usec;
-				VERBOSE0("%d KiB, in %llu usec, %lu KiB/sec", kib, (long long)total_usec, kibs);
+				kibs = ((bytes_copied * 1000000) / 1024) /
+					total_usec;
+				VERBOSE0("%d KiB, in %lld usec, %ld KiB/sec",
+					 kib, (long long)total_usec, kibs);
 			} else {
 				total_msec = total_usec / 1000;	/* now msec */
-				mibs = (bytes_copied * 1000) / (1024 * 1024) / total_msec;
-				VERBOSE0("%d MiB, in %llu msec, %lu MiB/sec", mib, (long long)total_msec, mibs);
+				mibs = (bytes_copied * 1000) /
+					(1024 * 1024) / total_msec;
+				VERBOSE0("%d MiB, in %lld msec, %ld MiB/sec",
+					 mib, (long long)total_msec, mibs);
 			}
 		}
 		VERBOSE0(" %d errors.\n", errors);
