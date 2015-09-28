@@ -650,6 +650,7 @@ int main(int argc, char **argv)
 	const char *extra_fname = NULL;
 	uint8_t *extra = NULL;
 	int extra_len = 0;
+	struct stat s;
 
 	/* avoid end-of-line conversions */
 	SET_BINARY_MODE(stdin);
@@ -803,6 +804,13 @@ int main(int argc, char **argv)
 			exit(EX_ERRNO);
 		}
 
+		rc = lstat(in_f, &s);
+		if ((rc == 0) && S_ISLNK(s.st_mode)) {
+			pr_err("%s: Too many levels of symbolic links\n",
+			       in_f);
+			exit(EXIT_FAILURE);
+		}
+
 		if (list_contents) {
 			rc = strip_ending(out_f, in_f, PATH_MAX, suffix);
 			if (rc < 0) {
@@ -826,8 +834,6 @@ int main(int argc, char **argv)
 		o_fp = stdout;	/* should not be a terminal! */
 
 	if (o_fp == NULL) {
-		struct stat s;
-
 		if (compress)
 			snprintf(out_f, PATH_MAX, "%s.%s", in_f, suffix);
 		else {
@@ -853,6 +859,20 @@ int main(int argc, char **argv)
 			print_args(stderr, argc, argv);
 			exit(EX_ERRNO);
 		}
+
+		/* get mode settings for existing file and ... */
+		rc = fstat(fileno(i_fp), &s);
+		if (rc == 0) {
+			rc = fchmod(fileno(o_fp), s.st_mode);
+			if (rc != 0) {
+				pr_err("Cannot set mode %s: %s\n", out_f,
+				       strerror(errno));
+				exit(EX_ERRNO);
+			}
+		} else /* else ignore ... */
+			pr_err("Cannot set mode %s: %s\n", out_f,
+			       strerror(errno));
+
 
 		/* If output does not go to stdout and a filename is
 		   given, set it */
