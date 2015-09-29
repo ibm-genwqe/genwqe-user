@@ -29,8 +29,63 @@
 # buffers.
 #
 
+export ZLIB_ACCELERATOR=GENWQE
+export ZLIB_CARD=0
+export ZLIB_DEFLATE_IMPL=0x01 # Use hardware by default
+export ZLIB_INFLATE_IMPL=0x01 # Use hardware by default
+
 export PATH=/opt/genwqe/bin/genwqe:$PATH
- 
+
+version="https://github.com/ibm-genwqe/genwqe-user"
+verbose=0
+
+# Print usage message helper function
+function usage() {
+    echo "Usage of $PROGRAM:"
+    echo "    [-A]  <accelerator> use either GENWQE for the PCIe and CAPI for"
+    echo "          CAPI based soltuion available only on System p"
+    echo "          Use SW to use software compress/decompression"
+    echo "    [-C]  <card> set the compression card to use (0, 1, ... )."
+    echo "          RED (or -1) drive work to all available cards."
+    echo "    [-v]  Print status and informational output."
+    echo "          -vv for more verbosity"
+    echo "    [-V]  Print program version (${version})"
+    echo "    [-h]  Print this help message."
+    echo
+}
+
+# Parse any options given on the command line
+while getopts "hA:C:vV" opt; do
+    case ${opt} in
+	A)
+	    ZLIB_ACCELERATOR=${OPTARG};
+            ;;
+        C)
+            ZLIB_CARD=${OPTARG};
+            ;;
+        v)
+            verbose+=1;
+            ;;
+        V)
+            echo "${version}"
+            exit 0;
+            ;;
+        h)
+            usage;
+            exit 0;
+            ;;
+        \?)
+            echo "ERROR: Invalid option: -$OPTARG" >&2
+            exit 1;
+            ;;
+    esac
+done
+
+if [ $ZLIB_ACCELERATOR = "SW" ]; then
+    export ZLIB_DEFLATE_IMPL=0x00;
+    export ZLIB_INFLATE_IMPL=0x00;
+fi
+
 # Random data cannot being compressed. Performance values might be poor.
 # Text data e.g. logfiles work pretty well. Use those if available.
 if [ ! -f /tmp/test_data.bin ]; then
