@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
 	long long	data;
 	FILE	*fp;
 	char	line[MAX_LINE];
-	int	line_no, line_len, rc, mmio_done;
+	int	line_no, line_len, rc, mmio_done = 0;
 	char	*filename = NULL;
 
 	rc = EXIT_SUCCESS;
@@ -104,7 +104,7 @@ int main(int argc, char *argv[])
 			{ "quiet",      no_argument,       NULL, 'q' },
 			{ "help",       no_argument,       NULL, 'h' },
 			{ "verbose",    no_argument,       NULL, 'v' },
-			{ 0},
+			{ 0,            no_argument,       NULL,  0  },
 		};
 		ch = getopt_long(argc, argv, "C:Vqhv",
 			long_options, &option_index);
@@ -192,7 +192,7 @@ int main(int argc, char *argv[])
 			continue;
 		}
 		/* e.g. 0x00002100 0x0E0000000008000000 */
-		rc = sscanf(&line[0], "0x%x", &addr);	
+		rc = sscanf(&line[0], "0x%x", &addr);
 		if (1 != rc) {
 			printf("Err: Wrong Addr in Line [#%d]\n",
 			     line_no);
@@ -215,7 +215,7 @@ int main(int argc, char *argv[])
 		rc = do_mmio(card, addr, (uint64_t)data);
 		if (0 != rc) {
 			printf("Err: MMIO Write Error Addr: %08x Data: %016llx "
-				"at line [%d]\n", 
+				"at line [%d]\n",
 				addr, data, line_no);
 			break;
 		}
