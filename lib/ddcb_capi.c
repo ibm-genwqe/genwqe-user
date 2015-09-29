@@ -78,7 +78,7 @@
 
 #define MMIO_DEBUG_REG		0x000FF00ull
 
-#define	NUM_DDCBS	16
+#define	NUM_DDCBS	4
 
 extern int libddcb_verbose;
 #define VERBOSE0(...) {fprintf(stderr, __VA_ARGS__);}
@@ -95,18 +95,20 @@ static void *__ddcb_done_thread(void *card_data);
  */
 struct ttxs {
 	struct	dev_ctx	*ctx;	/* Pointer to Card Context */
+	int	compl_code;	/* Completion Code */
+	sem_t	wait_sem;
+	int	seqnum;		/* Seq Number when done */
 	struct	ttxs	*verify;
 };
 
-enum waitq_status {DDCB_FREE, DDCB_IN, DDCB_OUT, DDCB_ERR};
 /* Thread wait Queue, allocate one entry per ddcb */
+enum waitq_status {DDCB_FREE, DDCB_IN, DDCB_OUT, DDCB_ERR};
 struct  tx_waitq {
-	int	compl_code;		/* Completion Code */
 	enum	waitq_status	status;
-	int	seqnum;
-	bool	wait_sem;
-	sem_t	sem;
 	struct	ddcb_cmd	*cmd;
+	struct	ttxs	*ttx;		/* back Pointer to active ttx */
+	int	seqnum;			/* a copy of ddcb_seqnum at start time */
+	bool	thread_wait;		/* A thread is waiting to */
 };
 
 /**
@@ -133,8 +135,7 @@ struct dev_ctx {
 	int		tout;		/* Timeout Value for compeltion */
 	pthread_t	ddcb_done_tid;
 	uint64_t	app_id;		/* a copy of MMIO_APP_VERSION_REG */
-	int		busy_wait;	/* How many waiting threads in busy sem */
-	sem_t		busy_sem;	/* bussy sem if ddcb q is full */
+	sem_t		free_sem;	/* Sem to wait for free ddcb */
 	struct		dev_ctx		*verify;	/* Verify field */
 };
 
@@ -144,7 +145,6 @@ static struct dev_ctx my_ctx;	/* My Card */
 static inline void cmd_2_ddcb(ddcb_t *pddcb, struct ddcb_cmd *cmd,
 			      uint16_t seqnum)
 {
-
 	pddcb->pre = DDCB_PRESET_PRE;
 	pddcb->cmdopts_16 = __cpu_to_be16(cmd->cmdopts);
 	pddcb->cmd = cmd->cmd;
@@ -158,14 +158,13 @@ static inline void cmd_2_ddcb(ddcb_t *pddcb, struct ddcb_cmd *cmd,
 
 	/* DDCB completion irq */
 	pddcb->icrc_hsi_shi_32 |= DDCB_INTR_BE32;
-
+	pddcb->seqnum = __cpu_to_be16(seqnum);
 	pddcb->retc_16 = 0;
 	if (libddcb_verbose > 3) {
 		VERBOSE0("DDCB [%016llx] Seqnum 0x%x before execution:\n",
 			(long long)(unsigned long)(void *)pddcb, seqnum);
 		ddcb_hexdump(stderr, pddcb, sizeof(ddcb_t));
 	}
-	pddcb->seqnum = __cpu_to_be16(seqnum);
 }
 
 /**
@@ -380,21 +379,19 @@ static int __afu_close(struct dev_ctx *ctx)
 /*	Init Thread Wait Queue */
 static struct tx_waitq* __init_waitq(int num)
 {
-	struct tx_waitq *txq = malloc(num * sizeof(struct tx_waitq));
-	struct tx_waitq *tx;
+	struct	tx_waitq *txq = malloc(num * sizeof(struct tx_waitq));
+	struct	tx_waitq *q;
 	int	i;
 
-	if (txq) {
-		tx =  &txq[0];
-		for (i = 0; i < num; i++) {
-			sem_init(&tx->sem, 0, 0);
-			tx->status = DDCB_FREE;
-			tx->seqnum = 0;
-			tx->cmd = NULL;
-			tx->wait_sem = false;
-			tx->compl_code = 0;
-			tx++;
-		}
+	if (NULL == txq)
+		return NULL;
+	q =  &txq[0];
+	for (i = 0; i < num; i++) {
+		q->status = DDCB_FREE;
+		q->cmd = NULL;
+		q->ttx = NULL;
+		q->thread_wait = false;
+		q++;
 	}
 	return txq;
 }
@@ -421,17 +418,15 @@ static int card_dev_open(int card_no)
 	ctx->ddcb_seqnum = 0xf00d;	/* Starting Seq */
 	ctx->ddcb_in = 0;		/* ddcb Input Index */
 	ctx->ddcb_out = 0;		/* ddcb Output Index */
-	ctx->busy_wait = 0,
-	sem_init(&ctx->busy_sem, 0, 0);
+	sem_init(&ctx->free_sem, 0, NUM_DDCBS);
 	/* Make the Wait queue for each ddcb */
 	ctx->waitq = __init_waitq(ctx->ddcb_num);
 	if (ctx->waitq) {
 		if (DDCB_OK == __afu_open(ctx)) {
-			ctx->verify = ctx;		/* Set Verify field */
-			ctx->dev_open = true;		/* Open done */
 			rc = pthread_create(&tid, NULL,
 					    &__ddcb_done_thread, ctx);
 			if (0 == rc) {
+				ctx->verify = ctx;	/* Set Verify field */
 				ctx->ddcb_done_tid = tid;
 				ctx->dev_open = true;	/* Set to done */
 				ctx->clients = 0;
@@ -471,22 +466,23 @@ static void *card_open(int card_no,
 		       uint64_t appl_id_mask __attribute__((unused)))
 {
 	int rc = DDCB_OK;
-	struct ttxs *ttx;
+	struct ttxs *ttx = NULL;
 
 	/* Check if Card is open or Open Card */
 	rc = card_dev_open(card_no);
-	if (DDCB_OK != rc) {
-		if (card_rc)
-			*card_rc = rc;
-		return NULL;
-	}
+	if (DDCB_OK != rc)
+		goto card_open_exit;
+
 	/* Allocate Thread Context */
 	ttx = calloc(1, sizeof(*ttx));
 	if (ttx) {
 		ttx->ctx = &my_ctx;
 		ttx->verify = ttx;
+		sem_init(&ttx->wait_sem, 0, 0);
 		__client_inc(ttx->ctx);
 	} else rc = DDCB_ERR_ENOMEM;
+
+	card_open_exit:
 	if (card_rc)
 		*card_rc = rc;
 	return ttx;
@@ -500,21 +496,27 @@ static int card_close(void *card_data)
 
 	if (NULL == ttx)
 		return DDCB_ERR_INVAL;
-	if (ttx->verify != ttx)
-		return DDCB_ERR_INVAL;
 	ctx = ttx->ctx;
 	__client_dec(ctx);
 	free(ttx);
 
-	VERBOSE2("card_close ctx: %p Clients: %d\n", ctx, ctx->clients);
+	VERBOSE1("card_close ttx: %p ctx: %p Clients: %d left\n",
+		ttx, ctx, ctx->clients);
 
 	if (0 == ctx->clients) {
 		pthread_cancel(ctx->ddcb_done_tid);
 		pthread_join(ctx->ddcb_done_tid, &res);
 		__afu_close(ctx);
 	}
-	VERBOSE2("card_close EXIT\n");
 	return DDCB_OK;
+}
+
+static void start_ddcb(struct	cxl_afu_h *afu_h, int seq)
+{
+	uint64_t	reg;
+
+	reg = (uint64_t)seq << 48 | 1;	/* Set Seq. Number + Start Bit */
+	cxl_mmio_write64(afu_h, MMIO_DDCBQ_COMMAND_REG, reg);
 }
 
 /*	set command into next DDCB Slot */
@@ -525,9 +527,8 @@ static int __ddcb_execute_multi(void *card_data, struct ddcb_cmd *cmd)
 	struct	tx_waitq *txq = NULL;
 	ddcb_t	*ddcb;
 	int	idx = 0;
-	int	seq;
-	struct	ddcb_cmd *my_cmd = cmd;
-	uint64_t	reg;
+	int	seq, val;
+	struct	ddcb_cmd *my_cmd;
 
 	if (NULL == ttx)
 		return DDCB_ERR_INVAL;
@@ -535,38 +536,39 @@ static int __ddcb_execute_multi(void *card_data, struct ddcb_cmd *cmd)
 		return DDCB_ERR_INVAL;
 	if (NULL == cmd)
 		return DDCB_ERR_INVAL;
-	ctx = ttx->ctx;	/* get card Context */
+	ctx = ttx->ctx;					/* get card Context */
+	my_cmd = cmd;
+
 	while (my_cmd) {
+		sem_getvalue(&ctx->free_sem, &val);
+		sem_wait(&ctx->free_sem);
 		pthread_mutex_lock(&ctx->lock);
 		idx = ctx->ddcb_in;
 		ddcb = &ctx->ddcb[idx];
 		txq = &ctx->waitq[idx];
-		if (DDCB_FREE == txq->status) {
-			txq->status = DDCB_IN;
-			seq = (int)ctx->ddcb_seqnum;	/* Get seq */
-			txq->seqnum = seq;		/* Set seq into thread ctx */
-			txq->cmd = my_cmd;
-			ctx->ddcb_seqnum++;		/* Next seq */
-			VERBOSE2("__ddcb_execute seq: 0x%x slot: %d cmd: %p\n",
-				seq, idx, my_cmd);
-			/* Increment ddcb_in and warp back to 0 */
-			ctx->ddcb_in = (ctx->ddcb_in + 1) % ctx->ddcb_num;
-			/* Check for Next cmd */
-			my_cmd = (struct ddcb_cmd *)my_cmd->next_addr;
-			if (NULL == my_cmd)
-				txq->wait_sem = true;
-			pthread_mutex_unlock(&ctx->lock);
-			cmd_2_ddcb(ddcb, cmd, seq);
-			reg = (uint64_t)seq << 48 | 1;	/* Set Seq. Number + Start Bit */
-			cxl_mmio_write64(ctx->afu_h, MMIO_DDCBQ_COMMAND_REG, reg);
-		} else {
-			ctx->busy_wait++;
-			pthread_mutex_unlock(&ctx->lock);
-			sem_wait(&ctx->busy_sem);
-		}
+		txq->ttx = ttx;			/* set ttx pointer into txq */
+		txq->status = DDCB_IN;
+		seq = (int)ctx->ddcb_seqnum;	/* Get seq */
+		txq->cmd = my_cmd;		/* my command to txq */
+		txq->seqnum = ctx->ddcb_seqnum;	/* Save seq Number */
+		ctx->ddcb_seqnum++;		/* Next seq */
+		VERBOSE2("__ddcb_execute seq: 0x%x slot: %d cmd: %p\n",
+			seq, idx, my_cmd);
+		/* Increment ddcb_in and warp back to 0 */
+		ctx->ddcb_in = (ctx->ddcb_in + 1) % ctx->ddcb_num;
+		cmd_2_ddcb(ddcb, cmd, seq);
+		start_ddcb(ctx->afu_h, seq);
+		/* Get  Next cmd and continue if there is one */
+		my_cmd = (struct ddcb_cmd *)my_cmd->next_addr;
+		if (NULL == my_cmd)
+			txq->thread_wait = true;
+		pthread_mutex_unlock(&ctx->lock);
 	}
-	sem_wait(&txq->sem);		/* And Block */
-	return txq->compl_code;		/* Give Completion code back to caller */
+	/* Block Caller */
+	VERBOSE2("__ddcb_execute Wait ttx: %p\n", ttx);
+	sem_wait(&ttx->wait_sem);
+	VERBOSE2("__ddcb_execute return ttx: %p\n", ttx);
+	return ttx->compl_code;		/* Give Completion code back to caller */
 }
 
 static int ddcb_execute(void *card_data, struct ddcb_cmd *cmd)
@@ -584,13 +586,14 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 	int	idx;
 	ddcb_t	*ddcb;
 	struct	tx_waitq	*txq;
+	struct	ttxs		*ttx;
 
 	idx = ctx->ddcb_out;
 	ddcb = &ctx->ddcb[idx];
 	txq = &ctx->waitq[idx];
 	if (libddcb_verbose > 3) {
-		VERBOSE0("DDCB %d [%016llx] after execution compl_code: %d\n",
-			idx, (long long)ddcb, compl_code);
+		VERBOSE0("DDCB %d [%016llx] after execution compl_code: %d ddcb->retc16: %4.4x\n",
+			idx, (long long)ddcb, compl_code, ddcb->retc_16);
 		ddcb_hexdump(stderr, ddcb, sizeof(ddcb_t));
 	}
 
@@ -601,34 +604,28 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 			return false; /* do not continue */
 		}
 	}
+
 	if (DDCB_IN == txq->status) {
-		VERBOSE2("\t__ddcb_done_thread seq: 0x%x slot: %d cmd: %p\n",
-			txq->seqnum, idx, txq->cmd);
-		pthread_mutex_lock(&ctx->lock);
-		ddcb_2_cmd(ddcb, txq->cmd);
-		ddcb->retc_16 = 0;
-		if (txq->wait_sem) {
-			txq->compl_code = compl_code;
-			VERBOSE2("\t__ddcb_done_thread seq: 0x%x slot: %d "
-				 "cmd: %p POST compl_code: %d\n",
-				 txq->seqnum, idx, txq->cmd, compl_code);
-			sem_post(&txq->sem);
-			txq->wait_sem = false;
+		ttx = txq->ttx;
+		VERBOSE1("\t__ddcb_done_thread seq: 0x%x slot: %d ttx: %p\n",
+			txq->seqnum, idx, ttx);
+		ddcb_2_cmd(ddcb, txq->cmd);	/* Copy DDCB back to CMD */
+		ttx->compl_code = compl_code;
+		VERBOSE2("\t__ddcb_done_thread seq: 0x%x slot: %d "
+			 "cmd: %p compl_code: %d\n",
+			 txq->seqnum, idx, txq->cmd, compl_code);
+		sem_post(&ctx->free_sem);
+		if (txq->thread_wait) {
+			VERBOSE2("\t__ddcb_done_thread Post: %p\n", ttx);
+			sem_post(&ttx->wait_sem);
+			txq->thread_wait = false;
 		}
+
 		/* Increment and wrap back to start */
 		ctx->ddcb_out = (ctx->ddcb_out + 1) % ctx->ddcb_num;
 		txq->status = DDCB_FREE;
-		while (ctx->busy_wait) {
-			VERBOSE2("\t__ddcb_done_thread post busy_wait %d\n",
-				ctx->busy_wait);
-			sem_post(&ctx->busy_sem);
-			ctx->busy_wait--;
-		}
-		pthread_mutex_unlock(&ctx->lock);
 		return true;		/* Continue */
 	}
-	/* This can happen if i did get a Event and no ddcb is active
-	   at this time */
 	return false;			/* do not continue */
 }
 
@@ -647,17 +644,16 @@ static void *__ddcb_done_thread(void *card_data)
 		timeout.tv_sec = ctx->tout;
 		timeout.tv_usec = 0;
 		rc = select(ctx->afu_fd + 1, &set, NULL, NULL, &timeout);
+
 		if (0 == rc) {
 			VERBOSE2("WARNING: %d sec timeout while waiting "
 				 "for interrupt! rc: %d --> %d\n",
 				 ctx->tout, rc, DDCB_ERR_IRQTIMEOUT);
-			__ddcb_done_post(ctx, DDCB_ERR_IRQTIMEOUT);
 			continue;
 		}
 		if ((rc == -1) && (errno == EINTR)) {
 			VERBOSE0("WARNING: select returned -1 "
 				 "and errno was EINTR, retrying\n");
-			afu_print_status(ctx->afu_h);
 			continue;
 		}
 
@@ -689,10 +685,11 @@ static void *__ddcb_done_thread(void *card_data)
 			"\tevent.header.type = %d event.header.size = %d\n",
 			rc, ctx->event.header.type, ctx->event.header.size);
 
+		pthread_mutex_lock(&ctx->lock);
 		switch (ctx->event.header.type) {
 		case CXL_EVENT_AFU_INTERRUPT:
 			/* Process all ddcb's */
-			VERBOSE1("\tCXL_EVENT_AFU_INTERRUPT: flags: 0x%x "
+			VERBOSE2("\tCXL_EVENT_AFU_INTERRUPT: flags: 0x%x "
 				 "irq: 0x%x\n",
 				ctx->event.irq.flags,
 				ctx->event.irq.irq);
@@ -705,7 +702,6 @@ static void *__ddcb_done_thread(void *card_data)
 				(long long)ctx->event.fault.addr,
 				(long long)ctx->event.fault.dsisr);
 			afu_print_status(ctx->afu_h);
-
 			__ddcb_done_post(ctx, DDCB_ERR_EVENTFAIL);
 			break;
 		case CXL_EVENT_AFU_ERROR:
@@ -714,7 +710,6 @@ static void *__ddcb_done_thread(void *card_data)
 				ctx->event.afu_error.flags,
 				(long long)ctx->event.afu_error.error);
 			afu_print_status(ctx->afu_h);
-
 			__ddcb_done_post(ctx, DDCB_ERR_EVENTFAIL);
 			break;
 		default:
@@ -723,6 +718,7 @@ static void *__ddcb_done_thread(void *card_data)
 			__ddcb_done_post(ctx, DDCB_ERR_EVENTFAIL);
 			break;
 		}
+		pthread_mutex_unlock(&ctx->lock);
 	}
 	return NULL;
 }
