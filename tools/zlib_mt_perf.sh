@@ -32,12 +32,11 @@
 export ZLIB_ACCELERATOR=GENWQE
 export ZLIB_CARD=0
 export ZLIB_DEFLATE_IMPL=0x01 # Use hardware by default
-export ZLIB_INFLATE_IMPL=0x01 # Use hardware by default
-
+export ZLIB_INFLATE_IMPL=0x01
 export PATH=/opt/genwqe/bin/genwqe:$PATH
 
 version="https://github.com/ibm-genwqe/genwqe-user"
-verbose=0
+verbose=""
 
 # Print usage message helper function
 function usage() {
@@ -48,14 +47,16 @@ function usage() {
     echo "    [-C]  <card> set the compression card to use (0, 1, ... )."
     echo "          RED (or -1) drive work to all available cards."
     echo "    [-v]  Print status and informational output."
-    echo "          -vv for more verbosity"
     echo "    [-V]  Print program version (${version})"
     echo "    [-h]  Print this help message."
+    echo
+    echo "Input data is to be placed in /tmp/test_data.bin."
+    echo "If it is not existent, the script will generate random example data."
     echo
 }
 
 # Parse any options given on the command line
-while getopts "hA:C:vV" opt; do
+while getopts "A:C:vVh" opt; do
     case ${opt} in
 	A)
 	    ZLIB_ACCELERATOR=${OPTARG};
@@ -64,7 +65,7 @@ while getopts "hA:C:vV" opt; do
             ZLIB_CARD=${OPTARG};
             ;;
         v)
-            verbose+=1;
+            verbose="-v";
             ;;
         V)
             echo "${version}"
@@ -100,39 +101,47 @@ echo
 echo -n "Number of available processors: $cpus"
 
 echo
-echo "DEFLATE"
-echo "Figure out maximum throughput and #threads which work best"
-for t in 1 2 3 4 8 16 32 64 128 ; do
-    zlib_mt_perf -i$bufsize -o$bufsize -D -f /tmp/test_data.bin \
-	-c$count -t$t ;
+echo "DEFLATE Figure out maximum throughput and #threads which work best"
+print_hdr=""
+for t in 1 2 3 4 8 16 32 64 128 160 ; do
+    zlib_mt_perf $verbose -i$bufsize -o$bufsize -D -f /tmp/test_data.bin \
+	-c$count -t$t $print_hdr;
     # sleep 1 ;
+    print_hdr="-N";
 done
 
 echo
-echo "Use optimal number of threads, guessing $cpus here, and see influence of buffer size"
+echo "DEFLATE Use optimal #threads, guessing $cpus, influence of buffer size"
+print_hdr=""
 t=$cpus # FIXME ;-)
 for b in 1KiB 4KiB 64KiB 128KiB 1MiB 4MiB 8MiB ; do
-    zlib_mt_perf -i$b -o$b -D -f /tmp/test_data.bin -c$count -t$t ;
+    zlib_mt_perf $verbose -i$b -o$b -D -f /tmp/test_data.bin -c$count -t$t \
+	$print_hdr;
     # sleep 1 ;
+    print_hdr="-N";
 done
 
 gzip -f -c /tmp/test_data.bin > /tmp/test_data.bin.gz
 
 echo
-echo "INFLATE"
-echo "Figure out maximum throughput and #threads which work best"
-for t in 1 2 3 4 8 16 32 64 128 ; do
-    zlib_mt_perf -i$bufsize -o$bufsize -f /tmp/test_data.bin.gz \
-	-c$count -t$t ;
+echo "INFLATE Figure out maximum throughput and #threads which work best"
+print_hdr=""
+for t in 1 2 3 4 8 16 32 64 128 160 ; do
+    zlib_mt_perf $verbose -i$bufsize -o$bufsize -f /tmp/test_data.bin.gz \
+	-c$count -t$t $print_hdr;
     # sleep 1 ;
+    print_hdr="-N";
 done
 
 echo
-echo "Use optimal number of threads, guessing $cpus here, and see influence of buffer size"
+echo "INFLATE Use optimal #threads, guessing $cpus, influence of buffer size"
 t=$cpus # FIXME ;-)
+print_hdr=""
 for b in 1KiB 4KiB 64KiB 128KiB 1MiB 4MiB 8MiB ; do
-    zlib_mt_perf -i$b -o$b -f /tmp/test_data.bin.gz -c$count -t$t ;
+    zlib_mt_perf $verbose -i$b -o$b -f /tmp/test_data.bin.gz -c$count -t$t \
+	$print_hdr;
     # sleep 1 ;
+    print_hdr="-N";
 done
 
 exit 0

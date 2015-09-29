@@ -94,6 +94,7 @@
 #endif
 
 static pthread_mutex_t mutex;
+static bool print_hdr = true;
 static int verbose = 0;
 static unsigned int count = 0;
 static unsigned int CHUNK_i = 128 * 1024; /* 16384; */
@@ -605,10 +606,10 @@ static void __print_deflate_results(struct thread_data *d,
 	unsigned int comp_calls = 0;
 	unsigned long int defl_total = 0;
 
-	printfv(0, "DEFLATE Statistics\n"
-		"thread ;    TID ; err ; "
-		" #defl ;      bytes ;            time ;      throughput     ;"
-		" checksum ; in/out\n");
+	if (print_hdr)
+		printfv(0, "thread ;    TID ; err ; "
+			" #defl ;      bytes ;            time ; "
+			"     throughput     ; checksum ; in/out\n");
 
 	for (i = 0; i < threads; i++) {
 		printfv(1, "%6d ; %6ld ; %3d ; "
@@ -649,10 +650,10 @@ static void __print_inflate_results(struct thread_data *d,
 	unsigned int decomp_calls=0;
 	unsigned long int infl_total=0;
 
-	printfv(0, "INFLATE Statistics\n"
-		"thread ;    TID ; err ; "
-		" #defl ;      bytes ;            time ;      throughput     ;"
-		" checksum ; in/out\n");
+	if (print_hdr)
+		printfv(0, "thread ;    TID ; err ; "
+			" #defl ;      bytes ;            time ; "
+			"     throughput     ; checksum ; in/out\n");
 
 	for (i = 0; i < threads; i++) {
 		printfv(1, "%6d ; %6ld ; %3d ; "
@@ -715,12 +716,13 @@ int main(int argc, char **argv)
 			{ "filename",	 required_argument,  NULL, 'f' },
 			{ "deflate",	 no_argument,	     NULL, 'D' },
 			{ "pre-alloc-memory", no_argument,   NULL, 'P' },
+			{ "no-header",	 no_argument,	     NULL, 'N' },
 			{ "verbose",	 no_argument,	     NULL, 'v' },
 			{ "help",	 no_argument,	     NULL, 'h' },
 			{ 0,		 no_argument,	     NULL, 0   },
 		};
 
-		ch = getopt_long(argc, argv, "Xd:f:Dc:t:i:o:Ivh?",
+		ch = getopt_long(argc, argv, "Xd:f:Dc:t:i:o:Nvh?",
 				 long_options, &option_index);
 		if (ch == -1)    /* all params processed ? */
 			break;
@@ -751,6 +753,9 @@ int main(int argc, char **argv)
 			break;
 		case 'D':
 			infl_ndefl = 0;
+			break;
+		case 'N':
+			print_hdr = false;
 			break;
 		case 'h':
 		case '?':
