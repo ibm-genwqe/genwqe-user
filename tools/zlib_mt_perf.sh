@@ -37,26 +37,31 @@ export PATH=/opt/genwqe/bin/genwqe:$PATH
 
 version="https://github.com/ibm-genwqe/genwqe-user"
 verbose=""
+test_data="/tmp/test_data.bin"
 
 # Print usage message helper function
 function usage() {
     echo "Usage of $PROGRAM:"
-    echo "    [-A]  <accelerator> use either GENWQE for the PCIe and CAPI for"
-    echo "          CAPI based soltuion available only on System p"
-    echo "          Use SW to use software compress/decompression"
-    echo "    [-C]  <card> set the compression card to use (0, 1, ... )."
+    echo "    [-A] <accelerator> use either GENWQE for the PCIe and CAPI for"
+    echo "         CAPI based soltuion available only on System p"
+    echo "         Use SW to use software compress/decompression"
+    echo "    [-C] <card> set the compression card to use (0, 1, ... )."
     echo "          RED (or -1) drive work to all available cards."
-    echo "    [-v]  Print status and informational output."
-    echo "    [-V]  Print program version (${version})"
-    echo "    [-h]  Print this help message."
+    echo "    [-t] <test_data.bin>"
+    echo "    [-v] Print status and informational output."
+    echo "    [-V] Print program version (${version})"
+    echo "    [-h] Print this help message."
     echo
-    echo "Input data is to be placed in /tmp/test_data.bin."
+    echo "Input data is to be placed in ${test_data}."
     echo "If it is not existent, the script will generate random example data."
+    echo "Note that the path needs to be setup to find the zlib_mt_perf tool."
+    echo "E.g. run as follows:"
+    echo "  PATH=tools:\$PATH tools/zlib_mt_perf.sh"
     echo
 }
 
 # Parse any options given on the command line
-while getopts "A:C:vVh" opt; do
+while getopts "A:C:t:vVh" opt; do
     case ${opt} in
 	A)
 	    ZLIB_ACCELERATOR=${OPTARG};
@@ -64,6 +69,9 @@ while getopts "A:C:vVh" opt; do
         C)
             ZLIB_CARD=${OPTARG};
             ;;
+	t)
+	    test_data=${OPTARG};
+	    ;;
         v)
             verbose="-v";
             ;;
@@ -89,8 +97,11 @@ fi
 
 # Random data cannot being compressed. Performance values might be poor.
 # Text data e.g. logfiles work pretty well. Use those if available.
-if [ ! -f /tmp/test_data.bin ]; then
-    dd if=/dev/urandom of=/tmp/test_data.bin count=1024 bs=4096
+if [ ! -f ${test_data} ]; then
+    dd if=/dev/urandom of=${test_data} count=1024 bs=4096
+fi
+if [ ! -f ${test_data}.gz ]; then
+    gzip -f -c ${test_data} > ${test_data}.gz
 fi
 
 cpus=`cat /proc/cpuinfo | grep processor | wc -l`
@@ -98,13 +109,22 @@ bufsize=1MiB
 count=1
 
 echo
-echo -n "Number of available processors: $cpus"
+uname -a
+echo "Accelerator:     ${ZLIB_ACCELERATOR}"
+echo "Processors:      $cpus"
+echo -n "Raw data:        "
+du -h ${test_data}
+echo -n "Compressed data: "
+du -h ${test_data}.gz
+
+echo "IBM Processing accelerators:"
+lspci | grep "Processing accelerators: IBM"
 
 echo
 echo "DEFLATE Figure out maximum throughput and #threads which work best"
 print_hdr=""
 for t in 1 2 3 4 8 16 32 64 128 160 ; do
-    zlib_mt_perf $verbose -i$bufsize -o$bufsize -D -f /tmp/test_data.bin \
+    zlib_mt_perf $verbose -i$bufsize -o$bufsize -D -f ${test_data} \
 	-c$count -t$t $print_hdr;
     # sleep 1 ;
     print_hdr="-N";
@@ -115,19 +135,17 @@ echo "DEFLATE Use optimal #threads, guessing $cpus, influence of buffer size"
 print_hdr=""
 t=$cpus # FIXME ;-)
 for b in 1KiB 4KiB 64KiB 128KiB 1MiB 4MiB 8MiB ; do
-    zlib_mt_perf $verbose -i$b -o$b -D -f /tmp/test_data.bin -c$count -t$t \
+    zlib_mt_perf $verbose -i$b -o$b -D -f ${test_data} -c$count -t$t \
 	$print_hdr;
     # sleep 1 ;
     print_hdr="-N";
 done
 
-gzip -f -c /tmp/test_data.bin > /tmp/test_data.bin.gz
-
 echo
 echo "INFLATE Figure out maximum throughput and #threads which work best"
 print_hdr=""
 for t in 1 2 3 4 8 16 32 64 128 160 ; do
-    zlib_mt_perf $verbose -i$bufsize -o$bufsize -f /tmp/test_data.bin.gz \
+    zlib_mt_perf $verbose -i$bufsize -o$bufsize -f ${test_data}.gz \
 	-c$count -t$t $print_hdr;
     # sleep 1 ;
     print_hdr="-N";
@@ -138,7 +156,7 @@ echo "INFLATE Use optimal #threads, guessing $cpus, influence of buffer size"
 t=$cpus # FIXME ;-)
 print_hdr=""
 for b in 1KiB 4KiB 64KiB 128KiB 1MiB 4MiB 8MiB ; do
-    zlib_mt_perf $verbose -i$b -o$b -f /tmp/test_data.bin.gz -c$count -t$t \
+    zlib_mt_perf $verbose -i$b -o$b -f ${test_data}.gz -c$count -t$t \
 	$print_hdr;
     # sleep 1 ;
     print_hdr="-N";
