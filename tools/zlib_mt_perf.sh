@@ -33,7 +33,7 @@ export ZLIB_ACCELERATOR=GENWQE
 export ZLIB_CARD=0
 export ZLIB_DEFLATE_IMPL=0x01 # Use hardware by default
 export ZLIB_INFLATE_IMPL=0x01
-export PATH=/opt/genwqe/bin/genwqe:$PATH
+export PATH=/opt/genwqe/bin/genwqe:/sbin:/usr/sbin:$PATH
 
 version="https://github.com/ibm-genwqe/genwqe-user"
 verbose=""
@@ -43,7 +43,7 @@ test_data="/tmp/test_data.bin"
 function usage() {
     echo "Usage of $PROGRAM:"
     echo "    [-A] <accelerator> use either GENWQE for the PCIe and CAPI for"
-    echo "         CAPI based soltuion available only on System p"
+    echo "         CAPI based solution available only on System p"
     echo "         Use SW to use software compress/decompression"
     echo "    [-C] <card> set the compression card to use (0, 1, ... )."
     echo "          RED (or -1) drive work to all available cards."
@@ -53,10 +53,22 @@ function usage() {
     echo "    [-h] Print this help message."
     echo
     echo "Input data is to be placed in ${test_data}."
-    echo "If it is not existent, the script will generate random example data."
+    echo "If it does not exist, the script will generate random example data."
+    echo "Using random data will cause performance to suffer, since it"
+    echo "will not compress nicely. So using something more realistic is"
+    echo "certainly a good idea."
+    echo
     echo "Note that the path needs to be setup to find the zlib_mt_perf tool."
+    echo
     echo "E.g. run as follows:"
-    echo "  PATH=tools:\$PATH tools/zlib_mt_perf.sh"
+    echo "  Use GenWQE accelerator card 0:"
+    echo "    PATH=tools:\$PATH tools/zlib_mt_perf.sh -A GENWQE -C0"
+    echo
+    echo "  Use CAPI accelerator card 0:"
+    echo "    PATH=tools:\$PATH tools/zlib_mt_perf.sh -A CAPI -C0"
+    echo
+    echo "  Use software zlib:"
+    echo "    PATH=tools:\$PATH tools/zlib_mt_perf.sh -A SW"
     echo
 }
 
