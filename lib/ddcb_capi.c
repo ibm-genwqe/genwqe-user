@@ -720,6 +720,7 @@ static void *__ddcb_done_thread(void *card_data)
 			VERBOSE2("WARNING: %d sec timeout while waiting "
 				 "for interrupt! rc: %d --> %d\n",
 				 ctx->tout, rc, DDCB_ERR_IRQTIMEOUT);
+			__ddcb_done_post(ctx, DDCB_ERR_IRQTIMEOUT);
 			rt_trace_dump();
 			continue;
 		}
