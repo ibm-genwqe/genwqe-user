@@ -353,16 +353,16 @@ static void *__memcpy_thread(void *data)
                 err = EX_MEMORY;
 		goto __memcpy_exit_2;
         }
-	memset(ddcb_list, 0, ip->preload * sizeof(struct ddcb_cmd));
 	VERBOSE1("Thread: %d memcopy: %p (in) to %p (out), pageoffs %d (in) "
-		"%d (out), %d bytes\n",
+		"%d (out), %d bytes Preload: %d\n",
 		pt->thread, pt->ibuf, obuf,
-		ip->pgoffs_i, ip->pgoffs_o, ip->data_buf_size);
+		ip->pgoffs_i, ip->pgoffs_o, ip->data_buf_size, ip->preload);
 	clock_gettime(CLOCK_MONOTONIC_RAW, &stime);
 	pt->stime.tv_sec = stime.tv_sec;	/* Save Start Time */
 	pt->stime.tv_nsec = stime.tv_nsec;	/* Save Start Time */
 
-	while (count && (false == stop_memcopying)) {
+	for (count = 0; count < ip->count; count++) {
+		if (stop_memcopying) break;
 		int xerrno;
 
 		/* preset output buffer when we check results */
@@ -384,6 +384,7 @@ static void *__memcpy_thread(void *data)
 		pt->etime.tv_sec = etime.tv_sec;	/* Save End Time */
 		pt->etime.tv_nsec = etime.tv_nsec;	/* Save End Time */
 		total_usec += tdiff_us(&etime, &stime);
+		ddcb0 = ddcb_list;	/* i only use the 1st ddcb */
 
 		if (rc != DDCB_OK) {
 			struct _asv_runtime_dma_error *d;
@@ -391,7 +392,6 @@ static void *__memcpy_thread(void *data)
 				"     errno=%d %s\n", pt->thread, pt->memcopies,
 				ddcb_strerror(rc), rc, xerrno,
 				strerror(xerrno));
-			ddcb0 = ddcb_list;	/* i only use the 1st ddcb */
 			fprintf(stderr, "  RETC: %03x %s ATTN: %x PROGR: %x\n"
 				"  from card CRC32: %08x ADLER: %08x\n"
 				"  original  CRC32: %08x ADLER: %08x\n",
@@ -415,7 +415,8 @@ static void *__memcpy_thread(void *data)
 		if ((mcpy_crc32 != ip->mcpy_crc32) || (mcpy_adler32 != ip->mcpy_adler32)) {
 			fprintf(stderr, "ERR: Thread: %d CRC/ADLER does not match!\n"
 				"  from card CRC32: %08x ADLER: %08x\n"
-				"  original  CRC32: %08x ADLER: %08x at %d of %d loops\n", pt->thread,
+				"  original  CRC32: %08x ADLER: %08x at %d of %d loops\n",
+				pt->thread,
 				mcpy_crc32, mcpy_adler32, ip->mcpy_crc32, ip->mcpy_adler32,
 				count, ip->count);
 			errors++;
@@ -425,22 +426,23 @@ static void *__memcpy_thread(void *data)
 		    (ip->data_buf_size != (int)mcpy_outp_returned)) {
 			fprintf(stderr, "ERR: Thread: %d IN/OUT sizes do not match!\n"
 				"  from card IN: %08x OUT: %08x\n"
-				"  original  IN: %08x OUT: %08x\n", pt->thread,
+				"  original  IN: %08x OUT: %08x at %d of %d loops\n",
+				pt->thread,
 				mcpy_inp_processed, mcpy_outp_returned,
-				ip->data_buf_size, ip->data_buf_size);
+				ip->data_buf_size, ip->data_buf_size,
+				count, ip->count);
 			errors++;
 		}
-		if (ip->force_cmp ||
-		     ((mcpy_crc32 != ip->mcpy_crc32) || (mcpy_adler32 != ip->mcpy_adler32))) {
+		if (ip->force_cmp || errors) {
 			/* Check if data is correct  ... */
 			for (i = 0; i < ip->data_buf_size; i++) {
 				if (obuf[i] != pt->ibuf[i]) {
-					EVERBOSE("\nERR: Thread. %d @ offs %08x\n"
+					EVERBOSE("\nERR: Thread: %d @ offs %08x\n"
 						"  RETC: %03x %s ATTN: %x "
 						"PROGR: %x\n"
 						"  INP_PROCESSED: %08x "
-						"OUTP_RETURNED: %08x\n", pt->thread, i,
-						ddcb0->retc,
+						"OUTP_RETURNED: %08x\n",
+						pt->thread, i, ddcb0->retc,
 						ddcb_retc_strerror(ddcb0->retc),
 						ddcb0->attn, ddcb0->progress,
 						mcpy_inp_processed,
@@ -463,7 +465,7 @@ static void *__memcpy_thread(void *data)
 				errors++;
 			}
 		}
-		count--;
+		if (errors) break;
 		memcopies += ip->preload;
 		bytes_copied += (long long)ip->preload * ip->data_buf_size;
 	}
@@ -786,7 +788,7 @@ int main(int argc, char *argv[])
 	signal(SIGINT, INT_handler);
 
 	pt = &tdata[0];
-	for (thread = 0; thread < ip.threads; thread++) {
+	for (thread = 0; thread < ip.threads; thread++, pt++) {
 		pt->thread = thread;
 		pt->ip = &ip;		/* Set input parms */
 		pt->err = 0;
@@ -811,11 +813,15 @@ int main(int argc, char *argv[])
 			accel_close(pt->accel);
 			break;
 		}
-		if (0 == pthread_create(&tid, NULL, &__memcpy_thread, pt)) {
-			pt->tid = tid;
-			ip.have_threads++;
+	}
+	pt = &tdata[0];
+	for (thread = 0; thread < ip.threads; thread++, pt++) {
+		if (0 == pt->err) {
+			if (0 == pthread_create(&tid, NULL, &__memcpy_thread, pt)) {
+				pt->tid = tid;
+				ip.have_threads++;
+			}
 		}
-		pt++;
 	}
 
 	pt = &tdata[0];
@@ -865,7 +871,9 @@ int main(int argc, char *argv[])
 		errors += pt->errors;
 		__memcpy_free_ibuf(&ip, pt);
 		accel_close(pt->accel);
-
+		VERBOSE1("Thread %02d Start: %08lld - %08lld End: %08lld - %08lld\n",
+			thread, (long long)pt->stime.tv_sec, (long long)pt->stime.tv_nsec,
+			(long long)pt->etime.tv_sec, (long long)pt->etime.tv_nsec);
 		/* Update lowest start time */
 		time_low(&ip.stime, &pt->stime);
 		/* Update highest end time */
