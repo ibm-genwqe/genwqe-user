@@ -141,6 +141,71 @@ struct dev_ctx {
 
 static struct dev_ctx my_ctx;	/* My Card */
 
+
+/*	Add trace function by setting RT_TRACE */
+//#define RT_TRACE
+#ifdef RT_TRACE
+#define	RT_TRACE_SIZE 1000
+struct trc_stru {
+	uint32_t	tok;
+	uint32_t	tid;
+	uint32_t	n1;
+	uint32_t	n2;
+	void	*p;
+};
+
+static int trc_idx = 0, trc_wrap = 0;
+static struct trc_stru trc_buff[RT_TRACE_SIZE];
+static pthread_mutex_t	trc_lock;
+
+static void rt_trace_init(void)
+{
+	pthread_mutex_init(&trc_lock, NULL);
+}
+
+static void rt_trace(uint32_t tok, uint32_t n1, uint32_t n2, void *p)
+{
+	int	i;
+
+	pthread_mutex_lock(&trc_lock);
+	i = trc_idx;
+	trc_buff[i].tid = (uint32_t)pthread_self();
+	trc_buff[i].tok = tok;
+	trc_buff[i].n1 = n1;
+	trc_buff[i].n2= n2;
+	trc_buff[i].p = p;
+	i++;
+	if (i == RT_TRACE_SIZE) {
+		i = 0;
+		trc_wrap++;
+	}
+	trc_idx = i;
+	pthread_mutex_unlock(&trc_lock);
+}
+static void rt_trace_dump(void)
+{
+	int i;
+
+	if (0 == trc_idx) return;
+	fprintf(stderr, "Index: %d Warp: %d\n", trc_idx, trc_wrap);
+	for (i = 0; i < RT_TRACE_SIZE; i++) {
+		if (0 == trc_buff[i].tok) break;
+		fprintf(stderr, "%03d: %04x - %04x - %04x - %04x - %p\n",
+			i, trc_buff[i].tid, trc_buff[i].tok,
+			trc_buff[i].n1, trc_buff[i].n2, trc_buff[i].p);
+	}
+	trc_idx = 0;
+}
+#else
+static void rt_trace_init(void) {}
+static void rt_trace(uint32_t tok __attribute__((unused)),
+			uint32_t n1 __attribute__((unused)),
+			uint32_t n2 __attribute__((unused)),
+			void *p __attribute__((unused))) {}
+static void rt_trace_dump(void) {}
+
+#endif
+
 /*	Command to ddcb */
 static inline void cmd_2_ddcb(ddcb_t *pddcb, struct ddcb_cmd *cmd,
 			      uint16_t seqnum)
@@ -508,6 +573,7 @@ static int card_close(void *card_data)
 		pthread_join(ctx->ddcb_done_tid, &res);
 		__afu_close(ctx);
 	}
+	rt_trace_dump();
 	return DDCB_OK;
 }
 
@@ -541,6 +607,7 @@ static int __ddcb_execute_multi(void *card_data, struct ddcb_cmd *cmd)
 
 	while (my_cmd) {
 		sem_getvalue(&ctx->free_sem, &val);
+		rt_trace(0x00a0, -1, val, ttx);
 		sem_wait(&ctx->free_sem);
 		pthread_mutex_lock(&ctx->lock);
 		idx = ctx->ddcb_in;
@@ -552,6 +619,7 @@ static int __ddcb_execute_multi(void *card_data, struct ddcb_cmd *cmd)
 		txq->cmd = my_cmd;		/* my command to txq */
 		txq->seqnum = ctx->ddcb_seqnum;	/* Save seq Number */
 		ctx->ddcb_seqnum++;		/* Next seq */
+		rt_trace(0x00a1, seq, idx, ttx);
 		VERBOSE2("__ddcb_execute seq: 0x%x slot: %d cmd: %p\n",
 			seq, idx, my_cmd);
 		/* Increment ddcb_in and warp back to 0 */
@@ -567,6 +635,7 @@ static int __ddcb_execute_multi(void *card_data, struct ddcb_cmd *cmd)
 	/* Block Caller */
 	VERBOSE2("__ddcb_execute Wait ttx: %p\n", ttx);
 	sem_wait(&ttx->wait_sem);
+	rt_trace(0x00af, ttx->seqnum, idx, ttx);
 	VERBOSE2("__ddcb_execute return ttx: %p\n", ttx);
 	return ttx->compl_code;		/* Give Completion code back to caller */
 }
@@ -614,8 +683,10 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 		VERBOSE2("\t__ddcb_done_thread seq: 0x%x slot: %d "
 			 "cmd: %p compl_code: %d\n",
 			 txq->seqnum, idx, txq->cmd, compl_code);
+		rt_trace(0x0011, txq->seqnum, idx, ttx);
 		sem_post(&ctx->free_sem);
 		if (txq->thread_wait) {
+			rt_trace(0x0012, txq->seqnum, idx, ttx);
 			VERBOSE2("\t__ddcb_done_thread Post: %p\n", ttx);
 			sem_post(&ttx->wait_sem);
 			txq->thread_wait = false;
@@ -649,6 +720,7 @@ static void *__ddcb_done_thread(void *card_data)
 			VERBOSE2("WARNING: %d sec timeout while waiting "
 				 "for interrupt! rc: %d --> %d\n",
 				 ctx->tout, rc, DDCB_ERR_IRQTIMEOUT);
+			rt_trace_dump();
 			continue;
 		}
 		if ((rc == -1) && (errno == EINTR)) {
@@ -879,6 +951,7 @@ static void capi_card_init(void)
 	struct	dev_ctx *ctx = &my_ctx;
 	int	rc;
 
+	rt_trace_init();
 	rc = pthread_mutex_init(&ctx->lock, NULL);
 	if (0 != rc) {
 		VERBOSE0("Error: initializing mutex failed!\n");
