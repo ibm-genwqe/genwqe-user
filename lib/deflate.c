@@ -471,7 +471,8 @@ static int deflate_process_results(struct zedc_stream_s *strm,
 
 	/* sum of uncompressed bytes used for RFC 1952) */
 	if (len > strm->avail_in) {
-		pr_err("inp_processed invalid\n");
+		pr_err("inp_processed=%d avail_in=%d invalid\n",
+		       strm->inp_processed, strm->avail_in);
 		zedc->zedc_rc = ZEDC_ERR_RETLEN;
 		return zedc->zedc_rc;
 	}
@@ -484,7 +485,11 @@ static int deflate_process_results(struct zedc_stream_s *strm,
 
 	/* Sanity check */
 	if ((len == 0) || (len > strm->avail_out)) {
-		pr_err("outp_returned (%u) invalid\n", len);
+		pr_err("outp_returned=%u inp_processed=%d "
+		       "avail_in=%d avail_out=%d "
+		       "invalid\n",
+		       strm->outp_returned, strm->inp_processed,
+		       strm->avail_in, strm->avail_out);
 		zedc->zedc_rc = ZEDC_ERR_RETLEN;
 		return zedc->zedc_rc;
 	}
