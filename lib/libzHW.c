@@ -249,89 +249,87 @@ void zedc_asiv_infl_print(zedc_streamp strm)
  * @param asiv	pointer to data area
  *
  */
-void zedc_asiv_defl_print(zedc_streamp strm)
+void zedc_asiv_defl_print(zedc_streamp strm, int dbg)
 {
 	struct ddcb_cmd *cmd = &strm->cmd;
 	struct zedc_asiv_defl *asiv = (struct zedc_asiv_defl *)cmd->asiv;
 	uint32_t out_buff_len = __be32_to_cpu(asiv->out_buff_len);
 	uint32_t in_buff_len = __be32_to_cpu(asiv->in_buff_len);
 
-	pr_info("Deflate ASIV (sent):\n"
-		"  [20] IN_BUFF         = 0x%llx\n"
-		"  [28] IN_BUFF_LEN     = 0x%x (%d)\n"
-		"  [2c] IN_CRC32        = 0x%08x\n"
-		"  [30] OUT_BUFF        = 0x%llx\n"
-		"  [38] OUT_BUFF_LEN    = 0x%x (%d)\n"
-		"  [3c] IN_ADLER32      = 0x%08x\n"
-		"  [40] IN_DICT         = 0x%llx\n"
-		"  [48] IN_DICT_LEN     = 0x%x (%d)\n"
-		"  [60] OUT_DICT        = 0x%llx\n"
-		"  [68] OUT_DICT_LEN    = 0x%x (%d)\n"
-		"  [7f] INUMBITS        = 0x%x\n",
-		(long long)__be64_to_cpu(asiv->in_buff),
-		in_buff_len, in_buff_len,
-		__be32_to_cpu(asiv->in_crc32),
-		(long long)__be64_to_cpu(asiv->out_buff),
-		out_buff_len, out_buff_len,
-		__be32_to_cpu(asiv->in_adler32),
-		(long long)__be64_to_cpu(asiv->in_dict),
-		__be32_to_cpu(asiv->in_dict_len),
-		__be32_to_cpu(asiv->in_dict_len),
-		(long long)__be64_to_cpu(asiv->out_dict),
-		__be32_to_cpu(asiv->out_dict_len),
-		__be32_to_cpu(asiv->out_dict_len),
-		asiv->inumbits);
+	pr_log(dbg, "Deflate ASIV (sent):\n"
+	       "  [20] IN_BUFF         = 0x%llx\n"
+	       "  [28] IN_BUFF_LEN     = 0x%x (%d)\n"
+	       "  [2c] IN_CRC32        = 0x%08x\n"
+	       "  [30] OUT_BUFF        = 0x%llx\n"
+	       "  [38] OUT_BUFF_LEN    = 0x%x (%d)\n"
+	       "  [3c] IN_ADLER32      = 0x%08x\n"
+	       "  [40] IN_DICT         = 0x%llx\n"
+	       "  [48] IN_DICT_LEN     = 0x%x (%d)\n"
+	       "  [60] OUT_DICT        = 0x%llx\n"
+	       "  [68] OUT_DICT_LEN    = 0x%x (%d)\n"
+	       "  [7f] INUMBITS        = 0x%x\n",
+	       (long long)__be64_to_cpu(asiv->in_buff),
+	       in_buff_len, in_buff_len,
+	       __be32_to_cpu(asiv->in_crc32),
+	       (long long)__be64_to_cpu(asiv->out_buff),
+	       out_buff_len, out_buff_len,
+	       __be32_to_cpu(asiv->in_adler32),
+	       (long long)__be64_to_cpu(asiv->in_dict),
+	       __be32_to_cpu(asiv->in_dict_len),
+	       __be32_to_cpu(asiv->in_dict_len),
+	       (long long)__be64_to_cpu(asiv->out_dict),
+	       __be32_to_cpu(asiv->out_dict_len),
+	       __be32_to_cpu(asiv->out_dict_len),
+	       asiv->inumbits);
 
-	pr_info("\n"
-		"       ATS             = 0x%08llx\n"
-		"       CMD             = 0x%02x\n"
-		"       CMDOPTS         = 0x%02x\n",
-		(long long)cmd->ats, cmd->cmd, cmd->cmdopts);
+	pr_log(dbg, "\n"
+	       "       ATS             = 0x%08llx\n"
+	       "       CMD             = 0x%02x\n"
+	       "       CMDOPTS         = 0x%02x\n",
+	       (long long)cmd->ats, cmd->cmd, cmd->cmdopts);
 
-	pr_info("  [7f] IBITS: %02x %02x %02x %02x %02x %02x %02x\n",
-		asiv->ibits[0], asiv->ibits[1], asiv->ibits[2],
-		asiv->ibits[3], asiv->ibits[4], asiv->ibits[5],
-		asiv->ibits[6]);
+	pr_log(dbg, "  [7f] IBITS: %02x %02x %02x %02x %02x %02x %02x\n",
+	       asiv->ibits[0], asiv->ibits[1], asiv->ibits[2],
+	       asiv->ibits[3], asiv->ibits[4], asiv->ibits[5],
+	       asiv->ibits[6]);
 }
 
 /**
  * @brief	print 'Application Specific Variant' part of deflate DDCB
  * @param asv	pointer to data area
  */
-void zedc_asv_defl_print(zedc_streamp strm)
+void zedc_asv_defl_print(zedc_streamp strm, int dbg)
 {
 	struct ddcb_cmd *cmd = &strm->cmd;
 	struct zedc_asv_defl *asv = (struct zedc_asv_defl *)cmd->asv;
 	uint32_t inp_processed = __be32_to_cpu(asv->inp_processed);
 	uint32_t outp_returned = __be32_to_cpu(asv->outp_returned);
 
-	pr_info("Deflate ASV (received):\n"
-		"  [80] OUT_DICT_USED    = 0x%x (%d)\n"
-		"  [87] ONUMBITS         = 0x%x (%u)\n"
-		"  [90] OUT_CRC32        = 0x%08x\n"
-		"  [94] OUT_ADLER32      = 0x%08x\n"
-		"  [98] INP_PROCESSED    = 0x%x (%d)\n"
-		"  [9c] OUTP_RETURNED    = 0x%x (%d)\n"
-		"  [b8] OUT_DICT_OFFS    = 0x%x (%d)\n",
-		__be16_to_cpu(asv->out_dict_used),
-		__be16_to_cpu(asv->out_dict_used),
-		asv->onumbits, asv->onumbits,
-		__be32_to_cpu(asv->out_crc32),
-		__be32_to_cpu(asv->out_adler32),
-		inp_processed, inp_processed,
-		outp_returned, outp_returned,
-		asv->out_dict_offs, asv->out_dict_offs);
+	pr_log(dbg, "Deflate ASV (received):\n"
+	       "  [80] OUT_DICT_USED    = 0x%x (%d)\n"
+	       "  [87] ONUMBITS         = 0x%x (%u)\n"
+	       "  [90] OUT_CRC32        = 0x%08x\n"
+	       "  [94] OUT_ADLER32      = 0x%08x\n"
+	       "  [98] INP_PROCESSED    = 0x%x (%d)\n"
+	       "  [9c] OUTP_RETURNED    = 0x%x (%d)\n"
+	       "  [b8] OUT_DICT_OFFS    = 0x%x (%d)\n",
+	       __be16_to_cpu(asv->out_dict_used),
+	       __be16_to_cpu(asv->out_dict_used),
+	       asv->onumbits, asv->onumbits, __be32_to_cpu(asv->out_crc32),
+	       __be32_to_cpu(asv->out_adler32),
+	       inp_processed, inp_processed, outp_returned, outp_returned,
+	       asv->out_dict_offs, asv->out_dict_offs);
 
-	pr_info("\n"
-		"       ATS             = 0x%08llx\n"
-		"       CMD             = 0x%02x\n"
-		"       CMDOPTS         = 0x%02x\n",
-		(long long)cmd->ats, cmd->cmd, cmd->cmdopts);
+	pr_log(dbg, "\n"
+	       "       ATS             = 0x%08llx\n"
+	       "       CMD             = 0x%02x\n"
+	       "       CMDOPTS         = 0x%02x\n",
+	       (long long)cmd->ats, cmd->cmd, cmd->cmdopts);
 
-	if (zedc_dbg) {
-		pr_info("  OBITS:\n");
+	if (dbg) {
+		pr_log(dbg, "  OBITS:\n");
 		ddcb_hexdump(stderr, asv->obits, ZEDC_ONUMBYTES_v1);
-		pr_info("  OBITS_EXTRA:\n");
+		pr_log(dbg, "  OBITS_EXTRA:\n");
 		ddcb_hexdump(stderr, asv->obits_extra, ZEDC_ONUMBYTES_EXTRA);
 	}
 }

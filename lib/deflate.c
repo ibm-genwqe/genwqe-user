@@ -471,8 +471,15 @@ static int deflate_process_results(struct zedc_stream_s *strm,
 
 	/* sum of uncompressed bytes used for RFC 1952) */
 	if (len > strm->avail_in) {
-		pr_err("inp_processed=%d avail_in=%d invalid\n",
-		       strm->inp_processed, strm->avail_in);
+		pr_err("inp_processed=%d avail_in=%d invalid: "
+		       "  retc=%x attn=%x progress=%x\n",
+		       strm->inp_processed, strm->avail_in,
+		       strm->retc, strm->attn, strm->progress);
+
+		/* Now become really verbose ... Let's see what happend. */
+		zedc_asiv_defl_print(strm, 1);
+		zedc_asv_defl_print(strm, 1);
+
 		zedc->zedc_rc = ZEDC_ERR_RETLEN;
 		return zedc->zedc_rc;
 	}
@@ -486,10 +493,16 @@ static int deflate_process_results(struct zedc_stream_s *strm,
 	/* Sanity check */
 	if ((len == 0) || (len > strm->avail_out)) {
 		pr_err("outp_returned=%u inp_processed=%d "
-		       "avail_in=%d avail_out=%d "
-		       "invalid\n",
+		       "avail_in=%d avail_out=%d invalid: "
+		       "  retc=%x attn=%x progress=%x\n",
 		       strm->outp_returned, strm->inp_processed,
-		       strm->avail_in, strm->avail_out);
+		       strm->avail_in, strm->avail_out,
+		       strm->retc, strm->attn, strm->progress);
+
+		/* Now become really verbose ... Let's see what happend. */
+		zedc_asiv_defl_print(strm, 1);
+		zedc_asv_defl_print(strm, 1);
+
 		zedc->zedc_rc = ZEDC_ERR_RETLEN;
 		return zedc->zedc_rc;
 	}
@@ -740,15 +753,16 @@ int zedc_deflate(zedc_streamp strm, int flush)
 	}
 
 	for (i = 0; i < tries; i++) {
-		zedc_asiv_defl_print(strm);
+		zedc_asiv_defl_print(strm, zedc_dbg);
 		rc = zedc_execute_request(zedc, cmd);
-		zedc_asv_defl_print(strm);
+		zedc_asv_defl_print(strm, zedc_dbg);
 
 		strm->retc = cmd->retc;
 		strm->attn = cmd->attn;
 		strm->progress = cmd->progress;
 
-		if (rc < 0) {
+		/* Check for unexecuted DDCBs too, where RETC is 0x000. */
+		if ((rc < 0) || (cmd->retc == 0x000)) {
 			struct ddcb_cmd *cmd = &strm->cmd;
 
 			pr_err("deflate failed rc=%d\n"
@@ -774,8 +788,10 @@ int zedc_deflate(zedc_streamp strm, int flush)
 			asiv->out_dict = out_dict;
 			asiv->out_dict_len = out_dict_len;
 
-			fprintf(stderr, "[%s] What a pitty optimization did "
-				"not work\n", __func__);
+			pr_warn("[%s] What a pitty, optimization did "
+				"not work\n"
+				"  (RETC=%03x ATTN=%04x PROGR=%x)\n",
+				__func__, cmd->retc, cmd->attn, cmd->progress);
 		}
 	}
 

@@ -843,21 +843,21 @@ static void set_inflate_asiv(struct zedc_stream_s *strm,
 		strm->scratch_bits;
 
 	if (len % 8ULL)
-		pr_err("warn: in_hdr_scratch_len: 0x%llx not consistent "
-		       "(0x%x 0x%x 0x%x 0x%x)\n",
-		       (long long)len,
-		       (unsigned int)strm->tree_bits,
-		       (unsigned int)strm->pad_bits,
-		       (unsigned int)strm->scratch_ib,
-		       (unsigned int)strm->scratch_bits);
+		pr_warn("[%s] in_hdr_scratch_len: 0x%llx not consistent "
+			"(0x%x 0x%x 0x%x 0x%x)\n",
+			__func__, (long long)len,
+			(unsigned int)strm->tree_bits,
+			(unsigned int)strm->pad_bits,
+			(unsigned int)strm->scratch_ib,
+			(unsigned int)strm->scratch_bits);
 
 	strm->in_hdr_scratch_len = (uint32_t)(len / 8ULL);
 	strm->pre_scratch_bits = strm->tree_bits + strm->scratch_bits;
 
 	/* This must not exceed ZEDC_TREE_LEN */
 	if (strm->in_hdr_scratch_len > ZEDC_TREE_LEN)
-		pr_err("warn: in_scratch_len=%d exceeds ZEDC_TREE_LEN=%d\n",
-		       strm->in_hdr_scratch_len, ZEDC_TREE_LEN);
+		pr_warn("[%s] in_scratch_len=%d exceeds ZEDC_TREE_LEN=%d\n",
+			__func__, strm->in_hdr_scratch_len, ZEDC_TREE_LEN);
 
 	asiv->in_scratch_len = __cpu_to_be32(strm->in_hdr_scratch_len);
 
@@ -1177,8 +1177,8 @@ int zedc_inflate(zedc_streamp strm, int flush)
 			cmd->cmdopts |= DDCB_OPT_INFL_SAVE_DICT;
 			asiv->out_dict = out_dict;
 			asiv->out_dict_len = out_dict_len;
-			pr_err("[%s] What a pitty, we guessed wrong "
-			       "and need to repeat\n", __func__);
+			pr_warn("[%s] What a pitty, we guessed wrong "
+				"and need to repeat\n", __func__);
 		}
 	}
 
@@ -1244,9 +1244,9 @@ int zedc_inflate(zedc_streamp strm, int flush)
 	/* If FEOB is in the middle of input and output is not
 	   excausted yet, it might be just ok. */
 	if (strm->avail_in && strm->avail_out) {
-		pr_warn("input not completely processed "
+		pr_warn("[%s] input not completely processed "
 			"(avail_in=%d avail_out=%d zrc=%d)\n",
-			strm->avail_in, strm->avail_out, zrc);
+			__func__, strm->avail_in, strm->avail_out, zrc);
 	}
 
 	return zrc;

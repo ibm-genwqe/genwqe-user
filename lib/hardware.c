@@ -648,7 +648,9 @@ int h_deflate(z_streamp strm, int flush)
 				s->ibuf = s->ibuf_base;
 				s->ibuf_avail = s->ibuf_total;
 			} else {
-				pr_err("not all input absorbed!\n");
+				pr_err("not all input absorbed! "
+				       "avail_in is still %d bytes\n",
+				       h->avail_in);
 				return Z_STREAM_ERROR;
 			}
 
@@ -1490,6 +1492,7 @@ int h_inflateEnd(z_streamp strm)
 void zedc_hw_init(void)
 {
 	char *verb = getenv("ZLIB_VERBOSE");
+	char *accel = getenv("ZLIB_ACCELERATOR");
 	const char *inflate_impl = getenv("ZLIB_INFLATE_IMPL");;
 	const char *deflate_impl = getenv("ZLIB_DEFLATE_IMPL");;
 
@@ -1511,6 +1514,16 @@ void zedc_hw_init(void)
 	if (deflate_impl != NULL)
 		deflate_flags = strtol(deflate_impl, (char **)NULL, 0) &
 			~ZLIB_IMPL_MASK;
+
+	/*
+	 * USE_FLAT_BUFFERS and CACHE_HANDLES only work for GenWQE.
+	 */
+	if ((accel != NULL) && (strncmp(accel, "GENWQE", 5) != 0)) {
+		deflate_flags &= ~(ZLIB_FLAG_USE_FLAT_BUFFERS |
+				   ZLIB_FLAG_CACHE_HANDLES);
+		inflate_flags &= ~(ZLIB_FLAG_USE_FLAT_BUFFERS |
+				   ZLIB_FLAG_CACHE_HANDLES);
+	}
 }
 
 void zedc_hw_done(void)

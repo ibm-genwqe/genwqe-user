@@ -81,10 +81,25 @@
 #define	NUM_DDCBS	4
 
 extern int libddcb_verbose;
-#define VERBOSE0(...) {fprintf(stderr, __VA_ARGS__);}
-#define VERBOSE1(...) {if (libddcb_verbose > 0) fprintf(stderr, __VA_ARGS__);}
-#define VERBOSE2(...) {if (libddcb_verbose > 1) fprintf(stderr, __VA_ARGS__);}
-#define VERBOSE3(...) {if (libddcb_verbose > 3) fprintf(stderr, __VA_ARGS__);}
+
+#define VERBOSE0(...) do {				\
+		fprintf(stderr, __VA_ARGS__);		\
+	} while (0)
+
+#define VERBOSE1(...) do {				\
+		if (libddcb_verbose > 0)		\
+			fprintf(stderr, __VA_ARGS__);	\
+	} while (0)
+
+#define VERBOSE2(...) do {				\
+		if (libddcb_verbose > 1)		\
+			fprintf(stderr, __VA_ARGS__);	\
+	} while (0)
+
+#define VERBOSE3(...) do {				\
+		if (libddcb_verbose > 3)		\
+			fprintf(stderr, __VA_ARGS__);	\
+	} while (0)
 
 static void *__ddcb_done_thread(void *card_data);
 
@@ -126,7 +141,7 @@ struct dev_ctx {
 	int		afu_fd;
 	uint16_t	ddcb_seqnum;
 	uint16_t	ddcb_free1;	/* Not used */
-	int		ddcb_num;	/* How deep is my ddcb queue */
+	unsigned int	ddcb_num;	/* How deep is my ddcb queue */
 	int		ddcb_out;	/* ddcb Output (done) index */
 	int		ddcb_in;	/* ddcb Input index */
 	ddcb_t		*ddcb;		/* Pointer to the ddcb queue */
@@ -251,38 +266,37 @@ static void ddcb_2_cmd(ddcb_t *ddcb, struct ddcb_cmd *cmd)
 
 static void afu_print_status(struct cxl_afu_h *afu_h)
 {
-	uint64_t	addr;
-	uint64_t	reg;
-	int	i;
+	int i;
+	uint64_t addr, reg;
 
 	cxl_mmio_read64(afu_h, MMIO_IMP_VERSION_REG, &reg);
-	VERBOSE0(" Version Reg:    0x%016llx\n", (long long)reg);
+	VERBOSE0(" Version Reg:        0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_APP_VERSION_REG, &reg);
-	VERBOSE0(" Appl. Reg:      0x%016llx\n", (long long)reg);
+	VERBOSE0(" Appl. Reg:          0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_AFU_CONFIG_REG, &reg);
-	VERBOSE0(" Afu Config Reg: 0x%016llx\n", (long long)reg);
+	VERBOSE0(" Afu Config Reg:     0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_AFU_STATUS_REG, &reg);
-	VERBOSE0(" Afu Status Reg: 0x%016llx\n", (long long)reg);
+	VERBOSE0(" Afu Status Reg:     0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_AFU_COMMAND_REG, &reg);
-	VERBOSE0(" Afu Cmd Reg:    0x%016llx\n", (long long)reg);
+	VERBOSE0(" Afu Cmd Reg:        0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_FRT_REG, &reg);
-	VERBOSE0(" Free Run Timer: 0x%016llx\n", (long long)reg);
+	VERBOSE0(" Free Run Timer:     0x%016llx\n", (long long)reg);
 
 	cxl_mmio_read64(afu_h, MMIO_DDCBQ_START_REG, &reg);
-	VERBOSE0(" DDCBQ Reg:      0x%016llx\n", (long long)reg);
+	VERBOSE0(" DDCBQ Reg:          0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_DDCBQ_CONFIG_REG, &reg);
-	VERBOSE0(" DDCBQ Conf Reg: 0x%016llx\n", (long long)reg);
+	VERBOSE0(" DDCBQ Conf Reg:     0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_DDCBQ_COMMAND_REG, &reg);
-	VERBOSE0(" DDCBQ Cmd Reg:  0x%016llx\n", (long long)reg);
+	VERBOSE0(" DDCBQ Cmd Reg:      0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_DDCBQ_STATUS_REG, &reg);
-	VERBOSE0(" DDCBQ Stat Reg: 0x%016llx\n", (long long)reg);
+	VERBOSE0(" DDCBQ Stat Reg:     0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_DDCBQ_WT_REG, &reg);
-	VERBOSE0(" DDCBQ WT Reg:   0x%016llx\n", (long long)reg);
+	VERBOSE0(" DDCBQ WT Reg:       0x%016llx\n", (long long)reg);
 
 	for (i = 0; i < MMIO_FIR_REGS_NUM; i++) {
 		addr = MMIO_FIR_REGS_BASE + (uint64_t)(i * 8);
 		cxl_mmio_read64(afu_h, addr, &reg);
-		VERBOSE0(" FIR Reg [%08llx]:     0x%016llx\n",
+		VERBOSE0(" FIR Reg [%08llx]: 0x%016llx\n",
 			 (long long)addr, (long long)reg);
 	}
 }
@@ -461,6 +475,16 @@ static struct tx_waitq* __init_waitq(int num)
 	return txq;
 }
 
+static void afu_dump_queue(struct dev_ctx *ctx)
+{
+	unsigned int i;
+	ddcb_t *ddcb;
+
+	for (i = 0, ddcb = &ctx->ddcb[0]; i < ctx->ddcb_num; i++, ddcb++) {
+		VERBOSE0("DDCB[%d]\n", i);
+		ddcb_hexdump(stderr, ddcb, sizeof(ddcb_t));
+	}
+}
 
 /* Open a Card. This will execute one time only  */
 static int card_dev_open(int card_no)
@@ -775,6 +799,7 @@ static void *__ddcb_done_thread(void *card_data)
 				(long long)ctx->event.fault.addr,
 				(long long)ctx->event.fault.dsisr);
 			afu_print_status(ctx->afu_h);
+			afu_dump_queue(ctx);
 			__ddcb_done_post(ctx, DDCB_ERR_EVENTFAIL);
 			break;
 		case CXL_EVENT_AFU_ERROR:

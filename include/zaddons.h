@@ -30,9 +30,9 @@ enum zlib_impl {
 	ZLIB_IMPL_MASK = 0x0f,
 
 	/* Flags which influence special optimization behavior */
-	ZLIB_FLAG_USE_FLAT_BUFFERS = 0x10,
-	ZLIB_FLAG_CACHE_HANDLES = 0x20,
-	ZLIB_FLAG_OMIT_LAST_DICT = 0x40,
+	ZLIB_FLAG_USE_FLAT_BUFFERS = 0x10, /* GenWQE only */
+	ZLIB_FLAG_CACHE_HANDLES = 0x20,	   /* GenWQE only, fails for CAPI */
+	ZLIB_FLAG_OMIT_LAST_DICT = 0x40,   /* Useful for cases like Genomics */
 };
 
 /**

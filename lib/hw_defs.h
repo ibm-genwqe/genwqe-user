@@ -45,10 +45,9 @@ extern int zedc_dbg;
 		getpid(), gettid(), __FILE__, __LINE__, ## __VA_ARGS__)
 
 #define pr_warn(fmt, ...) do {						\
-		if (zedc_dbg)						\
-			fprintf(stderr, "%08x.%08x %s:%u: Warn: " fmt,	\
-				getpid(), gettid(), __FILE__, __LINE__,	\
-				## __VA_ARGS__);			\
+		fprintf(stderr, "%08x.%08x %s:%u: Warn: " fmt,		\
+			getpid(), gettid(), __FILE__, __LINE__,		\
+			## __VA_ARGS__);				\
 	} while (0)
 
 #define	pr_dbg(fmt, ...) do {						\
@@ -58,6 +57,13 @@ extern int zedc_dbg;
 
 #define	pr_info(fmt, ...) do {						\
 		if (zedc_dbg)						\
+			fprintf(stderr, "%08x.%08x %s:%u: Info: " fmt,	\
+				getpid(), gettid(), __FILE__, __LINE__,	\
+				## __VA_ARGS__);			\
+	} while (0)
+
+#define	pr_log(dbg, fmt, ...) do {					\
+		if ((dbg))						\
 			fprintf(stderr, "%08x.%08x %s:%u: Info: " fmt,	\
 				getpid(), gettid(), __FILE__, __LINE__,	\
 				## __VA_ARGS__);			\
@@ -141,8 +147,8 @@ int zedc_free_workspace(zedc_streamp strm);
 void zedc_asv_infl_print(zedc_streamp strm);
 void zedc_asiv_infl_print(zedc_streamp strm);
 
-void zedc_asv_defl_print(zedc_streamp strm);
-void zedc_asiv_defl_print(zedc_streamp strm);
+void zedc_asv_defl_print(zedc_streamp strm, int dbg);
+void zedc_asiv_defl_print(zedc_streamp strm, int dbg);
 
 /**
  * @brief Prepare format specific deflate header when user
