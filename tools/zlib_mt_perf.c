@@ -256,7 +256,6 @@ static int defl(struct thread_data *d, FILE *source, int level)
 			time_ns_end=get_nsec();
 			time_ns += (time_ns_end - time_ns_beg);
 			d->comp_calls++;
-
 			assert(ret != Z_STREAM_ERROR);	/* not clobbered */
 
 			/* Throw away results, we just like to know
@@ -509,6 +508,7 @@ static void *libz_thread_defl(void *data)
 	pthread_exit(&d->thread_rc);
 
  exit_failure:
+	fclose(i_fp);
 	exit_on_err = 1;
 	d->thread_rc = -2;
 	pthread_exit(&d->thread_rc);
@@ -552,6 +552,7 @@ static void *libz_thread_infl(void *data)
 	pthread_exit(&d->thread_rc);
 
  exit_failure:
+	fclose(c_fp);
 	exit_on_err = 1;
 	d->thread_rc = -2;
 	pthread_exit(&d->thread_rc);
