@@ -481,7 +481,7 @@ static void afu_dump_queue(struct dev_ctx *ctx)
 	ddcb_t *ddcb;
 
 	for (i = 0, ddcb = &ctx->ddcb[0]; i < ctx->ddcb_num; i++, ddcb++) {
-		VERBOSE0("DDCB[%d]\n", i);
+		VERBOSE0("DDCB %d [%016llx]\n", i, (long long)ddcb);
 		ddcb_hexdump(stderr, ddcb, sizeof(ddcb_t));
 	}
 }
