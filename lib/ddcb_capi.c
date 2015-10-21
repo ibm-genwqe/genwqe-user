@@ -124,6 +124,7 @@ struct ttxs {
 	int	compl_code;	/* Completion Code */
 	sem_t	wait_sem;
 	int	seqnum;		/* Seq Number when done */
+	int	card_no;	/* Card number from Open */
 	struct	ttxs	*verify;
 };
 
@@ -144,11 +145,12 @@ struct  tx_waitq {
  * be multiple contexts using just one card.
  */
 struct dev_ctx {
-	int		card_no;
+	int		card_no;	/* Same card number as in ttx */
 	pthread_mutex_t	lock;
 	int		clients;	/* Thread open counter */
 	struct cxl_afu_h *afu_h;	/* afu_h != NULL device is open */
-	int		afu_fd;
+	int		afu_fd;		/* fd from cxl_afu_fd() */
+	int		afu_rc;		/* rc from __afu_open() */
 	uint16_t	ddcb_seqnum;
 	uint16_t	ddcb_free1;	/* Not used */
 	unsigned int	ddcb_num;	/* How deep is my ddcb queue */
@@ -159,6 +161,7 @@ struct dev_ctx {
 	struct		cxl_event	event;	/* last AFU event */
 	int		tout;		/* Timeout Value for compeltion */
 	pthread_t	ddcb_done_tid;
+	sem_t		open_done_sem;	/* open done */
 	uint64_t	app_id;		/* a copy of MMIO_APP_VERSION_REG */
 	sem_t		free_sem;	/* Sem to wait for free ddcb */
 	struct		dev_ctx		*verify;	/* Verify field */
@@ -211,7 +214,7 @@ static void rt_trace_dump(void)
 {
 	int i;
 
-	if (0 == trc_idx) return;
+	pthread_mutex_lock(&trc_lock);
 	fprintf(stderr, "Index: %d Warp: %d\n", trc_idx, trc_wrap);
 	for (i = 0; i < RT_TRACE_SIZE; i++) {
 		if (0 == trc_buff[i].tok) break;
@@ -220,6 +223,7 @@ static void rt_trace_dump(void)
 			trc_buff[i].n1, trc_buff[i].n2, trc_buff[i].p);
 	}
 	trc_idx = 0;
+	pthread_mutex_unlock(&trc_lock);
 }
 #else
 static void rt_trace_init(void) {}
@@ -370,6 +374,9 @@ static int __afu_open(struct dev_ctx *ctx)
 	char	device[64];
 	uint64_t	mmio_dat;
 
+	sprintf(device, "/dev/cxl/afu%d.0d", ctx->card_no);
+	VERBOSE1("       [%s] Enter Open: %s\n", __func__, device);
+
 	ctx->ddcb_num = NUM_DDCBS;
 	ctx->ddcb_seqnum = 0xf00d;	/* Starting Seq */
 	ctx->ddcb_in = 0;		/* ddcb Input Index */
@@ -381,10 +388,8 @@ static int __afu_open(struct dev_ctx *ctx)
 	if (!ctx->waitq)
 		return DDCB_ERR_ENOMEM;
 
-	sprintf(device, "/dev/cxl/afu%d.0d", ctx->card_no);
 	ctx->afu_h = cxl_afu_open_dev(device);
 	if (NULL == ctx->afu_h) {
-		VERBOSE0("Error: cxl_afu_open_dev: %s\n", device);
 		rc = DDCB_ERR_CARD;
 		goto err_waitq_free;
 	}
@@ -405,13 +410,11 @@ static int __afu_open(struct dev_ctx *ctx)
 	}
 
 	if (cxl_mmio_map(ctx->afu_h, CXL_MMIO_BIG_ENDIAN) == -1) {
-		VERBOSE0("Error: Unable to map problem state registers");
 		rc = DDCB_ERR_CARD;
 		goto err_ddcb_free;
 	}
 
 	if (afu_clear_firs(ctx->afu_h) == false) {
-		VERBOSE0("Error: Unable clear Pending FIRs!\n");
 		rc = DDCB_ERR_CARD;
 		goto err_mmio_unmap;
 	}
@@ -423,7 +426,6 @@ static int __afu_open(struct dev_ctx *ctx)
 		    ((uint64_t)(ctx->ddcb_num - 1) << 16));
 	rc = cxl_mmio_write64(ctx->afu_h, MMIO_DDCBQ_CONFIG_REG, mmio_dat);
 	if (rc != 0) {
-		VERBOSE0("Error: Unable to write Config Register");
 		rc = DDCB_ERR_CARD;
 		goto err_mmio_unmap;
 	}
@@ -434,17 +436,23 @@ static int __afu_open(struct dev_ctx *ctx)
 
 	if (libddcb_verbose > 1)
 		afu_print_status(ctx->afu_h);
-
+	ctx->verify = ctx;
+	VERBOSE1("       [%s] Exit rc: %d\n", __func__, rc);
 	return DDCB_OK;
 
  err_mmio_unmap:
 	cxl_mmio_unmap(ctx->afu_h);
  err_ddcb_free:
 	free(ctx->ddcb);
+	ctx->ddcb = NULL;
  err_afu_free:
 	cxl_afu_free(ctx->afu_h);
+	ctx->afu_h = NULL;
  err_waitq_free:
 	free(ctx->waitq);
+	ctx->waitq = NULL;
+	ctx->card_no = -1;
+	VERBOSE1("       [%s] Exit Error rc: %d\n", __func__, rc);
 	return rc;
 }
 
@@ -468,17 +476,19 @@ static int __afu_close(struct dev_ctx *ctx)
 
 	afu_h = ctx->afu_h;
 	if (NULL == afu_h) {
-		VERBOSE1("WARNING: Trying to close inactive AFU!\n");
+		VERBOSE0("[%s] WARNING: Trying to close inactive AFU!\n",
+			__func__);
 		return DDCB_ERR_INVAL;
 	}
 
 	if (0 != ctx->clients) {
-		VERBOSE0("ERROR: Closing AFU with %d pending clients!\n",
-			 ctx->clients);
+		VERBOSE0("[%s] ERROR: Closing AFU with %d pending clients!\n",
+			 __func__, ctx->clients);
 		return DDCB_ERR_INVAL;
 	}
 
-	VERBOSE2("__afu_close %p Afu %d pending opens\n", ctx, ctx->clients);
+	VERBOSE1(" 	  [%s] Enter Card: %d Open Clients: %d\n",
+		__func__, ctx->card_no, ctx->clients);
 	mmio_dat = 0x2ull;	/* Stop !! */
 	cxl_mmio_write64(afu_h, MMIO_DDCBQ_COMMAND_REG, mmio_dat);
 	while (1) {
@@ -488,8 +498,8 @@ static int __afu_close(struct dev_ctx *ctx)
 		usleep(100);
 		i++;
 		if (1000 == i) {
-			VERBOSE0("ERROR: Timeout wait_afu_stop STATUS_REG: "
-				 "0x%016llx\n",	(long long)mmio_dat);
+			VERBOSE0("[%s] ERROR: Timeout wait_afu_stop STATUS_REG: "
+				 "0x%016llx\n",	__func__, (long long)mmio_dat);
 			rc = DDCB_ERR_CARD;
 			break;
 		}
@@ -511,6 +521,8 @@ static int __afu_close(struct dev_ctx *ctx)
 		free(ctx->ddcb);
 		ctx->ddcb = NULL;
 	}
+	ctx->card_no = -1;
+	VERBOSE1(" 	  [%s] Exit, Card Removed\n", __func__);
 	return rc;
 }
 
@@ -528,36 +540,42 @@ static void afu_dump_queue(struct dev_ctx *ctx)
 /**
  * NOTE: ctx->lock must be held when entering this function.
  *
- * Open a Card. This needs to be executed only if the device is not
- * yet open.
+ * This needs to be executed only if the device is not
+ * yet open. The Card (AFU) will be attaced in the done thread.
  */
 static int card_dev_open(struct dev_ctx *ctx)
 {
 	int rc = DDCB_OK;
+	void *res = NULL;
 
-	/* VERBOSE0("    [%s] clients=%d\n", __func__, ctx->clients); */
-	if (ctx->afu_h) {
-		VERBOSE0("[%s] ERROR: afu already opened afu=%p clients=%d!\n",
-			 __func__, ctx->afu_h, ctx->clients);
-		return DDCB_ERR_CARD;
+	VERBOSE1("    [%s] Enter Card: %d clients: %d\n",
+		__func__, ctx->card_no, ctx->clients);
+	/* Create a semaphore to wait until afu Open is done */
+	rc = sem_init(&ctx->open_done_sem, 0, 0);
+	if (0 != rc) {
+		VERBOSE0("Error: initializing done sem!\n");
+		return DDCB_ERR_ENOMEM;
 	}
-
-	if (DDCB_OK != __afu_open(ctx)) {
-		free(ctx->waitq);
-		return DDCB_ERR_CARD;
-	}
-
-	/* Now create the worker thread */
+	/* Now create the worker thread which opens the afu */
 	rc = pthread_create(&ctx->ddcb_done_tid, NULL, &__ddcb_done_thread,
 			    ctx);
 	if (0 != rc) {
-		VERBOSE0("[%s] calling __afu_close()\n", __func__);
-		__afu_close(ctx);  /* frees waitq and ddcb queue too */
+		VERBOSE1("    [%s] Error pthread_create rc: %d\n",
+			__func__, rc);
 		return DDCB_ERR_ENOMEM;
 	}
-
-	ctx->verify = ctx;	/* Set Verify field */
-	return DDCB_OK;
+	/* Wait for thread to start and AFU did get opened */
+	sem_wait(&ctx->open_done_sem);
+	rc = ctx->afu_rc;	/* Get RC */
+	if (DDCB_OK != rc) {
+		/* The thread was not able to open or init tha AFU */
+		VERBOSE1("    [%s] Exit Error rc: %d, Wait done_thread to join\n",
+			__func__, rc);
+		/* Wait for done thread to join */
+		pthread_join(ctx->ddcb_done_tid, &res);
+	}
+	VERBOSE1("    [%s] Return rc: %d\n", __func__, rc);
+	return rc;
 }
 
 /**
@@ -567,45 +585,51 @@ static int card_dev_close(struct dev_ctx *ctx)
 {
 	void *res = NULL;
 
-	/* VERBOSE0("    [%s] clients=%d\n", __func__, ctx->clients); */
-	VERBOSE1("card_dev_close ctx: %p Clients: %d left\n",
-		 ctx, ctx->clients);
-
-	if (0 != ctx->clients) {
-		VERBOSE0("ERROR: Trying to close device which is in use!\n");
-		return DDCB_ERR_INVAL;
-	}
-
+	VERBOSE1("    [%s] Enter Card: %d clients: %d\n",
+		__func__, ctx->card_no, ctx->clients);
 	pthread_cancel(ctx->ddcb_done_tid);
+	VERBOSE1("    [%s] Wait for done_thread to join\n",
+		__func__);
 	pthread_join(ctx->ddcb_done_tid, &res);
-
-	/* VERBOSE0("[%s] calling __afu_close()\n", __func__); */
-	__afu_close(ctx);
-
+	VERBOSE1("    [%s] Exit Card: %d clients: %d\n",
+		__func__, ctx->card_no, ctx->clients);
 	return DDCB_OK;
 }
 
-static int __client_inc(struct dev_ctx *ctx)
+static int __client_inc(struct dev_ctx *ctx, int card_no)
 {
 	int rc = DDCB_OK;
 
 	pthread_mutex_lock(&ctx->lock);
-	/* VERBOSE0("  [%s] clients=%d\n", __func__, ctx->clients); */
-	if (ctx->clients == 0)
+	VERBOSE1("  [%s] Enter Card: %d clients: %d\n",
+		__func__, card_no, ctx->clients);
+	if (ctx->clients == 0) {
+		ctx->card_no = card_no;	/* Save 1st client card number */
 		rc = card_dev_open(ctx);
-	ctx->clients++;
+		if (DDCB_OK == rc)
+			ctx->clients++;	/* increment clients only if good */
+	} else {
+		/* Make sure we do use the same card */
+		if (ctx->card_no == card_no)
+			ctx->clients++;		/* increment clients */
+		else rc = DDCB_ERR_CARD;	/* Can not use 2nd Card */
+	}
+	VERBOSE1("  [%s] Exit Card: %d clients: %d\n",
+		__func__, card_no, ctx->clients);
 	pthread_mutex_unlock(&ctx->lock);
-
 	return rc;
 }
 
 static void __client_dec(struct dev_ctx *ctx)
 {
 	pthread_mutex_lock(&ctx->lock);
-	/* VERBOSE0("  [%s] clients=%d\n", __func__, ctx->clients); */
+	VERBOSE1("  [%s] Enter Card: %d Clients: %d\n",
+		__func__, ctx->card_no, ctx->clients);
 	ctx->clients--;
-	if (ctx->clients == 0)
+	if (0 == ctx->clients)
 		card_dev_close(ctx);
+	VERBOSE1("  [%s] Exit Card: %d Clients: %d\n",
+		__func__, ctx->card_no, ctx->clients);
 	pthread_mutex_unlock(&ctx->lock);
 }
 
@@ -618,7 +642,7 @@ static void *card_open(int card_no,
 	int rc = DDCB_OK;
 	struct ttxs *ttx = NULL;
 
-	/* VERBOSE0("[%s]\n", __func__); */
+	VERBOSE1("[%s] Enter Card: %d\n", __func__, card_no);
 
 	/* Allocate Thread Context */
 	ttx = calloc(1, sizeof(*ttx));
@@ -628,12 +652,12 @@ static void *card_open(int card_no,
 	}
 
 	/* Inc use count and initialize AFU on first open */
-	my_ctx.card_no = card_no; /* remember card number */
 	ttx->ctx = &my_ctx;
+	ttx->card_no = card_no;	/* Save only right now */
 	ttx->verify = ttx;
 	sem_init(&ttx->wait_sem, 0, 0);
 
-	rc = __client_inc(ttx->ctx);
+	rc = __client_inc(ttx->ctx, card_no);
 	if (rc != DDCB_OK) {
 		free(ttx);
 		ttx = NULL;
@@ -642,6 +666,7 @@ static void *card_open(int card_no,
  card_open_exit:
 	if (card_rc)
 		*card_rc = rc;
+	VERBOSE1("[%s] Exit Card: %d ttx: %p\n", __func__, card_no, ttx);
 	return ttx;
 }
 
@@ -650,20 +675,21 @@ static int card_close(void *card_data)
 	struct ttxs *ttx = (struct ttxs*)card_data;
 	struct dev_ctx *ctx;
 
-	/* VERBOSE0("[%s]\n", __func__); */
+	VERBOSE1("[%s] Enter ttx: %p\n", __func__, ttx);
 	if (NULL == ttx)
 		return DDCB_ERR_INVAL;
 
 	if (ttx->verify != ttx)
 		return DDCB_ERR_INVAL;
-
+	rt_trace(0xdeaf, 0, 0, ttx);
 	ctx = ttx->ctx;
 	__client_dec(ctx);
 
 	ttx->verify = NULL;
 	free(ttx);
 
-	rt_trace_dump();
+	//rt_trace_dump();
+	VERBOSE1("[%s] Exit ttx: %p\n", __func__, ttx);
 	return DDCB_OK;
 }
 
@@ -697,7 +723,7 @@ static int __ddcb_execute_multi(void *card_data, struct ddcb_cmd *cmd)
 
 	while (my_cmd) {
 		sem_getvalue(&ctx->free_sem, &val);
-		rt_trace(0x00a0, -1, val, ttx);
+		rt_trace(0x00a0, 0xffff, val, ttx);
 		sem_wait(&ctx->free_sem);
 
 		pthread_mutex_lock(&ctx->lock);
@@ -711,8 +737,8 @@ static int __ddcb_execute_multi(void *card_data, struct ddcb_cmd *cmd)
 		txq->seqnum = ctx->ddcb_seqnum;	/* Save seq Number */
 		ctx->ddcb_seqnum++;		/* Next seq */
 		rt_trace(0x00a1, seq, idx, ttx);
-		VERBOSE2("__ddcb_execute seq: 0x%x slot: %d cmd: %p\n",
-			seq, idx, my_cmd);
+		VERBOSE1("[%s] seq: 0x%x slot: %d cmd: %p\n",
+			__func__, seq, idx, my_cmd);
 		/* Increment ddcb_in and warp back to 0 */
 		ctx->ddcb_in = (ctx->ddcb_in + 1) % ctx->ddcb_num;
 		cmd_2_ddcb(ddcb, cmd, seq);
@@ -725,10 +751,10 @@ static int __ddcb_execute_multi(void *card_data, struct ddcb_cmd *cmd)
 	}
 
 	/* Block Caller */
-	VERBOSE2("__ddcb_execute Wait ttx: %p\n", ttx);
+	VERBOSE2("[%s] Wait ttx: %p\n", __func__, ttx);
 	sem_wait(&ttx->wait_sem);
 	rt_trace(0x00af, ttx->seqnum, idx, ttx);
-	VERBOSE2("__ddcb_execute return ttx: %p\n", ttx);
+	VERBOSE2("[%s] return ttx: %p\n", __func__, ttx);
 	return ttx->compl_code;	/* Give Completion code back to caller */
 }
 
@@ -761,26 +787,24 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 
 	if (DDCB_OK == compl_code) {
 		if (0 == ddcb->retc_16) {
-			VERBOSE2("\t__ddcb_done_thread seq: 0x%x slot: %d "
-				 "retc: 0 wait\n", txq->seqnum, idx);
+			VERBOSE2("\t[%s] seq: 0x%x slot: %d "
+				 "retc: 0 wait\n", __func__, txq->seqnum, idx);
 			return false; /* do not continue */
 		}
 	}
 
 	if (DDCB_IN == txq->status) {
 		ttx = txq->ttx;
-		VERBOSE1("\t__ddcb_done_thread seq: 0x%x slot: %d ttx: %p\n",
-			txq->seqnum, idx, ttx);
 		ddcb_2_cmd(ddcb, txq->cmd);	/* Copy DDCB back to CMD */
 		ttx->compl_code = compl_code;
-		VERBOSE2("\t__ddcb_done_thread seq: 0x%x slot: %d "
+		VERBOSE1("\t[%s] seq: 0x%x slot: %d "
 			 "cmd: %p compl_code: %d\n",
-			 txq->seqnum, idx, txq->cmd, compl_code);
-		rt_trace(0x0011, txq->seqnum, idx, ttx);
+			 __func__, txq->seqnum, idx, txq->cmd, compl_code);
+		//rt_trace(0x0011, txq->seqnum, idx, ttx);
 		sem_post(&ctx->free_sem);
 		if (txq->thread_wait) {
 			rt_trace(0x0012, txq->seqnum, idx, ttx);
-			VERBOSE2("\t__ddcb_done_thread Post: %p\n", ttx);
+			VERBOSE1("\t[%s] Post: %p\n", __func__, ttx);
 			sem_post(&ttx->wait_sem);
 			txq->thread_wait = false;
 		}
@@ -793,12 +817,42 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 	return false;			/* do not continue */
 }
 
+/* The cleanup function gets invoked after the thread was canceld by
+ * sending card_dev_close(). This function will close the AFU.
+ * Note: Open and Close the AFU must handled by the same thread id.
+ */
+static void __ddcb_done_thread_cleanup(void *arg)
+{
+	struct dev_ctx *ctx = (struct dev_ctx *)arg;
+
+	VERBOSE1("\t[%s] Enter Card: %d Next Seq: %x inIDX: %d outIDX: %d\n",
+		__func__, ctx->card_no, ctx->ddcb_seqnum,
+		ctx->ddcb_in, ctx->ddcb_out);
+	__afu_close(ctx);
+	VERBOSE1("\t[%s] Exit Card: %d\n",
+		__func__, ctx->card_no);
+}
+
 static void *__ddcb_done_thread(void *card_data)
 {
 	struct dev_ctx *ctx = (struct dev_ctx *)card_data;
 	fd_set	set;
 	struct	timeval timeout;
 	int	rc = 0;
+
+	VERBOSE1("[%s] Enter\n", __func__);
+	rc = __afu_open(ctx);
+	ctx->afu_rc = rc;		/* Save rc */
+	sem_post(&ctx->open_done_sem);	/* Post card_dev_open() */
+	if (DDCB_OK != rc) {
+		/* Error Exit here in case i was not able to open the AFU */
+		VERBOSE1("[%s] Error %d Thread Exit\n", __func__, rc);
+		/* Join in card_dev_open() */
+		return NULL;
+	}
+
+	/* Push the Cleanup Handler to close the AFU */
+	pthread_cleanup_push(__ddcb_done_thread_cleanup, ctx);
 
 	while (1) {
 		FD_ZERO(&set);
@@ -810,11 +864,11 @@ static void *__ddcb_done_thread(void *card_data)
 		rc = select(ctx->afu_fd + 1, &set, NULL, NULL, &timeout);
 
 		if (0 == rc) {
-			VERBOSE2("WARNING: %d sec timeout while waiting "
+			VERBOSE0("WARNING: %d sec timeout while waiting "
 				 "for interrupt! rc: %d --> %d\n",
 				 ctx->tout, rc, DDCB_ERR_IRQTIMEOUT);
 			__ddcb_done_post(ctx, DDCB_ERR_IRQTIMEOUT);
-			rt_trace_dump();
+			//rtc_trace_dump();
 			continue;
 		}
 		if ((rc == -1) && (errno == EINTR)) {
@@ -862,6 +916,7 @@ static void *__ddcb_done_thread(void *card_data)
 			while (__ddcb_done_post(ctx, DDCB_OK)) {};
 			break;
 		case CXL_EVENT_DATA_STORAGE:
+			rt_trace(0xbbbb, ctx->ddcb_out, ctx->ddcb_in, NULL);
 			VERBOSE0("\tCXL_EVENT_DATA_STORAGE: flags: 0x%x "
 				 "addr: 0x%016llx dsisr: 0x%016llx\n",
 				ctx->event.fault.flags,
@@ -869,6 +924,7 @@ static void *__ddcb_done_thread(void *card_data)
 				(long long)ctx->event.fault.dsisr);
 			afu_print_status(ctx->afu_h);
 			afu_dump_queue(ctx);
+			rt_trace_dump();
 			__ddcb_done_post(ctx, DDCB_ERR_EVENTFAIL);
 			break;
 		case CXL_EVENT_AFU_ERROR:
@@ -887,6 +943,7 @@ static void *__ddcb_done_thread(void *card_data)
 		}
 		pthread_mutex_unlock(&ctx->lock);
 	}
+	pthread_cleanup_pop(1);
 	return NULL;
 }
 
@@ -1050,6 +1107,7 @@ static void capi_card_init(void)
 		VERBOSE0("Error: initializing mutex failed!\n");
 		return;
 	}
+	ctx->card_no = -1;
 	ddcb_register_accelerator(&accel_funcs);
 }
 

@@ -805,14 +805,14 @@ int main(int argc, char *argv[])
 				ip.card_no, ip.card_type, err_code,
 				accel_strerror(pt->accel, err_code));
 			pt->err = EX_ERR_CARD;
-			break;
+			continue;
 		}
 		/* Alloc ibuf */
 		pt->err = __memcpy_alloc_ibuf(&ip, pt);
-		if (0 != pt->err) {
-			accel_close(pt->accel);
-			break;
-		}
+		//if (0 != pt->err) {
+			//accel_close(pt->accel);
+			//break;
+		//}
 	}
 	pt = &tdata[0];
 	for (thread = 0; thread < ip.threads; thread++, pt++) {
