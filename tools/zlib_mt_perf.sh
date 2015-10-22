@@ -138,10 +138,17 @@ print_hdr=""
 for t in 1 2 3 4 8 16 32 64 128 160 ; do
     zlib_mt_perf $verbose -i$bufsize -o$bufsize -D -f ${test_data} \
 	-c$count -t$t $print_hdr;
-	if [ $? -ne 0 ]; then
-            echo "failed with $t Threads"
-            exit 1
-        fi
+    if [ $? -ne 0 ]; then
+	echo "ERROR Failed with $t Threads"
+	echo -n "Version: "
+	zlib_mt_perf --version
+	echo "  Called with:"
+	echo "    export ZLIB_ACCELERATOR=${ZLIB_ACCELERATOR}"
+	echo "    export ZLIB_DEFLATE_IMPL=${ZLIB_DEFLATE_IMPL}"
+	echo "    export ZLIB_INFLATE_IMPL=${ZLIB_INFLATE_IMPL}"
+	echo "    zlib_mt_perf $verbose -i$bufsize -o$bufsize -D -f ${test_data} -c$count -t$t $print_hdr"
+	exit 1
+    fi
     # sleep 1 ;
     print_hdr="-N";
 done
