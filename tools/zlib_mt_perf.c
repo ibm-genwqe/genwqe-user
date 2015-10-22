@@ -93,6 +93,8 @@
 #  define MAX(x, y) ((x) > (y) ? (x) : (y))
 #endif
 
+static const char *version = GIT_VERSION;
+
 static pthread_mutex_t mutex;
 static bool print_hdr = true;
 static int verbose = 0;
@@ -470,6 +472,7 @@ static void usage(char *prog)
 	       "  -o, --o_bufsize <o_bufsize>\n"
 	       "  -D, --deflate - execute deflate. default: inflate\n"
 	       "  -f  --filename <filename>\n"
+	       "  -V  --version\n"
 	       "\n", b, b);
 }
 
@@ -718,12 +721,13 @@ int main(int argc, char **argv)
 			{ "deflate",	 no_argument,	     NULL, 'D' },
 			{ "pre-alloc-memory", no_argument,   NULL, 'P' },
 			{ "no-header",	 no_argument,	     NULL, 'N' },
+			{ "version",	 no_argument,	     NULL, 'V' },
 			{ "verbose",	 no_argument,	     NULL, 'v' },
 			{ "help",	 no_argument,	     NULL, 'h' },
 			{ 0,		 no_argument,	     NULL, 0   },
 		};
 
-		ch = getopt_long(argc, argv, "Xd:f:Dc:t:i:o:Nvh?",
+		ch = getopt_long(argc, argv, "Xd:f:Dc:t:i:o:NVvh?",
 				 long_options, &option_index);
 		if (ch == -1)    /* all params processed ? */
 			break;
@@ -757,6 +761,10 @@ int main(int argc, char **argv)
 			break;
 		case 'N':
 			print_hdr = false;
+			break;
+		case 'V':
+			fprintf(stdout, "%s\n", version);
+			exit(EXIT_SUCCESS);
 			break;
 		case 'h':
 		case '?':
