@@ -33,7 +33,7 @@ export ZLIB_ACCELERATOR=GENWQE
 export ZLIB_CARD=0
 export ZLIB_DEFLATE_IMPL=0x01 # Use hardware by default
 export ZLIB_INFLATE_IMPL=0x01
-export PATH=/opt/genwqe/bin/genwqe:/sbin:/usr/sbin:$PATH
+export PATH=./genwqe-user/tools:/opt/genwqe/bin/genwqe:/sbin:/usr/sbin:$PATH
 
 version="https://github.com/ibm-genwqe/genwqe-user"
 verbose=""

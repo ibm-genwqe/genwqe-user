@@ -609,12 +609,12 @@ static void __print_deflate_results(struct thread_data *d,
 
 	if (print_hdr)
 		printfv(0, "thread ;    TID ; err ; "
-			" #defl ;      bytes ;            time ; "
-			"     throughput     ; checksum ; in/out\n");
+			" #defl ;      bytes ;      time msec ; "
+			" throughput MiB/sec ; checksum ; in/out KiB\n");
 
 	for (i = 0; i < threads; i++) {
 		printfv(1, "%6d ; %6ld ; %3d ; "
-			"%6d ; %10ld ; %10ld msec ; %11.3f MiB/sec ; %08x ;\n",
+			"%6d ; %10ld ; %10ld     ; %11.3f     ; %08x ;\n",
 			i, (unsigned long)d[i].tid, (int)d[i].thread_rc,
 			d[i].comp_calls,
 			d[i].defl_total,
@@ -631,8 +631,8 @@ static void __print_deflate_results(struct thread_data *d,
 	}
 
 	printfv(0, "%6d ;    all ;     ; "
-		"%6d ; %10ld ; %10ld msec ; %11.3f MiB/sec ; %08x ; "
-		"%d/%d KiB\n", i,
+		"%6d ; %10ld ; %10ld     ; %11.3f    ; %08x ; "
+		"%d/%d\n", i,
 		comp_calls, defl_total, time_ns_threads / 1000, /* msec */
 		time_ns_threads ?
 		defl_total * 1000/(double)time_ns_threads : 0.0,
@@ -653,12 +653,12 @@ static void __print_inflate_results(struct thread_data *d,
 
 	if (print_hdr)
 		printfv(0, "thread ;    TID ; err ; "
-			" #defl ;      bytes ;            time ; "
-			"     throughput     ; checksum ; in/out\n");
+			" #defl ;      bytes ;      time msec ; "
+			" throughput MiB/sec ; checksum ; in/out KiB\n");
 
 	for (i = 0; i < threads; i++) {
 		printfv(1, "%6d ; %6ld ; %3d ; "
-			"%6d ; %10ld ; %10ld msec ; %11.3f MiB/sec ; %08x ;\n",
+			"%6d ; %10ld ; %10ld     ; %11.3f     ; %08x ;\n",
 			i, (unsigned long)d[i].tid, (int)d[i].thread_rc,
 			d[i].decomp_calls,
 			d[i].infl_total,
@@ -675,8 +675,8 @@ static void __print_inflate_results(struct thread_data *d,
 	}
 
 	printfv(0, "%6d ;    all ;     ; "
-		"%6d ; %10ld ; %10ld msec ; %11.3f MiB/sec ; %08x ; "
-		"%d/%d KiB\n", i,
+		"%6d ; %10ld ; %10ld     ; %11.3f    ; %08x ; "
+		"%d/%d\n", i,
 		decomp_calls, infl_total, time_ns_threads / 1000, /* msec */
 		time_ns_threads ?
 		infl_total * 1000 / (double)time_ns_threads : 0.0,
