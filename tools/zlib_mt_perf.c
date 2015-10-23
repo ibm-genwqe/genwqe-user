@@ -472,6 +472,7 @@ static void usage(char *prog)
 	       "  -o, --o_bufsize <o_bufsize>\n"
 	       "  -D, --deflate - execute deflate. default: inflate\n"
 	       "  -f  --filename <filename>\n"
+	       "  -v  --verbose\n"
 	       "  -V  --version\n"
 	       "\n", b, b);
 }
