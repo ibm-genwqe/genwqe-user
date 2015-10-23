@@ -16,7 +16,6 @@
 
 /*
  * Specialized DDCB execution implementation.
- *
  */
 
 #include <stdint.h>
@@ -50,6 +49,8 @@
 #include <ddcb.h>
 #include <libcxl.h>
 #include <memcopy_ddcb.h>
+
+#define CONFIG_DDCB_TIMEOUT	5  /* max time for a DDCB to be executed */
 
 #define MMIO_IMP_VERSION_REG	0x0000000ull
 #define MMIO_APP_VERSION_REG	0x0000008ull
@@ -112,6 +113,8 @@ static inline pid_t gettid(void)
 				getpid(), gettid(), ## __VA_ARGS__);	\
 	} while (0)
 
+#define __free(ptr) free((ptr))
+
 static void *__ddcb_done_thread(void *card_data);
 
 /**
@@ -145,6 +148,9 @@ struct  tx_waitq {
  * be multiple contexts using just one card.
  */
 struct dev_ctx {
+	char dummy;
+	ddcb_t *ddcb;			/* ddcb queue */
+	struct tx_waitq waitq[NUM_DDCBS];
 	int		card_no;	/* Same card number as in ttx */
 	pthread_mutex_t	lock;
 	int		clients;	/* Thread open counter */
@@ -156,8 +162,6 @@ struct dev_ctx {
 	unsigned int	ddcb_num;	/* How deep is my ddcb queue */
 	int		ddcb_out;	/* ddcb Output (done) index */
 	int		ddcb_in;	/* ddcb Input index */
-	ddcb_t		*ddcb;		/* Pointer to the ddcb queue */
-	struct		tx_waitq	*waitq;
 	struct		cxl_event	event;	/* last AFU event */
 	int		tout;		/* Timeout Value for compeltion */
 	pthread_t	ddcb_done_tid;
@@ -167,8 +171,13 @@ struct dev_ctx {
 	struct		dev_ctx		*verify;	/* Verify field */
 };
 
-static struct dev_ctx my_ctx;	/* My Card */
+static ddcb_t my_ddcbs[NUM_DDCBS] __attribute__((aligned(64 * 1024)));
 
+static struct dev_ctx my_ctx = {
+	.ddcb = my_ddcbs,
+	.ddcb_num = NUM_DDCBS,
+	.tout = CONFIG_DDCB_TIMEOUT,
+};
 
 /*	Add trace function by setting RT_TRACE */
 //#define RT_TRACE
@@ -332,8 +341,9 @@ static bool afu_clear_firs(struct cxl_afu_h *afu_h)
 			/* Read again, this time it must be 0 */
 			cxl_mmio_read64(afu_h, addr, &reg);
 			if (reg != 0ull) {
-				VERBOSE0(" [%08llx]:     0x%016llx cannot be cleared!\n",
-					(long long)addr, (long long)reg);
+				VERBOSE0(" [%08llx]:     0x%016llx cannot "
+					 "be cleared!\n", (long long)addr,
+					 (long long)reg);
 				return false;
 			}
 		}
@@ -342,23 +352,17 @@ static bool afu_clear_firs(struct cxl_afu_h *afu_h)
 }
 
 /* Init Thread Wait Queue */
-static struct tx_waitq* __alloc_waitq(int num)
+static void __setup_waitq(struct dev_ctx *ctx)
 {
-	struct	tx_waitq *txq;
-	struct	tx_waitq *q;
-	int	i;
+	unsigned int i;
+	struct tx_waitq *q;
 
-	txq = malloc(num * sizeof(struct tx_waitq));
-	if (NULL == txq)
-		return NULL;
-
-	for (i = 0, q = &txq[0]; i < num; i++, q++) {
+	for (i = 0, q = &ctx->waitq[0]; i < ctx->ddcb_num; i++, q++) {
 		q->status = DDCB_FREE;
 		q->cmd = NULL;
 		q->ttx = NULL;
 		q->thread_wait = false;
 	}
-	return txq;
 }
 
 /**
@@ -372,46 +376,44 @@ static int __afu_open(struct dev_ctx *ctx)
 {
 	int	rc = DDCB_OK;
 	char	device[64];
-	uint64_t	mmio_dat;
+	uint64_t mmio_dat;
+	int rc0;
 
 	sprintf(device, "/dev/cxl/afu%d.0d", ctx->card_no);
-	VERBOSE1("       [%s] Enter Open: %s\n", __func__, device);
+	VERBOSE1("       [%s] Enter Open: %s DDCBs @ %p\n", __func__, device,
+		 &ctx->ddcb[0]);
 
 	ctx->ddcb_num = NUM_DDCBS;
 	ctx->ddcb_seqnum = 0xf00d;	/* Starting Seq */
 	ctx->ddcb_in = 0;		/* ddcb Input Index */
 	ctx->ddcb_out = 0;		/* ddcb Output Index */
-	sem_init(&ctx->free_sem, 0, ctx->ddcb_num);
 
-	/* Make the Wait queue for each ddcb */
-	ctx->waitq = __alloc_waitq(ctx->ddcb_num);
-	if (!ctx->waitq)
-		return DDCB_ERR_ENOMEM;
+	rc0 = sem_init(&ctx->free_sem, 0, ctx->ddcb_num);
+	if (rc0 != 0) {
+		VERBOSE0("    [%s] initializing free_sem failed %d %s ...\n",
+			 __func__, rc0, strerror(errno));
+		return DDCB_ERRNO;
+	}
+
+	__setup_waitq(ctx);
 
 	ctx->afu_h = cxl_afu_open_dev(device);
 	if (NULL == ctx->afu_h) {
 		rc = DDCB_ERR_CARD;
-		goto err_waitq_free;
+		goto err_exit;
 	}
 	ctx->afu_fd = cxl_afu_fd(ctx->afu_h);
-	ctx->ddcb = memalign(sysconf(_SC_PAGESIZE),
-			     ctx->ddcb_num * sizeof(ddcb_t));
-	if (NULL == ctx->ddcb) {
-		rc = DDCB_ERR_ENOMEM;
-		goto err_afu_free;
-	}
-	memset(ctx->ddcb, 0, ctx->ddcb_num * sizeof(ddcb_t));
 
 	rc = cxl_afu_attach(ctx->afu_h,
 			    (__u64)(unsigned long)(void *)ctx->ddcb);
 	if (0 != rc) {
 		rc = DDCB_ERR_CARD;
-		goto err_ddcb_free;
+		goto err_afu_free;
 	}
 
 	if (cxl_mmio_map(ctx->afu_h, CXL_MMIO_BIG_ENDIAN) == -1) {
 		rc = DDCB_ERR_CARD;
-		goto err_ddcb_free;
+		goto err_afu_free;
 	}
 
 	if (afu_clear_firs(ctx->afu_h) == false) {
@@ -442,17 +444,12 @@ static int __afu_open(struct dev_ctx *ctx)
 
  err_mmio_unmap:
 	cxl_mmio_unmap(ctx->afu_h);
- err_ddcb_free:
-	free(ctx->ddcb);
-	ctx->ddcb = NULL;
  err_afu_free:
 	cxl_afu_free(ctx->afu_h);
 	ctx->afu_h = NULL;
- err_waitq_free:
-	free(ctx->waitq);
-	ctx->waitq = NULL;
 	ctx->card_no = -1;
-	VERBOSE1("       [%s] Exit Error rc: %d\n", __func__, rc);
+ err_exit:
+	VERBOSE1("       [%s] ERROR: rc: %d\n", __func__, rc);
 	return rc;
 }
 
@@ -461,7 +458,7 @@ static int __afu_open(struct dev_ctx *ctx)
  *       ctx->afu_h must be valid
  *       ctx->clients must be 0
  */
-static int __afu_close(struct dev_ctx *ctx)
+static inline int __afu_close(struct dev_ctx *ctx)
 {
 	struct cxl_afu_h *afu_h;
 	uint64_t mmio_dat;
@@ -487,7 +484,7 @@ static int __afu_close(struct dev_ctx *ctx)
 		return DDCB_ERR_INVAL;
 	}
 
-	VERBOSE1(" 	  [%s] Enter Card: %d Open Clients: %d\n",
+	VERBOSE1("        [%s] Enter Card: %d Open Clients: %d\n",
 		__func__, ctx->card_no, ctx->clients);
 	mmio_dat = 0x2ull;	/* Stop !! */
 	cxl_mmio_write64(afu_h, MMIO_DDCBQ_COMMAND_REG, mmio_dat);
@@ -495,11 +492,13 @@ static int __afu_close(struct dev_ctx *ctx)
 		cxl_mmio_read64(afu_h, MMIO_DDCBQ_STATUS_REG, &mmio_dat);
 		if (0x0ull == (mmio_dat & 0x4))
 			break;
+
 		usleep(100);
 		i++;
 		if (1000 == i) {
-			VERBOSE0("[%s] ERROR: Timeout wait_afu_stop STATUS_REG: "
-				 "0x%016llx\n",	__func__, (long long)mmio_dat);
+			VERBOSE0("[%s] ERROR: Timeout wait_afu_stop "
+				 "STATUS_REG: 0x%016llx\n", __func__,
+				 (long long)mmio_dat);
 			rc = DDCB_ERR_CARD;
 			break;
 		}
@@ -511,18 +510,8 @@ static int __afu_close(struct dev_ctx *ctx)
 	cxl_afu_free(afu_h);
 	ctx->afu_h = NULL;
 
-	/* Free wait queues */
-	if (ctx->waitq) {
-		free(ctx->waitq);
-		ctx->waitq = NULL;
-	}
-	/* Free DDCB queue */
-	if (ctx->ddcb) {
-		free(ctx->ddcb);
-		ctx->ddcb = NULL;
-	}
 	ctx->card_no = -1;
-	VERBOSE1(" 	  [%s] Exit, Card Removed\n", __func__);
+	VERBOSE1("        [%s] Exit, Card Removed\n", __func__);
 	return rc;
 }
 
@@ -548,32 +537,36 @@ static int card_dev_open(struct dev_ctx *ctx)
 	int rc = DDCB_OK;
 	void *res = NULL;
 
-	VERBOSE1("    [%s] Enter Card: %d clients: %d\n",
-		__func__, ctx->card_no, ctx->clients);
+	VERBOSE1("    [%s] Enter Card: %d clients: %d open_done_sem: %p\n",
+		 __func__, ctx->card_no, ctx->clients, &ctx->open_done_sem);
+
 	/* Create a semaphore to wait until afu Open is done */
 	rc = sem_init(&ctx->open_done_sem, 0, 0);
 	if (0 != rc) {
-		VERBOSE0("Error: initializing done sem!\n");
-		return DDCB_ERR_ENOMEM;
+		VERBOSE0("ERROR: initializing open_done_sem %p %d %s!\n",
+			 &ctx->open_done_sem, rc, strerror(errno));
+		return DDCB_ERRNO;
 	}
+
 	/* Now create the worker thread which opens the afu */
 	rc = pthread_create(&ctx->ddcb_done_tid, NULL, &__ddcb_done_thread,
 			    ctx);
 	if (0 != rc) {
-		VERBOSE1("    [%s] Error pthread_create rc: %d\n",
+		VERBOSE1("    [%s] ERROR: pthread_create rc: %d\n",
 			__func__, rc);
 		return DDCB_ERR_ENOMEM;
 	}
-	/* Wait for thread to start and AFU did get opened */
+
 	sem_wait(&ctx->open_done_sem);
 	rc = ctx->afu_rc;	/* Get RC */
 	if (DDCB_OK != rc) {
 		/* The thread was not able to open or init tha AFU */
-		VERBOSE1("    [%s] Exit Error rc: %d, Wait done_thread to join\n",
+		VERBOSE1("    [%s] ERROR: rc: %d, Wait done_thread to join\n",
 			__func__, rc);
 		/* Wait for done thread to join */
 		pthread_join(ctx->ddcb_done_tid, &res);
 	}
+
 	VERBOSE1("    [%s] Return rc: %d\n", __func__, rc);
 	return rc;
 }
@@ -583,16 +576,17 @@ static int card_dev_open(struct dev_ctx *ctx)
  */
 static int card_dev_close(struct dev_ctx *ctx)
 {
+	int rc;
 	void *res = NULL;
 
 	VERBOSE1("    [%s] Enter Card: %d clients: %d\n",
 		__func__, ctx->card_no, ctx->clients);
-	pthread_cancel(ctx->ddcb_done_tid);
-	VERBOSE1("    [%s] Wait for done_thread to join\n",
-		__func__);
-	pthread_join(ctx->ddcb_done_tid, &res);
-	VERBOSE1("    [%s] Exit Card: %d clients: %d\n",
-		__func__, ctx->card_no, ctx->clients);
+	rc = pthread_cancel(ctx->ddcb_done_tid);
+	VERBOSE1("    [%s] Wait for done_thread to join rc=%d\n",
+		 __func__, rc);
+	rc = pthread_join(ctx->ddcb_done_tid, &res);
+	VERBOSE1("    [%s] Exit Card: %d clients: %d rc=%d\n",
+		 __func__, ctx->card_no, ctx->clients, rc);
 	return DDCB_OK;
 }
 
@@ -701,7 +695,9 @@ static void start_ddcb(struct	cxl_afu_h *afu_h, int seq)
 	cxl_mmio_write64(afu_h, MMIO_DDCBQ_COMMAND_REG, reg);
 }
 
-/*	set command into next DDCB Slot */
+/**
+ * Set command into next DDCB Slot
+ */
 static int __ddcb_execute_multi(void *card_data, struct ddcb_cmd *cmd)
 {
 	struct	ttxs	*ttx = (struct ttxs*)card_data;
@@ -817,36 +813,50 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 	return false;			/* do not continue */
 }
 
-/* The cleanup function gets invoked after the thread was canceld by
+/**
+ * The cleanup function gets invoked after the thread was canceld by
  * sending card_dev_close(). This function will close the AFU.
+ *
  * Note: Open and Close the AFU must handled by the same thread id.
+ *       ctx->lock must be held when entering this function.
  */
 static void __ddcb_done_thread_cleanup(void *arg)
 {
 	struct dev_ctx *ctx = (struct dev_ctx *)arg;
 
-	VERBOSE1("\t[%s] Enter Card: %d Next Seq: %x inIDX: %d outIDX: %d\n",
-		__func__, ctx->card_no, ctx->ddcb_seqnum,
-		ctx->ddcb_in, ctx->ddcb_out);
 	__afu_close(ctx);
-	VERBOSE1("\t[%s] Exit Card: %d\n",
-		__func__, ctx->card_no);
 }
 
+/**
+ * DDCB completion and timeout handling. This function implements the
+ * thread which looks out for completed DDCBs. Due to a CAPI
+ * restriction it also needs to open and close the AFU handle used to
+ * communicate to the CAPI card.
+ */
 static void *__ddcb_done_thread(void *card_data)
 {
 	struct dev_ctx *ctx = (struct dev_ctx *)card_data;
 	fd_set	set;
 	struct	timeval timeout;
-	int	rc = 0;
+	int	rc = 0, rc0;
 
 	VERBOSE1("[%s] Enter\n", __func__);
 	rc = __afu_open(ctx);
 	ctx->afu_rc = rc;		/* Save rc */
-	sem_post(&ctx->open_done_sem);	/* Post card_dev_open() */
+
+	rc0 = sem_post(&ctx->open_done_sem);	/* Post card_dev_open() */
+	if (rc0 != 0) {
+		VERBOSE0("[%s] ERROR: %d %s\n", __func__, rc0,
+			 strerror(errno));
+		__afu_close(ctx);
+		ctx->afu_rc = -1;
+		return NULL;
+	}
+
 	if (DDCB_OK != rc) {
-		/* Error Exit here in case i was not able to open the AFU */
-		VERBOSE1("[%s] Error %d Thread Exit\n", __func__, rc);
+		/* Error Exit here in case open the AFU failed */
+		VERBOSE1("[%s] ERROR: %d Thread Exit\n", __func__, rc);
+
 		/* Join in card_dev_open() */
 		return NULL;
 	}
@@ -854,6 +864,7 @@ static void *__ddcb_done_thread(void *card_data)
 	/* Push the Cleanup Handler to close the AFU */
 	pthread_cleanup_push(__ddcb_done_thread_cleanup, ctx);
 
+	VERBOSE1("[%s] Enter work loop\n", __func__);
 	while (1) {
 		FD_ZERO(&set);
 		FD_SET(ctx->afu_fd, &set);
@@ -897,7 +908,7 @@ static void *__ddcb_done_thread(void *card_data)
 
 		rc = cxl_read_event(ctx->afu_h, &ctx->event);
 		if (0 != rc) {
-			VERBOSE0("\tERROR cxl_read_event() rc: %d errno: %d\n",
+			VERBOSE0("\tERROR: cxl_read_event rc: %d errno: %d\n",
 				 rc, errno);
 			continue;
 		}
@@ -1091,35 +1102,25 @@ static void capi_card_exit(void) __attribute__((destructor));
 
 static void capi_card_init(void)
 {
+	int	rc;
 	const char *ttt = getenv("DDCB_TIMEOUT");
 	struct	dev_ctx *ctx = &my_ctx;
-	int	rc;
 
-	/* VERBOSE0("[%s]\n", __func__); */
-	memset(ctx, 0, sizeof(*ctx));
-	ctx->tout = 5;		/* Set timeout to 5 sec */
 	if (ttt)
 		ctx->tout = strtoul(ttt, (char **) NULL, 0);
 
 	rt_trace_init();
 	rc = pthread_mutex_init(&ctx->lock, NULL);
 	if (0 != rc) {
-		VERBOSE0("Error: initializing mutex failed!\n");
+		VERBOSE0("ERROR: initializing mutex failed!\n");
 		return;
 	}
+
 	ctx->card_no = -1;
 	ddcb_register_accelerator(&accel_funcs);
 }
 
 static void capi_card_exit(void)
 {
-	/* struct dev_ctx *ctx = &my_ctx; */
-
-	/*
-	 *  We normally close the AFU when the refrence count drops to
-	 *  zero. Trying to do __afu_close() is not helpful. Worker
-	 *  thread will die with the process too.
-	 */
-	/* VERBOSE0("[%s] calling __afu_close()\n", __func__); */
-	/* __afu_close(ctx); */
+	/* nothing to be done */
 }
