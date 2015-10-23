@@ -50,6 +50,8 @@
 #include <libcxl.h>
 #include <memcopy_ddcb.h>
 
+#define CONFIG_DDCB_TIMEOUT	5  /* max time for a DDCB to be executed */
+
 #define MMIO_IMP_VERSION_REG	0x0000000ull
 #define MMIO_APP_VERSION_REG	0x0000008ull
 #define MMIO_AFU_CONFIG_REG	0x0000010ull
@@ -146,7 +148,8 @@ struct  tx_waitq {
  * be multiple contexts using just one card.
  */
 struct dev_ctx {
-	ddcb_t ddcb[NUM_DDCBS];		/* Pointer to the ddcb queue */
+	char dummy;
+	ddcb_t *ddcb;			/* ddcb queue */
 	struct tx_waitq waitq[NUM_DDCBS];
 	int		card_no;	/* Same card number as in ttx */
 	pthread_mutex_t	lock;
@@ -168,8 +171,13 @@ struct dev_ctx {
 	struct		dev_ctx		*verify;	/* Verify field */
 };
 
-/* static struct dev_ctx my_ctx __attribute__((aligned(64 * 1024))); */
-static struct dev_ctx *my_ctx;
+static ddcb_t my_ddcbs[NUM_DDCBS] __attribute__((aligned(64 * 1024)));
+
+static struct dev_ctx my_ctx = {
+	.ddcb = my_ddcbs,
+	.ddcb_num = NUM_DDCBS,
+	.tout = CONFIG_DDCB_TIMEOUT,
+};
 
 /*	Add trace function by setting RT_TRACE */
 //#define RT_TRACE
@@ -638,7 +646,7 @@ static void *card_open(int card_no,
 	}
 
 	/* Inc use count and initialize AFU on first open */
-	ttx->ctx = my_ctx;
+	ttx->ctx = &my_ctx;
 	ttx->card_no = card_no;	/* Save only right now */
 	ttx->verify = ttx;
 	sem_init(&ttx->wait_sem, 0, 0);
@@ -1094,19 +1102,10 @@ static void capi_card_exit(void) __attribute__((destructor));
 
 static void capi_card_init(void)
 {
-	const char *ttt = getenv("DDCB_TIMEOUT");
-	struct	dev_ctx *ctx;
 	int	rc;
+	const char *ttt = getenv("DDCB_TIMEOUT");
+	struct	dev_ctx *ctx = &my_ctx;
 
-	my_ctx = ctx = memalign(sysconf(_SC_PAGESIZE), sizeof(*ctx));
-	if (ctx == NULL) {
-		VERBOSE0("ERROR: Out of memory!\n");
-		return;
-	}
-
-	/* VERBOSE0("[%s]\n", __func__); */
-	memset(ctx, 0, sizeof(*ctx));
-	ctx->tout = 5;		/* Set timeout to 5 sec */
 	if (ttt)
 		ctx->tout = strtoul(ttt, (char **) NULL, 0);
 
@@ -1114,15 +1113,14 @@ static void capi_card_init(void)
 	rc = pthread_mutex_init(&ctx->lock, NULL);
 	if (0 != rc) {
 		VERBOSE0("ERROR: initializing mutex failed!\n");
-		free(ctx);
 		return;
 	}
+
 	ctx->card_no = -1;
 	ddcb_register_accelerator(&accel_funcs);
 }
 
 static void capi_card_exit(void)
 {
-	if (my_ctx)
-		free(my_ctx);
+	/* nothing to be done */
 }
