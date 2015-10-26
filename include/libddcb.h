@@ -52,6 +52,7 @@ extern "C" {
 #define DDCB_MODE_RDWR			0x0004 /* ... */
 #define DDCB_MODE_ASYNC			0x0008 /* ... */
 #define DDCB_MODE_NONBLOCK		0x0010 /* non blocking, -EBUSY */
+#define DDCB_MODE_POLLING		0x0020 /* polling */
 
 #define DDCB_APPL_ID_IGNORE		0x0000000000000000 /* Ignore applid */
 #define DDCB_APPL_ID_MASK		0x00000000ffffffff /* Valid bits */

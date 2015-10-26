@@ -58,6 +58,7 @@
 struct hw_state {
 	int card_no;
 	int card_type;
+	unsigned int mode;
 
 	zedc_stream h;		/* hardware compression context */
 	int rc;			/* hardware return code e.g. Z_STREAM_END */
@@ -205,6 +206,7 @@ int h_deflateInit2_(z_streamp strm,
 
 	s->card_no = 0;
 	s->card_type = DDCB_TYPE_GENWQE;
+	s->mode = DDCB_MODE_ASYNC | DDCB_MODE_RDWR;
 
 	if (card != NULL) {
 		if (strncmp(card, "RED", 3) == 0)
@@ -218,9 +220,10 @@ int h_deflateInit2_(z_streamp strm,
 		else
 			s->card_type = DDCB_TYPE_GENWQE;
 	}
+	if (deflate_flags & ZLIB_FLAG_USE_POLLING)
+		s->mode |= DDCB_MODE_POLLING;
 
-	zedc = __zedc_open(s->card_no, s->card_type,
-			   DDCB_MODE_ASYNC | DDCB_MODE_RDWR, &err_code);
+	zedc = __zedc_open(s->card_no, s->card_type, s->mode, &err_code);
 	if (!zedc) {
 		rc = Z_STREAM_ERROR;
 		goto free_hw_state;
@@ -346,7 +349,7 @@ int h_deflateCopy(z_streamp dest, z_streamp source)
 	}
 
 	zedc = __zedc_open(s_dest->card_no, s_dest->card_type,
-			   DDCB_MODE_ASYNC | DDCB_MODE_RDWR, &err_code);
+			   s_dest->mode, &err_code);
 	if (!zedc) {
 		pr_err("Cannot open accelerator handle\n");
 		rc = Z_STREAM_ERROR;
@@ -740,6 +743,7 @@ int h_inflateInit2_(z_streamp strm, int  windowBits,
 
 	s->card_no = 0;
 	s->card_type = DDCB_TYPE_GENWQE;
+	s->mode = DDCB_MODE_ASYNC | DDCB_MODE_RDWR;
 
 	if (card != NULL) {
 		if (strncmp(card, "RED", 3) == 0)
@@ -753,12 +757,13 @@ int h_inflateInit2_(z_streamp strm, int  windowBits,
 		else
 			s->card_type = DDCB_TYPE_GENWQE;
 	}
+	if (inflate_flags & ZLIB_FLAG_USE_POLLING)
+		s->mode |= DDCB_MODE_POLLING;
 
 	hw_trace("[%p] h_inflateInit2_: card_no=%d card_type=%d ibuf_total=%d\n",
 		 strm, s->card_no, s->card_type, ibuf_total);
 
-	zedc = __zedc_open(s->card_no, s->card_type,
-			   DDCB_MODE_ASYNC | DDCB_MODE_RDWR, &err_code);
+	zedc = __zedc_open(s->card_no, s->card_type, s->mode, &err_code);
 	if (!zedc) {
 		rc = Z_STREAM_ERROR;
 		goto free_hw_state;

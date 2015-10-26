@@ -128,6 +128,7 @@ struct ttxs {
 	sem_t	wait_sem;
 	int	seqnum;		/* Seq Number when done */
 	int	card_no;	/* Card number from Open */
+	unsigned int mode;
 	struct	ttxs	*verify;
 };
 
@@ -148,10 +149,11 @@ struct  tx_waitq {
  * be multiple contexts using just one card.
  */
 struct dev_ctx {
-	char dummy;
 	ddcb_t *ddcb;			/* ddcb queue */
 	struct tx_waitq waitq[NUM_DDCBS];
-	int		card_no;	/* Same card number as in ttx */
+	unsigned int completed_tasks[NUM_DDCBS+1];
+	int card_no;			/* Same card number as in ttx */
+	unsigned int mode;
 	pthread_mutex_t	lock;
 	int		clients;	/* Thread open counter */
 	struct cxl_afu_h *afu_h;	/* afu_h != NULL device is open */
@@ -246,7 +248,7 @@ static void rt_trace_dump(void) {}
 
 /*	Command to ddcb */
 static inline void cmd_2_ddcb(ddcb_t *pddcb, struct ddcb_cmd *cmd,
-			      uint16_t seqnum)
+			      uint16_t seqnum, bool use_irq)
 {
 	pddcb->pre = DDCB_PRESET_PRE;
 	pddcb->cmdopts_16 = __cpu_to_be16(cmd->cmdopts);
@@ -260,7 +262,9 @@ static inline void cmd_2_ddcb(ddcb_t *pddcb, struct ddcb_cmd *cmd,
 	pddcb->deque_ts_64 = __cpu_to_be64(0xffdd0000 | seqnum);
 
 	/* DDCB completion irq */
-	pddcb->icrc_hsi_shi_32 |= DDCB_INTR_BE32;
+	if (use_irq)
+		pddcb->icrc_hsi_shi_32 |= DDCB_INTR_BE32;
+
 	pddcb->seqnum = __cpu_to_be16(seqnum);
 	pddcb->retc_16 = 0;
 	if (libddcb_verbose > 3) {
@@ -581,24 +585,29 @@ static int card_dev_close(struct dev_ctx *ctx)
 
 	VERBOSE1("    [%s] Enter Card: %d clients: %d\n",
 		__func__, ctx->card_no, ctx->clients);
+
 	rc = pthread_cancel(ctx->ddcb_done_tid);
-	VERBOSE1("    [%s] Wait for done_thread to join rc=%d\n",
-		 __func__, rc);
+	VERBOSE1("    [%s] Wait done_thread to join rc=%d\n", __func__, rc);
+
 	rc = pthread_join(ctx->ddcb_done_tid, &res);
 	VERBOSE1("    [%s] Exit Card: %d clients: %d rc=%d\n",
 		 __func__, ctx->card_no, ctx->clients, rc);
+
 	return DDCB_OK;
 }
 
-static int __client_inc(struct dev_ctx *ctx, int card_no)
+static int __client_inc(struct dev_ctx *ctx, int card_no, unsigned int mode)
 {
 	int rc = DDCB_OK;
 
 	pthread_mutex_lock(&ctx->lock);
+
 	VERBOSE1("  [%s] Enter Card: %d clients: %d\n",
 		__func__, card_no, ctx->clients);
+
 	if (ctx->clients == 0) {
 		ctx->card_no = card_no;	/* Save 1st client card number */
+		ctx->mode = mode;
 		rc = card_dev_open(ctx);
 		if (DDCB_OK == rc)
 			ctx->clients++;	/* increment clients only if good */
@@ -606,17 +615,22 @@ static int __client_inc(struct dev_ctx *ctx, int card_no)
 		/* Make sure we do use the same card */
 		if (ctx->card_no == card_no)
 			ctx->clients++;		/* increment clients */
-		else rc = DDCB_ERR_CARD;	/* Can not use 2nd Card */
+		else
+			rc = DDCB_ERR_CARD;	/* Can not use 2nd Card, yet */
 	}
-	VERBOSE1("  [%s] Exit Card: %d clients: %d\n",
-		__func__, card_no, ctx->clients);
+
+	VERBOSE1("  [%s] Exit Card: %d clients: %d\n", __func__, card_no,
+		 ctx->clients);
 	pthread_mutex_unlock(&ctx->lock);
+
 	return rc;
 }
 
 static void __client_dec(struct dev_ctx *ctx)
 {
+
 	pthread_mutex_lock(&ctx->lock);
+
 	VERBOSE1("  [%s] Enter Card: %d Clients: %d\n",
 		__func__, ctx->card_no, ctx->clients);
 	ctx->clients--;
@@ -624,12 +638,11 @@ static void __client_dec(struct dev_ctx *ctx)
 		card_dev_close(ctx);
 	VERBOSE1("  [%s] Exit Card: %d Clients: %d\n",
 		__func__, ctx->card_no, ctx->clients);
+
 	pthread_mutex_unlock(&ctx->lock);
 }
 
-static void *card_open(int card_no,
-		       unsigned int mode __attribute__((unused)),
-		       int *card_rc,
+static void *card_open(int card_no, unsigned int mode, int *card_rc,
 		       uint64_t appl_id __attribute__((unused)),
 		       uint64_t appl_id_mask __attribute__((unused)))
 {
@@ -648,10 +661,11 @@ static void *card_open(int card_no,
 	/* Inc use count and initialize AFU on first open */
 	ttx->ctx = &my_ctx;
 	ttx->card_no = card_no;	/* Save only right now */
+	ttx->mode = mode;
 	ttx->verify = ttx;
 	sem_init(&ttx->wait_sem, 0, 0);
 
-	rc = __client_inc(ttx->ctx, card_no);
+	rc = __client_inc(ttx->ctx, card_no, mode);
 	if (rc != DDCB_OK) {
 		free(ttx);
 		ttx = NULL;
@@ -723,6 +737,7 @@ static int __ddcb_execute_multi(void *card_data, struct ddcb_cmd *cmd)
 		sem_wait(&ctx->free_sem);
 
 		pthread_mutex_lock(&ctx->lock);
+
 		idx = ctx->ddcb_in;
 		ddcb = &ctx->ddcb[idx];
 		txq = &ctx->waitq[idx];
@@ -737,12 +752,16 @@ static int __ddcb_execute_multi(void *card_data, struct ddcb_cmd *cmd)
 			__func__, seq, idx, my_cmd);
 		/* Increment ddcb_in and warp back to 0 */
 		ctx->ddcb_in = (ctx->ddcb_in + 1) % ctx->ddcb_num;
-		cmd_2_ddcb(ddcb, cmd, seq);
+
+		cmd_2_ddcb(ddcb, cmd, seq,
+			   (ctx->mode & DDCB_MODE_POLLING) ? false : true);
+
 		start_ddcb(ctx->afu_h, seq);
 		/* Get  Next cmd and continue if there is one */
 		my_cmd = (struct ddcb_cmd *)my_cmd->next_addr;
 		if (NULL == my_cmd)
 			txq->thread_wait = true;
+
 		pthread_mutex_unlock(&ctx->lock);
 	}
 
@@ -794,8 +813,9 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 		ddcb_2_cmd(ddcb, txq->cmd);	/* Copy DDCB back to CMD */
 		ttx->compl_code = compl_code;
 		VERBOSE1("\t[%s] seq: 0x%x slot: %d "
-			 "cmd: %p compl_code: %d\n",
-			 __func__, txq->seqnum, idx, txq->cmd, compl_code);
+			 "cmd: %p compl_code: %d retc: %x\n",
+			 __func__, txq->seqnum, idx, txq->cmd, compl_code,
+			 __be16_to_cpu(ddcb->retc_16));
 		//rt_trace(0x0011, txq->seqnum, idx, ttx);
 		sem_post(&ctx->free_sem);
 		if (txq->thread_wait) {
@@ -824,56 +844,75 @@ static void __ddcb_done_thread_cleanup(void *arg)
 {
 	struct dev_ctx *ctx = (struct dev_ctx *)arg;
 
+	VERBOSE1("[%s]\n", __func__);
 	__afu_close(ctx);
 }
 
 /**
- * DDCB completion and timeout handling. This function implements the
- * thread which looks out for completed DDCBs. Due to a CAPI
- * restriction it also needs to open and close the AFU handle used to
- * communicate to the CAPI card.
+ * Process DDCB queue results using polling for completion. This
+ * implementation might not yet be perfect from an error isolation
+ * standpoint. E.g. how to handle error interrupt conditions without
+ * impacting performance? We still do it to figure possible
+ * performance differentces between interrupt and polling driven
+ * operation.
  */
-static void *__ddcb_done_thread(void *card_data)
+static int __ddcb_process_polling(struct dev_ctx *ctx)
 {
-	struct dev_ctx *ctx = (struct dev_ctx *)card_data;
-	fd_set	set;
-	struct	timeval timeout;
-	int	rc = 0, rc0;
+	bool ok;
+	int tasks;
 
-	VERBOSE1("[%s] Enter\n", __func__);
-	rc = __afu_open(ctx);
-	ctx->afu_rc = rc;		/* Save rc */
-
-	rc0 = sem_post(&ctx->open_done_sem);	/* Post card_dev_open() */
-	if (rc0 != 0) {
-		VERBOSE0("[%s] ERROR: %d %s\n", __func__, rc0,
-			 strerror(errno));
-		__afu_close(ctx);
-		ctx->afu_rc = -1;
-		return NULL;
-	}
-
-	if (DDCB_OK != rc) {
-		/* Error Exit here in case open the AFU failed */
-		VERBOSE1("[%s] ERROR: %d Thread Exit\n", __func__, rc);
-
-		/* Join in card_dev_open() */
-		return NULL;
-	}
-
-	/* Push the Cleanup Handler to close the AFU */
-	pthread_cleanup_push(__ddcb_done_thread_cleanup, ctx);
-
-	VERBOSE1("[%s] Enter work loop\n", __func__);
+	VERBOSE1("[%s] Enter polling work loop\n", __func__);
 	while (1) {
+		/*
+		 * Using trylock in combination with testcancel to
+		 * avoid deadlock situations when competing for the
+		 * ctx->lock on shutdown ...
+		 */
+		while (pthread_mutex_trylock(&ctx->lock) != 0)
+			pthread_testcancel();
+
+		tasks = 0;
+		while (1) {
+			ok = __ddcb_done_post(ctx, DDCB_OK);
+			if (ok)
+				tasks++;
+			else
+				break;
+		}
+		if (tasks < NUM_DDCBS)
+			ctx->completed_tasks[tasks]++;
+		else
+			ctx->completed_tasks[NUM_DDCBS]++;
+
+		pthread_mutex_unlock(&ctx->lock);
+
+	}
+	VERBOSE1("[%s] Exit polling work loop\n", __func__);
+
+	return 0;
+}
+
+/**
+ * Process DDCB queue results using completion processing with
+ * interrupt.
+ */
+static int __ddcb_process_irqs(struct dev_ctx *ctx)
+{
+	int rc;
+
+	VERBOSE1("[%s] Enter interrupt work loop\n", __func__);
+	while (1) {
+		fd_set	set;
+		struct	timeval timeout;
+
 		FD_ZERO(&set);
 		FD_SET(ctx->afu_fd, &set);
 
 		/* Set timeout to "tout" seconds */
 		timeout.tv_sec = ctx->tout;
 		timeout.tv_usec = 0;
-		rc = select(ctx->afu_fd + 1, &set, NULL, NULL, &timeout);
 
+		rc = select(ctx->afu_fd + 1, &set, NULL, NULL, &timeout);
 		if (0 == rc) {
 			VERBOSE0("WARNING: %d sec timeout while waiting "
 				 "for interrupt! rc: %d --> %d\n",
@@ -917,6 +956,7 @@ static void *__ddcb_done_thread(void *card_data)
 			rc, ctx->event.header.type, ctx->event.header.size);
 
 		pthread_mutex_lock(&ctx->lock);
+
 		switch (ctx->event.header.type) {
 		case CXL_EVENT_AFU_INTERRUPT:
 			/* Process all ddcb's */
@@ -954,6 +994,50 @@ static void *__ddcb_done_thread(void *card_data)
 		}
 		pthread_mutex_unlock(&ctx->lock);
 	}
+
+	return 0;
+}
+
+/**
+ * DDCB completion and timeout handling. This function implements the
+ * thread which looks out for completed DDCBs. Due to a CAPI
+ * restriction it also needs to open and close the AFU handle used to
+ * communicate to the CAPI card.
+ */
+static void *__ddcb_done_thread(void *card_data)
+{
+	int rc = 0, rc0;
+	struct dev_ctx *ctx = (struct dev_ctx *)card_data;
+
+	VERBOSE1("[%s] Enter\n", __func__);
+	rc = __afu_open(ctx);
+	ctx->afu_rc = rc;		/* Save rc */
+
+	rc0 = sem_post(&ctx->open_done_sem);	/* Post card_dev_open() */
+	if (rc0 != 0) {
+		VERBOSE0("[%s] ERROR: %d %s\n", __func__, rc0,
+			 strerror(errno));
+		__afu_close(ctx);
+		ctx->afu_rc = -1;
+		return NULL;
+	}
+
+	if (DDCB_OK != rc) {
+		/* Error Exit here in case open the AFU failed */
+		VERBOSE1("[%s] ERROR: %d Thread Exit\n", __func__, rc);
+
+		/* Join in card_dev_open() */
+		return NULL;
+	}
+
+	/* Push the Cleanup Handler to close the AFU */
+	pthread_cleanup_push(__ddcb_done_thread_cleanup, ctx);
+
+	if ( DDCB_MODE_POLLING & ctx->mode)
+		__ddcb_process_polling(ctx);
+	else
+		__ddcb_process_irqs(ctx);
+
 	pthread_cleanup_pop(1);
 	return NULL;
 }
@@ -1122,5 +1206,10 @@ static void capi_card_init(void)
 
 static void capi_card_exit(void)
 {
-	/* nothing to be done */
+	unsigned int i;
+	struct	dev_ctx *ctx = &my_ctx;
+
+	VERBOSE1("Completed tasks per run:\n");
+	for (i = 0; i < NUM_DDCBS + 1; i++)
+		VERBOSE1("  %d: %d\n", i, ctx->completed_tasks[i]);
 }

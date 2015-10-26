@@ -47,6 +47,7 @@ function usage() {
     echo "         Use SW to use software compress/decompression"
     echo "    [-C] <card> set the compression card to use (0, 1, ... )."
     echo "          RED (or -1) drive work to all available cards."
+    echo "    [-P] Use polling to detect work-request completion/only CAPI."
     echo "    [-t] <test_data.bin>"
     echo "    [-v] Print status and informational output."
     echo "    [-V] Print program version (${version})"
@@ -73,32 +74,36 @@ function usage() {
 }
 
 # Parse any options given on the command line
-while getopts "A:C:t:vVh" opt; do
+while getopts "A:C:t:PvVh" opt; do
     case ${opt} in
 	A)
-	    ZLIB_ACCELERATOR=${OPTARG};
-            ;;
+	ZLIB_ACCELERATOR=${OPTARG};
+	;;
         C)
-            ZLIB_CARD=${OPTARG};
-            ;;
+	ZLIB_CARD=${OPTARG};
+	;;
+	P)
+	export ZLIB_DEFLATE_IMPL=0x81;
+	export ZLIB_INFLATE_IMPL=0x81;
+	;;	
 	t)
-	    test_data=${OPTARG};
-	    ;;
+	test_data=${OPTARG};
+	;;
         v)
-            verbose="-v";
-            ;;
+	verbose="-v";
+	;;
         V)
-            echo "${version}"
-            exit 0;
-            ;;
+	echo "${version}"
+	exit 0;
+	;;
         h)
-            usage;
-            exit 0;
-            ;;
+	usage;
+	exit 0;
+	;;
         \?)
-            echo "ERROR: Invalid option: -$OPTARG" >&2
-            exit 1;
-            ;;
+	echo "ERROR: Invalid option: -$OPTARG" >&2
+	exit 1;
+	;;
     esac
 done
 
