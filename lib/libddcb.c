@@ -351,12 +351,38 @@ uint64_t accel_get_app_id(accel_t card)
 	struct ddcb_accel_funcs *accel = card->accel;
 
 	if (accel == NULL)
-		return DDCB_ERR_INVAL;
+		return 0;
 
 	if (accel->card_get_app_id == NULL)
-		return DDCB_ERR_NOTIMPL;
+		return 0;
 
 	return accel->card_get_app_id(card->card_data);
+}
+
+uint64_t accel_get_queue_work_time(accel_t card)
+{
+	struct ddcb_accel_funcs *accel = card->accel;
+
+	if (accel == NULL)
+		return 0;
+
+	if (accel->card_get_queue_work_time == NULL)
+		return 0;
+
+	return accel->card_get_queue_work_time(card->card_data);
+}
+
+uint64_t accel_get_frequency(accel_t card)
+{
+	struct ddcb_accel_funcs *accel = card->accel;
+
+	if (accel == NULL)
+		return 0;
+
+	if (accel->card_get_frequency == NULL)
+		return 0;
+
+	return accel->card_get_frequency(card->card_data);
 }
 
 int accel_pin_memory(accel_t card, const void *addr, size_t size,

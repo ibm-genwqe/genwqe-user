@@ -232,12 +232,21 @@ int accel_close(accel_t card);
 int accel_ddcb_execute(accel_t card, struct ddcb_cmd *req, int *card_rc,
 		       int *card_errno);
 
-/** Register access */
+/* Register access */
 uint64_t accel_read_reg64(accel_t card, uint32_t offs, int *card_rc);
 uint32_t accel_read_reg32(accel_t card, uint32_t offs, int *card_rc);
 int accel_write_reg64(accel_t card, uint32_t offs, uint64_t val);
 int accel_write_reg32(accel_t card, uint32_t offs, uint32_t val);
 uint64_t accel_get_app_id(accel_t card);
+
+/**
+ * @brief Get the queue work timer card ticks. This indicates how long
+ * the hardware queue was in use. Comparing this value with the over
+ * all runtime, helps to judge how much time was spend in software and
+ * in hardware data processing.
+ */
+uint64_t accel_get_queue_work_time(accel_t card);
+uint64_t accel_get_frequency(accel_t card);
 
 /**
  * @brief Prepare buffer to do DMA transactions. The driver will
@@ -334,6 +343,8 @@ struct ddcb_accel_funcs {
 	   implementation. For CAPI we are searching a similar
 	   mechanism still. */
 	uint64_t (* card_get_app_id)(void *card_data);
+	uint64_t (* card_get_queue_work_time)(void *card_data); /* ticks */
+	uint64_t (* card_get_frequency)(void *card_data); /* Hz */
 
 	/* Not all DDCB accelerators have this, GenWQE has it, but
 	   CAPI does not. If not executed wrapper functions will

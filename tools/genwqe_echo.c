@@ -238,6 +238,7 @@ int main(int argc, char *argv[])
 	unsigned long packets_send = 0, packets_received = 0;
 	int cpu = -1;
 	int err_code = 0;
+	unsigned long long frequency, wtime_usec, wtime_s = 0, wtime_e = 0;
 
 	while (1) {
 		int option_index = 0;
@@ -381,6 +382,7 @@ int main(int argc, char *argv[])
 		preload = 1;
 
 	signal(SIGINT, INT_handler);
+	wtime_s = accel_get_queue_work_time(card);
 
 	while (!stop_echoing) {
 		struct timeval t0, t1;
@@ -414,6 +416,9 @@ int main(int argc, char *argv[])
 			break;
 	}
 
+	wtime_e = accel_get_queue_work_time(card);
+	frequency = accel_get_frequency(card);
+	wtime_usec = frequency ? (wtime_e - wtime_s) / (frequency/1000000) : 0;
 	accel_close(card);
 
 	if (!flood && !quiet)
@@ -423,10 +428,12 @@ int main(int argc, char *argv[])
 	if (!quiet) {
 		printf("--- UNIT #%x echo statistics ---\n"
 		       "%ld packets transmitted, %ld received, %ld lost, "
-		       "%ld%% packet loss\n", unit, packets_send,
+		       "%ld%% packet loss, queue %lld usec\n",
+		       unit, packets_send,
 		       packets_received, (packets_send - packets_received),
 		       !packets_send ? 100 :
-		       100 * (packets_send - packets_received)/packets_send);
+		       100 * (packets_send - packets_received)/packets_send,
+		       wtime_usec);
 	}
 
 	if (rc != DDCB_OK)

@@ -99,6 +99,32 @@ static uint64_t _card_get_app_id(void *card_data)
 	return card_get_app_id(card_data);
 }
 
+static uint64_t _card_get_frequency(void *card_data)
+{
+	uint16_t speed; /*		   MHz	MHz  MHz  MHz */
+	static const int speed_grade[] = { 250, 200, 166, 175 };
+	uint64_t slu_unitcfg;
+
+	slu_unitcfg = card_read_reg64(card_data, IO_SLU_UNITCFG, NULL);
+	speed = (uint16_t)((slu_unitcfg >> 28) & 0x0full);
+	if (speed >= ARRAY_SIZE(speed_grade))
+		return 0;       /* illegal value */
+
+	return speed_grade[speed] * 1000000;  /* in Hz */
+}
+
+/**
+ * Special formular is required to get the right time for our GenWQE
+ * implementation.
+ */
+static uint64_t _card_get_queue_work_time(void *card_data)
+{
+	uint64_t queue_wtime;
+
+	queue_wtime = card_read_reg64(card_data, IO_SLC_QUEUE_WTIME, NULL);
+	return queue_wtime * 8;
+}
+
 static int card_pin_memory(void *card_data, const void *addr, size_t size,
 			   int dir)
 {
@@ -131,6 +157,8 @@ static struct ddcb_accel_funcs accel_funcs = {
 	.card_write_reg64 = card_write_reg64,
 	.card_write_reg32 = card_write_reg32,
 	.card_get_app_id = _card_get_app_id,
+	.card_get_queue_work_time = _card_get_queue_work_time,
+	.card_get_frequency = _card_get_frequency,
 	.card_pin_memory = card_pin_memory,
 	.card_unpin_memory = card_unpin_memory,
 	.card_malloc = card_malloc,

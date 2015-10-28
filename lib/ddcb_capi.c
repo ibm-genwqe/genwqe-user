@@ -1128,7 +1128,41 @@ static uint64_t _card_get_app_id(void *card_data)
 		if (ctx)
 			return ctx->app_id;
 	}
-	return DDCB_ERR_INVAL;
+	return 0;
+}
+
+/**
+ * The Queue worktimer increments every 4 cycles.
+ */
+static uint64_t _card_get_queue_work_time(void *card_data)
+{
+	int rc;
+	struct	ttxs	*ttx = (struct ttxs*)card_data;
+	struct	dev_ctx *ctx;
+	uint64_t data;
+
+	if (ttx && (ttx->verify == ttx)) {
+		ctx = ttx->ctx;
+		if (!ctx)
+			return 0;
+
+		rc = cxl_mmio_read64(ctx->afu_h, MMIO_DDCBQ_WT_REG, &data);
+		if (rc != 0)
+			return 0;
+
+		/* FIXME New versions do not need masking. */
+		return data & 0x00ffffffffffffffull;
+	}
+	return 0;
+}
+
+/**
+ * Our CAPI version runs witht 250 MHz.
+ */
+static uint64_t _card_get_frequency(void *card_data __attribute__((unused)))
+{
+	/* FIXME Version register contains that info. */
+	return 250 * 1000000;
 }
 
 static int card_pin_memory(void *card_data __attribute__((unused)),
@@ -1174,6 +1208,8 @@ static struct ddcb_accel_funcs accel_funcs = {
 	.card_write_reg64 = card_write_reg64,
 	.card_write_reg32 = card_write_reg32,
 	.card_get_app_id = _card_get_app_id,
+	.card_get_queue_work_time = _card_get_queue_work_time,
+	.card_get_frequency = _card_get_frequency,
 	.card_pin_memory = card_pin_memory,
 	.card_unpin_memory = card_unpin_memory,
 	.card_malloc = card_malloc,

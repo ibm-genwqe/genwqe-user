@@ -506,32 +506,39 @@ __memcpy_exit_1:
 }
 
 /* Free input buffer for each Thread */
-static int __memcpy_free_ibuf(struct memcpy_in_parms *ip, struct  memcpy_thread_data *pt)
+static int __memcpy_free_ibuf(struct memcpy_in_parms *ip,
+			      struct memcpy_thread_data *pt)
 {
 	/* the last one must free ibuf */
 	if (ip->use_sglist) {
 		if (ip->use_sglist > 1)
-			accel_unpin_memory(pt->accel, pt->ibuf4k, ip->data_buf_size + ip->pgoffs_i);
+			accel_unpin_memory(pt->accel, pt->ibuf4k,
+					   ip->data_buf_size + ip->pgoffs_i);
 		free(pt->ibuf4k);
-	} else accel_free(pt->accel, pt->ibuf4k, ip->data_buf_size + ip->pgoffs_i);
+	} else accel_free(pt->accel, pt->ibuf4k,
+			  ip->data_buf_size + ip->pgoffs_i);
 	pt->ibuf4k = NULL;
 	return 0;
 }
 
 /* Allocate input buffer per Thread */
-static int __memcpy_alloc_ibuf(struct memcpy_in_parms *ip, struct  memcpy_thread_data *pt)
+static int __memcpy_alloc_ibuf(struct memcpy_in_parms *ip,
+			       struct memcpy_thread_data *pt)
 {
 	int	i;
 	size_t	fread_size = 0;
 
 	if (ip->use_sglist) {
-               	ip->in_ats_type = ATS_TYPE_SGL_RDWR;
-		pt->ibuf4k = memalign(ip->page_size, ip->data_buf_size + ip->pgoffs_i);
+		ip->in_ats_type = ATS_TYPE_SGL_RDWR;
+		pt->ibuf4k = memalign(ip->page_size,
+				      ip->data_buf_size + ip->pgoffs_i);
 		if (ip->use_sglist > 1)
-			accel_pin_memory(pt->accel, pt->ibuf4k, ip->data_buf_size + ip->pgoffs_i, 0);
+			accel_pin_memory(pt->accel, pt->ibuf4k,
+					 ip->data_buf_size + ip->pgoffs_i, 0);
 	} else {
-               	ip->in_ats_type = ATS_TYPE_FLAT_RD;
-		pt->ibuf4k = accel_malloc(pt->accel, ip->data_buf_size + ip->pgoffs_i);
+		ip->in_ats_type = ATS_TYPE_FLAT_RD;
+		pt->ibuf4k = accel_malloc(pt->accel,
+					  ip->data_buf_size + ip->pgoffs_i);
 	}
 
 	if ((ip->data_buf_size != 0) && (pt->ibuf4k == NULL)) {
@@ -544,7 +551,8 @@ static int __memcpy_alloc_ibuf(struct memcpy_in_parms *ip, struct  memcpy_thread
 
 	/* preset partial input buffer in case pgoffs_i is set */
 	if (ip->fpattern) {
-		fread_size = fread(pt->ibuf, 1, ip->data_buf_size, ip->fpattern);
+		fread_size = fread(pt->ibuf, 1, ip->data_buf_size,
+				   ip->fpattern);
 		if ((int)fread_size != ip->data_buf_size) {
 			pr_err("Can not read pattern file!\n");
 			return EX_ERRNO;
@@ -555,11 +563,14 @@ static int __memcpy_alloc_ibuf(struct memcpy_in_parms *ip, struct  memcpy_thread
 			pt->ibuf[i] = (uint8_t)i;
 	}
 	if (0 == pt->thread) {
-		/* Create Adler and CRC from Input buffer, which is thea same for each thread */
-		ip->mcpy_adler32 = adler32(0L, Z_NULL, 0);	/* start value */
-		ip->mcpy_adler32 = adler32(ip->mcpy_adler32, pt->ibuf, ip->data_buf_size);
+		/* Create Adler and CRC from Input buffer, which is
+		   thea same for each thread */
+		ip->mcpy_adler32 = adler32(0L, Z_NULL, 0); /* start value */
+		ip->mcpy_adler32 = adler32(ip->mcpy_adler32, pt->ibuf,
+					   ip->data_buf_size);
 		ip->mcpy_crc32 = crc32(0L, Z_NULL, 0); /* start value */
-		ip->mcpy_crc32 = crc32(ip->mcpy_crc32 , pt->ibuf, ip->data_buf_size);
+		ip->mcpy_crc32 = crc32(ip->mcpy_crc32 , pt->ibuf,
+				       ip->data_buf_size);
 	}
 	return 0;
 }
@@ -572,6 +583,7 @@ int main(int argc, char *argv[])
 	int	thread;
 	char	*out_f;		/* Output File name used */
 	int	err_code;
+	unsigned long long frequency, wtime_usec = 0, wtime_s = 0, wtime_e = 0;
 
 	/* Summ for all threads */
 	long long	bytes_copied = 0;
@@ -756,7 +768,7 @@ int main(int argc, char *argv[])
 		ip.o_fp = fopen(out_f, "w+");
 		if (NULL == ip.o_fp) {
 			pr_err("can not open output file '%s': %s\n",
-		       		out_f, strerror(errno));
+			       out_f, strerror(errno));
 			exit(EX_ERRNO);
 		}
 	}
@@ -774,7 +786,8 @@ int main(int argc, char *argv[])
 	ddcb_debug(verbose_flag);
 
 	/* Allocate Thread data */
-	tdata = (struct memcpy_thread_data*)malloc(ip.threads * sizeof(struct memcpy_thread_data));
+	tdata = (struct memcpy_thread_data*)
+		malloc(ip.threads * sizeof(struct memcpy_thread_data));
 	if (NULL == tdata) {
 		pr_err("Can not allocate memory Thread Data\n");
 		exit(EX_MEMORY);
@@ -807,6 +820,9 @@ int main(int argc, char *argv[])
 			pt->err = EX_ERR_CARD;
 			continue;
 		}
+		if (thread == 0)
+			wtime_s = accel_get_queue_work_time(pt->accel);
+
 		/* Alloc ibuf */
 		pt->err = __memcpy_alloc_ibuf(&ip, pt);
 		//if (0 != pt->err) {
@@ -817,7 +833,8 @@ int main(int argc, char *argv[])
 	pt = &tdata[0];
 	for (thread = 0; thread < ip.threads; thread++, pt++) {
 		if (0 == pt->err) {
-			if (0 == pthread_create(&tid, NULL, &__memcpy_thread, pt)) {
+			if (0 == pthread_create(&tid, NULL,
+						&__memcpy_thread, pt)) {
 				pt->tid = tid;
 				ip.have_threads++;
 			}
@@ -828,7 +845,8 @@ int main(int argc, char *argv[])
 	for (thread = 0; thread < ip.threads; thread++) {
 		if (0 == pt->tid) {		/* Skip if tid is not set */
 			errors++;
-			VERBOSE0("Thread: %d, tid: 0 err: %d\n", thread, pt->err);
+			VERBOSE0("Thread: %d, tid: 0 err: %d\n",
+				 thread, pt->err);
 			continue;
 		}
 		pthread_join(pt->tid, NULL);	/* wait for good tid */
@@ -870,10 +888,22 @@ int main(int argc, char *argv[])
 		memcopies += pt->memcopies;
 		errors += pt->errors;
 		__memcpy_free_ibuf(&ip, pt);
+
+		if (thread == ip.threads - 1) {
+			wtime_e = accel_get_queue_work_time(pt->accel);
+			frequency = accel_get_frequency(pt->accel);
+			wtime_usec = frequency ? (wtime_e - wtime_s) /
+				(frequency/1000000) : 0;
+		}
+
 		accel_close(pt->accel);
-		VERBOSE1("Thread %02d Start: %08lld - %08lld End: %08lld - %08lld\n",
-			thread, (long long)pt->stime.tv_sec, (long long)pt->stime.tv_nsec,
-			(long long)pt->etime.tv_sec, (long long)pt->etime.tv_nsec);
+
+		VERBOSE1("Thread %02d Start: %08lld - %08lld "
+			 "End: %08lld - %08lld\n", thread,
+			 (long long)pt->stime.tv_sec,
+			 (long long)pt->stime.tv_nsec,
+			 (long long)pt->etime.tv_sec,
+			 (long long)pt->etime.tv_nsec);
 		/* Update lowest start time */
 		time_low(&ip.stime, &pt->stime);
 		/* Update highest end time */
@@ -888,7 +918,7 @@ int main(int argc, char *argv[])
 		mib = kib / 1024;
 		VERBOSE0("--- MEMCOPY statistics ---\n"
 			"%d memcopies done, %lld bytes, ",
-			memcopies, bytes_copied);
+			 memcopies, bytes_copied);
 
 		total_usec = tdiff_us(&ip.etime, &ip.stime);
 		/* Avoid div fault */
@@ -896,14 +926,16 @@ int main(int argc, char *argv[])
 			if (total_usec < 100000) {
 				kibs = ((bytes_copied * 1000000) / 1024) /
 					total_usec;
-				VERBOSE0("%d KiB, in %lld usec, %ld KiB/sec",
-					 kib, (long long)total_usec, kibs);
+				VERBOSE0("%d KiB, in %lld/%lld usec, %ld KiB/sec,",
+					 kib, (long long)total_usec,
+					 wtime_usec, kibs);
 			} else {
 				total_msec = total_usec / 1000;	/* now msec */
 				mibs = (bytes_copied * 1000) /
 					(1024 * 1024) / total_msec;
-				VERBOSE0("%d MiB, in %lld msec, %ld MiB/sec",
-					 mib, (long long)total_msec, mibs);
+				VERBOSE0("%d MiB, in %lld/%lld msec, %ld MiB/sec,",
+					 mib, (long long)total_msec,
+					 wtime_usec/1000, mibs);
 			}
 		}
 		VERBOSE0(" %d errors.\n", errors);
