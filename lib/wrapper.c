@@ -403,20 +403,6 @@ static void __print_stats(void)
 	pthread_mutex_unlock(&stats_mutex);
 }
 
-static void _done(void) __attribute__((destructor));
-
-static void _done(void)
-{
-	if (zlib_gather_statistics()) {
-		__print_stats();
-		pthread_mutex_destroy(&stats_mutex);
-	}
-
-	zedc_hw_done();
-	zedc_sw_done();
-	return;
-}
-
 /**
  * If there is no hardware available we retry automatically the
  * software version.
@@ -1460,4 +1446,18 @@ uLong crc32_combine(uLong crc1, uLong crc2, z_off_t len2)
 const char *zError(int err)
 {
 	return z_zError(err);
+}
+
+static void _done(void) __attribute__((destructor));
+
+static void _done(void)
+{
+	if (zlib_gather_statistics()) {
+		__print_stats();
+		pthread_mutex_destroy(&stats_mutex);
+	}
+
+	zedc_hw_done();
+	zedc_sw_done();
+	return;
 }

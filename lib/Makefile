@@ -27,7 +27,7 @@ CFLAGS += -fPIC -fno-strict-aliasing \
 libname=libzADC
 projs = $(libname).a $(libname)-$(libversion).so $(libname).so
 src = wrapper.c hardware.c software.c
-objs = $(src:.c=.o) __libzHW.o __libDDCB.o __libcard.o
+objs = __libzHW.o __libcard.o __libDDCB.o $(src:.c=.o)
 
 ### libzHW
 src0 = libzHW.c inflate.c deflate.c

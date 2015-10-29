@@ -383,6 +383,10 @@ static int __afu_open(struct dev_ctx *ctx)
 	uint64_t mmio_dat;
 	int rc0;
 
+	/* Do not do anything if afu should have already been opened */
+	if (ctx->afu_h)
+		return DDCB_OK;
+
 	sprintf(device, "/dev/cxl/afu%d.0d", ctx->card_no);
 	VERBOSE1("       [%s] Enter Open: %s DDCBs @ %p\n", __func__, device,
 		 &ctx->ddcb[0]);
@@ -513,8 +517,8 @@ static inline int __afu_close(struct dev_ctx *ctx)
 	cxl_mmio_unmap(afu_h);
 	cxl_afu_free(afu_h);
 	ctx->afu_h = NULL;
-
 	ctx->card_no = -1;
+
 	VERBOSE1("        [%s] Exit, Card Removed\n", __func__);
 	return rc;
 }
@@ -543,6 +547,9 @@ static int card_dev_open(struct dev_ctx *ctx)
 
 	VERBOSE1("    [%s] Enter Card: %d clients: %d open_done_sem: %p\n",
 		 __func__, ctx->card_no, ctx->clients, &ctx->open_done_sem);
+
+	if (ctx->ddcb_done_tid != 0)  /* already in use!! */
+		return DDCB_OK;
 
 	/* Create a semaphore to wait until afu Open is done */
 	rc = sem_init(&ctx->open_done_sem, 0, 0);
@@ -577,8 +584,12 @@ static int card_dev_open(struct dev_ctx *ctx)
 
 /**
  * NOTE: ctx->lock must be held when entering this function.
+ *
+ * @join:    When being used in the library destructor the worker thread
+ *           could already be stopped. Therefore set join to 0 to avoid
+ *           syncronization.
  */
-static int card_dev_close(struct dev_ctx *ctx)
+static int card_dev_close(struct dev_ctx *ctx, int join)
 {
 	int rc;
 	void *res = NULL;
@@ -587,12 +598,14 @@ static int card_dev_close(struct dev_ctx *ctx)
 		__func__, ctx->card_no, ctx->clients);
 
 	rc = pthread_cancel(ctx->ddcb_done_tid);
-	VERBOSE1("    [%s] Wait done_thread to join rc=%d\n", __func__, rc);
 
-	rc = pthread_join(ctx->ddcb_done_tid, &res);
-	VERBOSE1("    [%s] Exit Card: %d clients: %d rc=%d\n",
-		 __func__, ctx->card_no, ctx->clients, rc);
-
+	if (join) {
+		VERBOSE1("    [%s] Wait done_thread to join rc=%d\n",
+			 __func__, rc);
+		rc = pthread_join(ctx->ddcb_done_tid, &res);
+		VERBOSE1("    [%s] Exit Card: %d clients: %d rc=%d\n",
+			 __func__, ctx->card_no, ctx->clients, rc);
+	}
 	return DDCB_OK;
 }
 
@@ -634,11 +647,17 @@ static void __client_dec(struct dev_ctx *ctx)
 	VERBOSE1("  [%s] Enter Card: %d Clients: %d\n",
 		__func__, ctx->card_no, ctx->clients);
 	ctx->clients--;
-	if (0 == ctx->clients)
-		card_dev_close(ctx);
+
+	/*
+	 * Since closing the AFU is so expensive, we keep the afu
+	 * handle and the allocating thread alive until the
+	 * application exits.
+	 *
+	 * if (0 == ctx->clients)
+	 *         card_dev_close(ctx, 1);
+	 */
 	VERBOSE1("  [%s] Exit Card: %d Clients: %d\n",
 		__func__, ctx->card_no, ctx->clients);
-
 	pthread_mutex_unlock(&ctx->lock);
 }
 
@@ -835,12 +854,16 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 
 /**
  * The cleanup function gets invoked after the thread was canceld by
- * sending card_dev_close(). This function will close the AFU.
+ * sending card_dev_close(). This function was intended to close the
+ * AFU. But it turned out that closing it has sigificant performance
+ * impact. So we decided to keep the afu resource opened until the
+ * application terminates. This will absorb one file descriptor plus
+ * the memory associated to the afu handle.
  *
  * Note: Open and Close the AFU must handled by the same thread id.
  *       ctx->lock must be held when entering this function.
  */
-static void __ddcb_done_thread_cleanup(void *arg)
+static void __ddcb_done_thread_cleanup(void *arg __attribute__((unused)))
 {
 	struct dev_ctx *ctx = (struct dev_ctx *)arg;
 
@@ -1256,6 +1279,8 @@ static void capi_card_exit(void)
 {
 	unsigned int i;
 	struct	dev_ctx *ctx = &my_ctx;
+
+	card_dev_close(ctx, 0);
 
 	VERBOSE1("Completed tasks per run:\n");
 	for (i = 0; i < NUM_DDCBS + 1; i++)

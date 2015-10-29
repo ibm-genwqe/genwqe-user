@@ -1533,4 +1533,15 @@ void zedc_hw_init(void)
 
 void zedc_hw_done(void)
 {
+	unsigned int card_no;
+	int flags = (inflate_flags | deflate_flags);
+
+	if ((flags & ZLIB_FLAG_CACHE_HANDLES) == 0x0)
+		return;
+
+	for (card_no = 0; card_no <= 128; card_no++) {
+		if (zedc_cards[card_no] == NULL)
+			continue;
+		zedc_close(zedc_cards[card_no]);
+	}
 }
