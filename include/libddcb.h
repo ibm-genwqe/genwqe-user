@@ -35,6 +35,7 @@ extern "C" {
 
 #include <stdint.h>
 #include <string.h>
+#include <pthread.h>
 #include <linux/types.h>
 
 /*****************************************************************************/
@@ -265,8 +266,7 @@ uint64_t accel_get_frequency(accel_t card);
  * @param [in] direction 0: read/1: read and write
  * @return	         DDCB_LIB_OK on success or negative error code.
  */
-int accel_pin_memory(accel_t card, const void *addr, size_t size,
-			 int dir);
+int accel_pin_memory(accel_t card, const void *addr, size_t size, int dir);
 
 /**
  * @brief Remove the pinning and free the dma-addresess within the driver.
@@ -315,8 +315,11 @@ int accel_free(accel_t card, void *ptr, size_t size);
  * libddcb will use the registered functions to provide the requested
  * functionality.
  */
+#define DDCB_FLAG_STATISTICS 0x0001 /* enable statistical data gathering */
+
 struct ddcb_accel_funcs {
 	int card_type;
+	const char *card_name;
 
 	/* must return void *card_data */
 	void *(* card_open)(int card_no, unsigned int mode, int *card_rc,
@@ -355,6 +358,16 @@ struct ddcb_accel_funcs {
 				  size_t size);
 	void * (* card_malloc)(void *card_data, size_t size);
 	int (* card_free)(void *card_data, void *ptr, size_t size);
+
+	/* statistical information */
+	pthread_mutex_t slock;
+	unsigned long num_open;
+	unsigned long num_execute;
+	unsigned long num_close;
+
+	unsigned long time_open;
+	unsigned long time_execute;
+	unsigned long time_close;
 
 	/* private */
 	void *priv_data;

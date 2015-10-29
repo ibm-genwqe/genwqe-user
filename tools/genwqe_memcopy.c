@@ -348,11 +348,11 @@ static void *__memcpy_thread(void *data)
 
 	/* Allocate ddcb list */
 	ddcb_list = (struct ddcb_cmd *)malloc(ip->preload * sizeof(struct ddcb_cmd));
-        if (NULL == ddcb_list) {
-                pr_err("Can not allocate %d DDCB List\n", ip->preload);
-                err = EX_MEMORY;
+	if (NULL == ddcb_list) {
+		pr_err("Can not allocate %d DDCB List\n", ip->preload);
+		err = EX_MEMORY;
 		goto __memcpy_exit_2;
-        }
+	}
 	VERBOSE1("Thread: %d memcopy: %p (in) to %p (out), pageoffs %d (in) "
 		"%d (out), %d bytes Preload: %d\n",
 		pt->thread, pt->ibuf, obuf,
@@ -403,7 +403,7 @@ static void *__memcpy_thread(void *data)
 				(long long)ddcb0->cmplt_ts,
 				(long long)ddcb0->disp_ts);
 			if ((ddcb0->retc == DDCB_RETC_UNEXEC) &&
-		    		(ddcb0->attn == 0xe007)) {
+			    (ddcb0->attn == 0xe007)) {
 				d = (struct _asv_runtime_dma_error *)ddcb0->asv;
 				ddcb_print_dma_err(d);
 			}

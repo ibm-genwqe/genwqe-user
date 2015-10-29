@@ -75,8 +75,21 @@ struct card_dev_t {
 	struct ddcb_accel_funcs *accel;	 /* supported set of functions */
 };
 
+static unsigned int ddcb_trace = 0x0;
+
+#define ddcb_gather_statistics(accel) \
+	(ddcb_trace & DDCB_FLAG_STATISTICS)
+
 static struct ddcb_accel_funcs *accel_list = NULL;
 int libddcb_verbose = 0;
+
+static inline uint64_t get_usec(void)
+{
+	struct timeval t;
+
+	gettimeofday(&t, NULL);
+	return t.tv_sec * 1000000 + t.tv_usec;
+}
 
 static struct ddcb_accel_funcs *find_accelerator(int card_type)
 {
@@ -182,6 +195,10 @@ accel_t accel_open(int card_no, unsigned int card_type,
 	int rc = DDCB_OK;
 	struct card_dev_t *card;
 	struct ddcb_accel_funcs *accel;
+	uint64_t s = 0, e = 0;
+
+	if (ddcb_gather_statistics())
+		s = get_usec();
 
 	card = calloc(1, sizeof(*card));
 	if (card == NULL) {
@@ -213,6 +230,15 @@ accel_t accel_open(int card_no, unsigned int card_type,
 	}
 	if (err_code)
 		*err_code = DDCB_OK;
+
+	if (ddcb_gather_statistics()) {
+		e = get_usec();
+		pthread_mutex_lock(&accel->slock);
+		accel->num_open++;
+		accel->time_open += (e - s);
+		pthread_mutex_unlock(&accel->slock);
+	}
+
 	return card;
 
  err_free:
@@ -227,6 +253,10 @@ int accel_close(accel_t card)
 {
 	int rc;
 	struct ddcb_accel_funcs *accel = card->accel;
+	uint64_t s = 0, e = 0;
+
+	if (ddcb_gather_statistics())
+		s = get_usec();
 
 	if (accel == NULL)
 		return DDCB_ERR_INVAL;
@@ -236,6 +266,14 @@ int accel_close(accel_t card)
 
 	rc = accel->card_close(card->card_data);
 	free(card);
+
+	if (ddcb_gather_statistics()) {
+		e = get_usec();
+		pthread_mutex_lock(&accel->slock);
+		accel->num_close++;
+		accel->time_close += (e - s);
+		pthread_mutex_unlock(&accel->slock);
+	}
 
 	return rc;
 }
@@ -262,6 +300,10 @@ int accel_ddcb_execute(accel_t card, struct ddcb_cmd *req,
 		 int *card_rc, int *card_errno)
 {
 	struct ddcb_accel_funcs *accel = card->accel;
+	uint64_t s = 0, e = 0;
+
+	if (ddcb_gather_statistics())
+		s = get_usec();
 
 	if (accel == NULL)
 		return DDCB_ERR_INVAL;
@@ -278,6 +320,14 @@ int accel_ddcb_execute(accel_t card, struct ddcb_cmd *req,
 		*card_errno = card->card_errno;
 	if (card->card_rc < 0)
 		return DDCB_ERR_CARD;
+
+	if (ddcb_gather_statistics()) {
+		e = get_usec();
+		pthread_mutex_lock(&accel->slock);
+		accel->num_execute++;
+		accel->time_execute += (e - s);
+		pthread_mutex_unlock(&accel->slock);
+	}
 
 	return DDCB_OK;
 }
@@ -442,10 +492,57 @@ int accel_free(accel_t card, void *ptr, size_t size)
 
 int ddcb_register_accelerator(struct ddcb_accel_funcs *accel)
 {
+	int rc;
+
 	if (accel == NULL)
 		return DDCB_ERR_INVAL;
+
+	if ddcb_gather_statistics() {
+		rc = pthread_mutex_init(&accel->slock, NULL);
+		if (rc != 0)
+			return DDCB_ERRNO;
+	}
 
 	accel->priv_data = accel_list;
 	accel_list = accel;
 	return DDCB_OK;
+}
+
+static void _init(void) __attribute__((constructor));
+
+static void _init(void)
+{
+	const char *ddcb_trace_env = getenv("DDCB_TRACE");
+
+	if (ddcb_trace_env != NULL)
+		ddcb_trace = strtol(ddcb_trace_env, (char **)NULL, 0);
+}
+
+static void _done(void) __attribute__((destructor));
+
+static void _done(void)
+{
+	struct ddcb_accel_funcs *accel;
+
+	for (accel = accel_list; accel != NULL; accel = accel->priv_data) {
+		if (accel->num_open == 0)
+			continue;
+
+		if (ddcb_gather_statistics()) {
+			fprintf(stderr,
+				"libddcb statistics for %s\n"
+				"  open    ; %5lld ; %8lld usec\n"
+				"  execute ; %5lld ; %8lld usec\n"
+				"  close   ; %5lld ; %8lld usec\n",
+				accel->card_name,
+				(long long)accel->num_open,
+				(long long)accel->time_open,
+				(long long)accel->num_execute,
+				(long long)accel->time_execute,
+				(long long)accel->num_close,
+				(long long)accel->time_close);
+			pthread_mutex_destroy(&accel->slock);
+		}
+	}
+	return;
 }

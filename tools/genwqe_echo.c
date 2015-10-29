@@ -233,12 +233,12 @@ int main(int argc, char *argv[])
 	int run_infinite = 1;
 	unsigned long interval = 1000000; /* 1sec is default */
 	uint8_t unit = DDCB_ACFUNC_APP;	/* 0=service layer / 1=ZCOMP/GZIP/... */
-	accel_t card;	/* accessing Servive Layer */
+	accel_t card;
 	char *teststring =(char *)tstring_default;
 	unsigned long packets_send = 0, packets_received = 0;
 	int cpu = -1;
 	int err_code = 0;
-	unsigned long long frequency, wtime_usec, wtime_s = 0, wtime_e = 0;
+	unsigned long long frequency, wtime_usec = 0, wtime_s = 0, wtime_e = 0;
 
 	while (1) {
 		int option_index = 0;
