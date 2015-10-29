@@ -148,6 +148,9 @@ static int card_free(void *card_data, void *ptr, size_t size)
 
 static struct ddcb_accel_funcs accel_funcs = {
 	.card_type = DDCB_TYPE_GENWQE,
+	.card_name = "GENWQE",
+
+	/* functions */
 	.card_open = card_open,
 	.card_close = card_close,
 	.ddcb_execute = ddcb_execute,
@@ -163,6 +166,15 @@ static struct ddcb_accel_funcs accel_funcs = {
 	.card_unpin_memory = card_unpin_memory,
 	.card_malloc = card_malloc,
 	.card_free = card_free,
+
+	/* statistics */
+	.num_open = 0,
+	.num_close = 0,
+	.num_execute = 0,
+	.time_open = 0,
+	.time_execute = 0,
+	.time_close = 0,
+
 	.priv_data = NULL,
 };
 
