@@ -1280,7 +1280,7 @@ static void capi_card_exit(void)
 	unsigned int i;
 	struct	dev_ctx *ctx = &my_ctx;
 
-	card_dev_close(ctx, 0);
+	card_dev_close(ctx, 1);
 
 	VERBOSE1("Completed tasks per run:\n");
 	for (i = 0; i < NUM_DDCBS + 1; i++)
