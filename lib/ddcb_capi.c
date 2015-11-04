@@ -176,6 +176,8 @@ struct dev_ctx {
 static ddcb_t my_ddcbs[NUM_DDCBS] __attribute__((aligned(64 * 1024)));
 
 static struct dev_ctx my_ctx = {
+	.afu_h = NULL,
+	.ddcb_done_tid = 0,
 	.ddcb = my_ddcbs,
 	.ddcb_num = NUM_DDCBS,
 	.tout = CONFIG_DDCB_TIMEOUT,
@@ -584,12 +586,8 @@ static int card_dev_open(struct dev_ctx *ctx)
 
 /**
  * NOTE: ctx->lock must be held when entering this function.
- *
- * @join:    When being used in the library destructor the worker thread
- *           could already be stopped. Therefore set join to 0 to avoid
- *           syncronization.
  */
-static int card_dev_close(struct dev_ctx *ctx, int join)
+static int card_dev_close(struct dev_ctx *ctx)
 {
 	int rc;
 	void *res = NULL;
@@ -597,15 +595,16 @@ static int card_dev_close(struct dev_ctx *ctx, int join)
 	VERBOSE1("    [%s] Enter Card: %d clients: %d\n",
 		__func__, ctx->card_no, ctx->clients);
 
-	rc = pthread_cancel(ctx->ddcb_done_tid);
+	if (ctx->ddcb_done_tid == 0)  /* not used */
+		return DDCB_OK;
 
-	if (join) {
-		VERBOSE1("    [%s] Wait done_thread to join rc=%d\n",
-			 __func__, rc);
-		rc = pthread_join(ctx->ddcb_done_tid, &res);
-		VERBOSE1("    [%s] Exit Card: %d clients: %d rc=%d\n",
-			 __func__, ctx->card_no, ctx->clients, rc);
-	}
+	rc = pthread_cancel(ctx->ddcb_done_tid);
+	VERBOSE1("    [%s] Wait done_thread to join rc=%d\n", __func__, rc);
+	rc = pthread_join(ctx->ddcb_done_tid, &res);
+	VERBOSE1("    [%s] Exit Card: %d clients: %d rc=%d\n", __func__,
+		 ctx->card_no, ctx->clients, rc);
+
+	ctx->ddcb_done_tid = 0;
 	return DDCB_OK;
 }
 
@@ -654,7 +653,7 @@ static void __client_dec(struct dev_ctx *ctx)
 	 * application exits.
 	 *
 	 * if (0 == ctx->clients)
-	 *         card_dev_close(ctx, 1);
+	 *         card_dev_close(ctx);
 	 */
 	VERBOSE1("  [%s] Exit Card: %d Clients: %d\n",
 		__func__, ctx->card_no, ctx->clients);
@@ -1280,7 +1279,7 @@ static void capi_card_exit(void)
 	unsigned int i;
 	struct	dev_ctx *ctx = &my_ctx;
 
-	card_dev_close(ctx, 0);
+	card_dev_close(ctx);
 
 	VERBOSE1("Completed tasks per run:\n");
 	for (i = 0; i < NUM_DDCBS + 1; i++)
