@@ -63,6 +63,7 @@
 #define MMIO_DDCBQ_CONFIG_REG	0x0000108ull
 #define MMIO_DDCBQ_COMMAND_REG	0x0000110ull
 #define MMIO_DDCBQ_STATUS_REG	0x0000118ull
+#define MMIO_DDCBQ_CID_REG   	0x0000120ull	/* Context ID REG */
 #define MMIO_DDCBQ_WT_REG	0x0000180ull
 
 #define MMIO_FIR_REGS_BASE	0x0001000ull	/* FIR: 1000...1028 */
@@ -312,13 +313,15 @@ static void afu_print_status(struct cxl_afu_h *afu_h)
 	VERBOSE0(" Free Run Timer:     0x%016llx\n", (long long)reg);
 
 	cxl_mmio_read64(afu_h, MMIO_DDCBQ_START_REG, &reg);
-	VERBOSE0(" DDCBQ Reg:          0x%016llx\n", (long long)reg);
+	VERBOSE0(" DDCBQ Start Reg:    0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_DDCBQ_CONFIG_REG, &reg);
 	VERBOSE0(" DDCBQ Conf Reg:     0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_DDCBQ_COMMAND_REG, &reg);
 	VERBOSE0(" DDCBQ Cmd Reg:      0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_DDCBQ_STATUS_REG, &reg);
 	VERBOSE0(" DDCBQ Stat Reg:     0x%016llx\n", (long long)reg);
+	cxl_mmio_read64(afu_h, MMIO_DDCBQ_CID_REG, &reg);
+	VERBOSE0(" DDCBQ Context ID:   0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_DDCBQ_WT_REG, &reg);
 	VERBOSE0(" DDCBQ WT Reg:       0x%016llx\n", (long long)reg);
 
@@ -328,33 +331,6 @@ static void afu_print_status(struct cxl_afu_h *afu_h)
 		VERBOSE0(" FIR Reg [%08llx]: 0x%016llx\n",
 			 (long long)addr, (long long)reg);
 	}
-}
-
-static bool afu_clear_firs(struct cxl_afu_h *afu_h)
-{
-	uint64_t	addr;
-	uint64_t	reg;
-	int	i;
-
-	for (i = 0; i < MMIO_FIR_REGS_NUM; i++) {
-		addr = MMIO_FIR_REGS_BASE + (uint64_t)(i * 8);
-		cxl_mmio_read64(afu_h, addr, &reg);
-		if (reg != 0ull) {
-			/* Pending Firs from prev execution */
-			VERBOSE0(" [%08llx]:     0x%016llx\n",
-				 (long long)addr, (long long)reg);
-			cxl_mmio_write64(afu_h, addr, 0xffffffffffffffffull);
-			/* Read again, this time it must be 0 */
-			cxl_mmio_read64(afu_h, addr, &reg);
-			if (reg != 0ull) {
-				VERBOSE0(" [%08llx]:     0x%016llx cannot "
-					 "be cleared!\n", (long long)addr,
-					 (long long)reg);
-				return false;
-			}
-		}
-	}
-	return true;
 }
 
 /* Init Thread Wait Queue */
@@ -389,7 +365,7 @@ static int __afu_open(struct dev_ctx *ctx)
 	if (ctx->afu_h)
 		return DDCB_OK;
 
-	sprintf(device, "/dev/cxl/afu%d.0d", ctx->card_no);
+	sprintf(device, "/dev/cxl/afu%d.0s", ctx->card_no);
 	VERBOSE1("       [%s] Enter Open: %s DDCBs @ %p\n", __func__, device,
 		 &ctx->ddcb[0]);
 
@@ -426,10 +402,8 @@ static int __afu_open(struct dev_ctx *ctx)
 		goto err_afu_free;
 	}
 
-	if (afu_clear_firs(ctx->afu_h) == false) {
-		rc = DDCB_ERR_CARD;
-		goto err_mmio_unmap;
-	}
+	cxl_mmio_write64(ctx->afu_h, MMIO_DDCBQ_START_REG,
+		(uint64_t)(void *)ctx->ddcb);
 
 	/* | 63..48 | 47....32 | 31........24 | 23....16 | 15.....0 | */
 	/* | Seqnum | Reserved | 1st ddcb num | max ddcb | Reserved | */
@@ -827,6 +801,7 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 	}
 
 	if (DDCB_IN == txq->status) {
+		pthread_mutex_lock(&ctx->lock);
 		ttx = txq->ttx;
 		ddcb_2_cmd(ddcb, txq->cmd);	/* Copy DDCB back to CMD */
 		ttx->compl_code = compl_code;
@@ -846,6 +821,7 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 		/* Increment and wrap back to start */
 		ctx->ddcb_out = (ctx->ddcb_out + 1) % ctx->ddcb_num;
 		txq->status = DDCB_FREE;
+		pthread_mutex_unlock(&ctx->lock);
 		return true;		/* Continue */
 	}
 	return false;			/* do not continue */
@@ -977,8 +953,6 @@ static int __ddcb_process_irqs(struct dev_ctx *ctx)
 			"\tevent.header.type = %d event.header.size = %d\n",
 			rc, ctx->event.header.type, ctx->event.header.size);
 
-		pthread_mutex_lock(&ctx->lock);
-
 		switch (ctx->event.header.type) {
 		case CXL_EVENT_AFU_INTERRUPT:
 			/* Process all ddcb's */
@@ -1014,7 +988,6 @@ static int __ddcb_process_irqs(struct dev_ctx *ctx)
 			__ddcb_done_post(ctx, DDCB_ERR_EVENTFAIL);
 			break;
 		}
-		pthread_mutex_unlock(&ctx->lock);
 	}
 
 	return 0;
