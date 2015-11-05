@@ -43,6 +43,7 @@ MAKE		+= -s
 CC		= printf "\t[CC]\t%s\n" `basename "$@"`; $(CROSS)gcc
 AS		= printf "\t[AS]\t%s\n" `basename "$@"`; $(CROSS)as
 LD		= printf "\t[LD]\t%s\n" `basename "$@"`; $(CROSS)ld
+OBJCOPY		= printf "\t[OBJCOPY]\t%s\n" `basename "$@"`; $(CROSS)objcopy
 else
 CLEAN		= echo -n
 endif

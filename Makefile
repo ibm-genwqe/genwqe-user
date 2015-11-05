@@ -38,16 +38,42 @@ instdir = /opt/genwqe
 
 distro = $(shell lsb_release -d | cut -f2)
 subdirs += lib tools
-targets += $(subdirs)
+targets += zlib-1.2.8/z_libz.a $(subdirs)
 
 UDEV_RULES_D ?= /etc/udev/rules.d
 MODPROBE_D ?= /etc/modprobe.d
+HAS_WGET = $(shell which wget > /dev/null 2>&1 && echo y || echo n)
+OBJCOPY = @printf "\t[OBJCP]\t%s\n" `basename "$@"`; $(CROSS)objcopy
+
+define Q
+  @/bin/echo -e "	[$1]\t$(2)"
+  @$(3)
+endef
 
 all: $(targets)
 
 .PHONY: $(subdirs) clean build_dist install uninstall 	\
 	install_src uninstall_src copy_test_code \
 	install_test_code build_testcode
+
+zlib-1.2.8/z_libz.a: zlib-1.2.8/libz.a
+	$(OBJCOPY) --prefix-symbols=z_ $< $@
+
+zlib-1.2.8/libz.a: zlib-1.2.8
+	@touch zlib-1.2.8.log
+	@$(MAKE) -C $< 1>&2 >> zlib-1.2.8.log
+
+zlib-1.2.8: zlib-1.2.8.tar.gz
+	@/bin/echo -e "	[TAR]\t$<"
+	@tar xfz $< 1>&2 > zlib-1.2.8.log
+	@/bin/echo -e "	[CFG]\t$@"
+	@(cd $@ && CFLAGS=-O2 ./configure --prefix=/opt/genwqe) \
+		1>&2 >> zlib-1.2.8.log
+
+zlib-1.2.8.tar.gz:
+ifeq (${HAS_WGET},y)
+	$(call Q,WGET,zlib-1.2.8.tar.gz, wget -O zlib-1.2.8.tar.gz -q http://www.zlib.net/zlib-1.2.8.tar.gz)
+endif
 
 # Only build if the subdirectory is really existent
 $(subdirs):
@@ -120,9 +146,12 @@ clean:
 	done
 	@$(RM) *~ */*~ 					\
 		genwqe-tools-$(rpmversion).tgz 		\
-		genwqe-zlib-$(rpmversion).tgz
+		genwqe-zlib-$(rpmversion).tgz		\
+		zlib-1.2.8/z_libz.a zlib-1.2.8.log
+	@$(MAKE) -s -C zlib-1.2.8 $@
 	@find . -depth -name '*~'  -exec rm -rf '{}' \; -print
 	@find . -depth -name '.#*' -exec rm -rf '{}' \; -print
 
 distclean: clean
-	@$(RM) -r sim_*
+	@$(RM) -r sim_*	zlib-1.2.8 zlib-1.2.8.tar.gz
+
