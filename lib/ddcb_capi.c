@@ -83,6 +83,7 @@
 #define	NUM_DDCBS	4
 
 extern int libddcb_verbose;
+extern FILE *libddcb_fd_out;
 
 #include <sys/syscall.h>   /* For SYS_xxx definitions */
 
@@ -92,25 +93,25 @@ static inline pid_t gettid(void)
 }
 
 #define VERBOSE0(fmt, ...) do {						\
-		fprintf(stderr, "%08x.%08x: " fmt,			\
+		fprintf(libddcb_fd_out, "%08x.%08x: " fmt,			\
 			getpid(), gettid(), ## __VA_ARGS__);		\
 	} while (0)
 
 #define VERBOSE1(fmt, ...) do {						\
 		if (libddcb_verbose > 0)				\
-			fprintf(stderr, "%08x.%08x: " fmt,		\
+			fprintf(libddcb_fd_out, "%08x.%08x: " fmt,		\
 				getpid(), gettid(), ## __VA_ARGS__);	\
 	} while (0)
 
 #define VERBOSE2(fmt, ...) do {						\
 		if (libddcb_verbose > 1)				\
-			fprintf(stderr, "%08x.%08x: " fmt,		\
+			fprintf(libddcb_fd_out, "%08x.%08x: " fmt,		\
 				getpid(), gettid(), ## __VA_ARGS__);	\
 	} while (0)
 
 #define VERBOSE3(fmt, ...) do {						\
 		if (libddcb_verbose > 3)				\
-			fprintf(stderr, "%08x.%08x: " fmt,		\
+			fprintf(libddcb_fd_out, "%08x.%08x: " fmt,		\
 				getpid(), gettid(), ## __VA_ARGS__);	\
 	} while (0)
 
@@ -229,10 +230,10 @@ static void rt_trace_dump(void)
 	int i;
 
 	pthread_mutex_lock(&trc_lock);
-	fprintf(stderr, "Index: %d Warp: %d\n", trc_idx, trc_wrap);
+	VERBOSE0("Index: %d Warp: %d\n", trc_idx, trc_wrap);
 	for (i = 0; i < RT_TRACE_SIZE; i++) {
 		if (0 == trc_buff[i].tok) break;
-		fprintf(stderr, "%03d: %04x - %04x - %04x - %04x - %p\n",
+		VERBOSE0("%03d: %04x - %04x - %04x - %04x - %p\n",
 			i, trc_buff[i].tid, trc_buff[i].tok,
 			trc_buff[i].n1, trc_buff[i].n2, trc_buff[i].p);
 	}
@@ -329,7 +330,21 @@ static void afu_print_status(struct cxl_afu_h *afu_h)
 		addr = MMIO_FIR_REGS_BASE + (uint64_t)(i * 8);
 		cxl_mmio_read64(afu_h, addr, &reg);
 		VERBOSE0(" FIR Reg [%08llx]: 0x%016llx\n",
-			 (long long)addr, (long long)reg);
+			(long long)addr, (long long)reg);
+	}
+}
+
+static void afu_check_status(struct cxl_afu_h *afu_h)
+{
+	int i;
+	uint64_t addr, reg;
+
+	for (i = 0; i < MMIO_FIR_REGS_NUM; i++) {
+		addr = MMIO_FIR_REGS_BASE + (uint64_t)(i * 8);
+		cxl_mmio_read64(afu_h, addr, &reg);
+		if (0 != reg)
+			VERBOSE0(" FIR Reg [%08llx]: 0x%016llx\n",
+				(long long)addr, (long long)reg);
 	}
 }
 
@@ -365,7 +380,9 @@ static int __afu_open(struct dev_ctx *ctx)
 	if (ctx->afu_h)
 		return DDCB_OK;
 
-	sprintf(device, "/dev/cxl/afu%d.0s", ctx->card_no);
+	if (DDCB_MODE_MASTER & ctx->mode)
+		sprintf(device, "/dev/cxl/afu%d.0m", ctx->card_no);
+	else	sprintf(device, "/dev/cxl/afu%d.0s", ctx->card_no);
 	VERBOSE1("       [%s] Enter Open: %s DDCBs @ %p\n", __func__, device,
 		 &ctx->ddcb[0]);
 
@@ -652,8 +669,6 @@ static void *card_open(int card_no, unsigned int mode, int *card_rc,
 
 	/* Inc use count and initialize AFU on first open */
 	ttx->ctx = &my_ctx;
-	ttx->card_no = card_no;	/* Save only right now */
-	ttx->mode = mode;
 	ttx->verify = ttx;
 	sem_init(&ttx->wait_sem, 0, 0);
 
@@ -721,6 +736,8 @@ static int __ddcb_execute_multi(void *card_data, struct ddcb_cmd *cmd)
 	if (NULL == cmd)
 		return DDCB_ERR_INVAL;
 	ctx = ttx->ctx;					/* get card Context */
+	if (DDCB_MODE_MASTER & ctx->mode)	/* no DMA in Master Mode */
+		return DDCB_ERR_INVAL;
 	my_cmd = cmd;
 
 	while (my_cmd) {
@@ -994,6 +1011,40 @@ static int __ddcb_process_irqs(struct dev_ctx *ctx)
 }
 
 /**
+ * Process Master
+ */
+static int __ddcb_process_master(struct dev_ctx *ctx)
+{
+	uint64_t data, offs;
+	int	i, n;
+	int	dt = (ctx->mode & DDCB_MODE_MASTER_DT) >> 28;
+
+	n = 0;
+	if (0 == dt) dt = 1;	/* Default Master Delay poll Time is 1 sec */
+	while (1) {
+		VERBOSE1("[%s]Execute Loop: %d Delay: %d sec\n", __func__, n, dt);
+		if (DDCB_MODE_MASTER_F_CHECK & ctx->mode) {
+			VERBOSE0("Checking Master FIRS\n");
+			afu_check_status(ctx->afu_h);
+			fflush(libddcb_fd_out);
+		}
+		if (DDCB_MODE_MASTER_T_CHECK & ctx->mode) {
+			VERBOSE0("Checking Active Slaves\n");
+			for (i = 1; i < 511; i++) {
+				offs = (0x10000 * i) + MMIO_DDCBQ_WT_REG;
+				cxl_mmio_read64(ctx->afu_h, offs, &data);
+				if (0 != data)
+					VERBOSE0("Slave: %d offs: %llx data = %lld\n",
+						i, (long long)offs, (long long)data);
+			}
+		}
+		sleep(dt);
+		n++;
+	}
+	return 0;
+}
+
+/**
  * DDCB completion and timeout handling. This function implements the
  * thread which looks out for completed DDCBs. Due to a CAPI
  * restriction it also needs to open and close the AFU handle used to
@@ -1028,6 +1079,8 @@ static void *__ddcb_done_thread(void *card_data)
 	/* Push the Cleanup Handler to close the AFU */
 	pthread_cleanup_push(__ddcb_done_thread_cleanup, ctx);
 
+	if ( DDCB_MODE_MASTER & ctx->mode)
+		__ddcb_process_master(ctx);
 	if ( DDCB_MODE_POLLING & ctx->mode)
 		__ddcb_process_polling(ctx);
 	else

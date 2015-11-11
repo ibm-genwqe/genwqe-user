@@ -82,6 +82,7 @@ static unsigned int ddcb_trace = 0x0;
 
 static struct ddcb_accel_funcs *accel_list = NULL;
 int libddcb_verbose = 0;
+FILE *libddcb_fd_out;
 
 static inline uint64_t get_usec(void)
 {
@@ -186,6 +187,11 @@ void ddcb_hexdump(FILE *fp, const void *buff, unsigned int size)
 void ddcb_debug(int verbosity)
 {
 	libddcb_verbose = verbosity;
+}
+
+void ddcb_debug_log(FILE *fd_out)
+{
+	libddcb_fd_out  = fd_out;
 }
 
 accel_t accel_open(int card_no, unsigned int card_type,
@@ -514,6 +520,7 @@ static void _init(void)
 {
 	const char *ddcb_trace_env = getenv("DDCB_TRACE");
 
+	libddcb_fd_out = stderr;	/* Default fd out for messages */
 	if (ddcb_trace_env != NULL)
 		ddcb_trace = strtol(ddcb_trace_env, (char **)NULL, 0);
 }

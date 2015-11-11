@@ -83,6 +83,7 @@ int main(int argc, char *argv[])
 	int quiet = 0;
 	unsigned long i, count = 1;
 	unsigned long interval = 0;
+	int mode = DDCB_MODE_WR;
 
 	while (1) {
 		int option_index = 0;
@@ -187,8 +188,12 @@ int main(int argc, char *argv[])
 	}
 
 	switch_cpu(cpu, verbose_flag);
+	ddcb_debug(verbose_flag);
 
-	card = accel_open(card_no, card_type, DDCB_MODE_RD, &err_code,
+	/* CAPI need's master flag for Poke */
+        if (DDCB_TYPE_CAPI == card_type)
+                mode |= DDCB_MODE_MASTER;
+	card = accel_open(card_no, card_type, mode, &err_code,
 			  0, DDCB_APPL_ID_IGNORE);
 	if (card == NULL) {
 		fprintf(stderr, "err: failed to open card %u type %u "
@@ -196,7 +201,6 @@ int main(int argc, char *argv[])
 			accel_strerror(card, err_code));
 		exit(EXIT_FAILURE);
 	}
-	ddcb_debug(verbose_flag);
 
 	for (i = 0; i < count; i++) {
 		switch (width) {
