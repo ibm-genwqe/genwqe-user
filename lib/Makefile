@@ -99,7 +99,7 @@ $(libname1)-$(libversion).so: __$(libname1).o
 	$(CC) $(LDFLAGS) -shared -Wl,-soname,$@ -o $@ $^
 
 ### libDDCB
-__$(libname2).o: $(objs2)
+__$(libname2).o: $(objs2) $(libcxl_a)
 	$(LD) $(XLDFLAGS) -r -o $@ $^
 
 $(libname2).a: __$(libname2).o
