@@ -199,6 +199,10 @@ uLong z_crc32_combine(uLong crc1, uLong crc2, z_off_t len2);
 const char *z_zError(int err);
 
 extern int zlib_trace;
+extern unsigned int zlib_inflate_impl;
+extern unsigned int zlib_deflate_impl;
+extern unsigned int zlib_inflate_flags;
+extern unsigned int zlib_deflate_flags;
 
 /* PCIe trigger function. Writes to register 0x0 which normally non-sense. */
 void error_trigger(void);

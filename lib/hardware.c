@@ -85,8 +85,11 @@ struct hw_state {
 #define ZEDC_VERBOSE_DDCB	  0x00010000  /* dump DDCBs if requested */
 
 static int zedc_verbose  = 0x00000000; /* verbosity flag */
-static int inflate_flags = 0x00000000;
-static int deflate_flags = 0x00000000;
+static int zlib_accelerator = DDCB_TYPE_GENWQE;
+static int zlib_card = 0;
+static int zlib_xcheck = 1;
+static unsigned int zlib_ibuf_total = CONFIG_DEFLATE_BUF_SIZE;
+static unsigned int zlib_obuf_total = CONFIG_INFLATE_BUF_SIZE;
 
 /* Try to cache filehandles for faster access. Do not close them. */
 static zedc_handle_t zedc_cards[128 + 1];
@@ -94,7 +97,7 @@ static zedc_handle_t zedc_cards[128 + 1];
 static zedc_handle_t __zedc_open(int card_no, int card_type, int mode,
 				 int *err_code)
 {
-	int flags = (inflate_flags | deflate_flags);
+	int flags = (zlib_inflate_flags | zlib_deflate_flags);
 
 	if ((flags & ZLIB_FLAG_CACHE_HANDLES) == 0x0)
 		return zedc_open(card_no, card_type, mode,
@@ -123,7 +126,7 @@ static zedc_handle_t __zedc_open(int card_no, int card_type, int mode,
 
 static int __zedc_close(zedc_handle_t zedc __unused)
 {
-	int flags = (inflate_flags | deflate_flags);
+	int flags = (zlib_inflate_flags | zlib_deflate_flags);
 
 	if ((flags & ZLIB_FLAG_CACHE_HANDLES) == 0x0)
 		return zedc_close(zedc);
@@ -179,13 +182,7 @@ int h_deflateInit2_(z_streamp strm,
 		    const char *version __unused,
 		    int stream_size __unused)
 {
-	char *card = getenv("ZLIB_CARD");
-	char *accel = getenv("ZLIB_ACCELERATOR");
-	char *xcheck_str = getenv("ZLIB_CROSS_CHECK");
-	char *ibuf_total_str = getenv("ZLIB_IBUF_TOTAL");
 	int rc, err_code = 0;
-	int xcheck = 1;	    /* default is yes, do hw cross checking */
-	unsigned int ibuf_total = CONFIG_DEFLATE_BUF_SIZE;
 	struct hw_state *s;
 	zedc_handle_t zedc;
 	unsigned int page_size = sysconf(_SC_PAGESIZE);
@@ -193,34 +190,15 @@ int h_deflateInit2_(z_streamp strm,
 	strm->total_in = 0;
 	strm->total_out = 0;
 
-	if (ibuf_total_str != NULL)
-		ibuf_total = str_to_num(ibuf_total_str);
-
-	/* NOTE: It is very dangerous to turn this off!! */
-	if (xcheck_str != NULL)
-		xcheck = atoi(xcheck_str);
-
 	s = calloc(1, sizeof(*s));
 	if (s == NULL)
 		return Z_MEM_ERROR;
 
-	s->card_no = 0;
-	s->card_type = DDCB_TYPE_GENWQE;
+	s->card_type = zlib_accelerator;
+	s->card_no = zlib_card;
 	s->mode = DDCB_MODE_ASYNC | DDCB_MODE_RDWR;
 
-	if (card != NULL) {
-		if (strncmp(card, "RED", 3) == 0)
-			s->card_no = ACCEL_REDUNDANT;
-		else
-			s->card_no = atoi(card);
-	}
-	if (accel != NULL) {
-		if (strncmp(accel, "CAPI", 4) == 0)
-			s->card_type = DDCB_TYPE_CAPI;
-		else
-			s->card_type = DDCB_TYPE_GENWQE;
-	}
-	if (deflate_flags & ZLIB_FLAG_USE_POLLING)
+	if (zlib_deflate_flags & ZLIB_FLAG_USE_POLLING)
 		s->mode |= DDCB_MODE_POLLING;
 
 	zedc = __zedc_open(s->card_no, s->card_type, s->mode, &err_code);
@@ -238,8 +216,8 @@ int h_deflateInit2_(z_streamp strm,
 	s->h.dma_type[ZEDC_OUT] = DDCB_DMA_TYPE_SGLIST;
 	s->h.dma_type[ZEDC_WS]  = DDCB_DMA_TYPE_SGLIST;
 
-	if (deflate_flags & ZLIB_FLAG_USE_FLAT_BUFFERS) {
-		if (ibuf_total != 0) {
+	if (zlib_deflate_flags & ZLIB_FLAG_USE_FLAT_BUFFERS) {
+		if (zlib_ibuf_total != 0) {
 			s->h.dma_type[ZEDC_IN]  = DDCB_DMA_TYPE_FLAT;
 			s->h.dma_type[ZEDC_OUT] = DDCB_DMA_TYPE_FLAT;
 		}
@@ -251,17 +229,17 @@ int h_deflateInit2_(z_streamp strm,
 	s->h.dma_type[ZEDC_OUT] |= DDCB_DMA_PIN_MEMORY;
 	s->h.dma_type[ZEDC_WS]  |= DDCB_DMA_PIN_MEMORY;
 #endif
-	if (xcheck)
+	if (zlib_xcheck)
 		s->h.flags |= ZEDC_FLG_CROSS_CHECK;
 
 	if (zedc_verbose & ZEDC_VERBOSE_DDCB)
 		s->h.flags |= ZEDC_FLG_DEBUG_DATA;
 
-	if (deflate_flags & ZLIB_FLAG_OMIT_LAST_DICT)
+	if (zlib_deflate_flags & ZLIB_FLAG_OMIT_LAST_DICT)
 		s->h.flags |= ZEDC_FLG_SKIP_LAST_DICT;
 
-	if (ibuf_total) {
-		s->ibuf_total = s->ibuf_avail = ibuf_total;
+	if (zlib_ibuf_total) {
+		s->ibuf_total = s->ibuf_avail = zlib_ibuf_total;
 		s->ibuf_base = s->ibuf = zedc_memalign(zedc, s->ibuf_total,
 						s->h.dma_type[ZEDC_IN]);
 		if (s->ibuf_base == NULL) {
@@ -282,7 +260,7 @@ int h_deflateInit2_(z_streamp strm,
 		 * us to increase the factor to 15/8, which wastes
 		 * some memory in most cases. What a pitty.
 		 */
-		s->obuf_total = s->obuf_avail = ibuf_total * 15/8 +
+		s->obuf_total = s->obuf_avail = zlib_ibuf_total * 15/8 +
 			page_size;
 
 		s->obuf_base = s->obuf = s->obuf_next =
@@ -294,8 +272,10 @@ int h_deflateInit2_(z_streamp strm,
 		}
 	}
 
-	hw_trace("[%p] h_deflateInit2_: card_no=%d card_type=%d ibuf_total=%d\n",
-		 strm, s->card_no, s->card_type, ibuf_total);
+	hw_trace("[%p] h_deflateInit2_: card_type=%d card_no=%d card_type=%d "
+		 "zlib_ibuf_total=%d\n", strm, s->card_type, s->card_no,
+		 s->card_type, zlib_ibuf_total);
+
 	rc = zedc_deflateInit2(&s->h, level, method, windowBits, memLevel,
 			       strategy);
 	__fixup_crc_or_adler(strm, &s->h);
@@ -717,51 +697,27 @@ int h_deflateEnd(z_streamp strm)
 int h_inflateInit2_(z_streamp strm, int  windowBits,
 		    const char *version __unused, int stream_size __unused)
 {
-	char *card = getenv("ZLIB_CARD");
-	char *accel = getenv("ZLIB_ACCELERATOR");
-	char *xcheck_str = getenv("ZLIB_CROSS_CHECK");
-	char *ibuf_total_str = getenv("ZLIB_OBUF_TOTAL");
 	int rc, err_code = 0;
-	int xcheck = 1;	    /* default is yes, do hw cross checking */
 	struct hw_state *s;
-	unsigned int ibuf_total = CONFIG_INFLATE_BUF_SIZE;
 	zedc_handle_t zedc;
 
 	strm->total_in = 0;
 	strm->total_out = 0;
 
-	if (ibuf_total_str != NULL)
-		ibuf_total = str_to_num(ibuf_total_str);
-
-	/* NOTE: It is very dangerous to turn this off!! */
-	if (xcheck_str != NULL)
-		xcheck = atoi(xcheck_str);
-
 	s = calloc(1, sizeof(*s));
 	if (s == NULL)
 		return Z_MEM_ERROR;
 
-	s->card_no = 0;
-	s->card_type = DDCB_TYPE_GENWQE;
+	s->card_type = zlib_accelerator;
+	s->card_no = zlib_card;
 	s->mode = DDCB_MODE_ASYNC | DDCB_MODE_RDWR;
 
-	if (card != NULL) {
-		if (strncmp(card, "RED", 3) == 0)
-			s->card_no = ACCEL_REDUNDANT;
-		else
-			s->card_no = atoi(card);
-	}
-	if (accel != NULL) {
-		if (strncmp(accel, "CAPI", 4) == 0)
-			s->card_type = DDCB_TYPE_CAPI;
-		else
-			s->card_type = DDCB_TYPE_GENWQE;
-	}
-	if (inflate_flags & ZLIB_FLAG_USE_POLLING)
+	if (zlib_inflate_flags & ZLIB_FLAG_USE_POLLING)
 		s->mode |= DDCB_MODE_POLLING;
 
-	hw_trace("[%p] h_inflateInit2_: card_no=%d card_type=%d ibuf_total=%d\n",
-		 strm, s->card_no, s->card_type, ibuf_total);
+	hw_trace("[%p] h_inflateInit2_: card_type=%d card_no=%d card_type=%d "
+		 "zlib_obuf_total=%d\n", strm, s->card_type, s->card_no,
+		 s->card_type, zlib_obuf_total);
 
 	zedc = __zedc_open(s->card_no, s->card_type, s->mode, &err_code);
 	if (!zedc) {
@@ -779,9 +735,9 @@ int h_inflateInit2_(z_streamp strm, int  windowBits,
 	s->h.dma_type[ZEDC_OUT] = DDCB_DMA_TYPE_SGLIST;
 	s->h.dma_type[ZEDC_WS]  = DDCB_DMA_TYPE_SGLIST;
 
-	if (inflate_flags & ZLIB_FLAG_USE_FLAT_BUFFERS) {
+	if (zlib_inflate_flags & ZLIB_FLAG_USE_FLAT_BUFFERS) {
 		s->h.dma_type[ZEDC_IN]  = DDCB_DMA_TYPE_SGLIST;
-		if (ibuf_total != 0)
+		if (zlib_obuf_total != 0)
 			s->h.dma_type[ZEDC_OUT] = DDCB_DMA_TYPE_FLAT;
 
 		/* FIXME FIXME */
@@ -795,18 +751,18 @@ int h_inflateInit2_(z_streamp strm, int  windowBits,
 	s->h.dma_type[ZEDC_OUT] |= DDCB_DMA_PIN_MEMORY;
 	s->h.dma_type[ZEDC_WS]  |= DDCB_DMA_PIN_MEMORY;
 #endif
-	if (xcheck)	  /* FIXME Not needed/supported for inflate */
+	if (zlib_xcheck)  /* FIXME Not needed/supported for inflate */
 		s->h.flags |= ZEDC_FLG_CROSS_CHECK;
 
 	if (zedc_verbose & ZEDC_VERBOSE_DDCB)
 		s->h.flags |= ZEDC_FLG_DEBUG_DATA;
 
-	if (inflate_flags & ZLIB_FLAG_OMIT_LAST_DICT)
+	if (zlib_inflate_flags & ZLIB_FLAG_OMIT_LAST_DICT)
 		s->h.flags |= ZEDC_FLG_SKIP_LAST_DICT;
 
 	/* We only use output buffering for inflate */
-	if (ibuf_total) {
-		s->obuf_total = s->obuf_avail = ibuf_total;
+	if (zlib_obuf_total) {
+		s->obuf_total = s->obuf_avail = zlib_obuf_total;
 		s->obuf_base = s->obuf = s->obuf_next =
 			zedc_memalign(zedc, s->obuf_total,
 				      s->h.dma_type[ZEDC_OUT]);
@@ -1498,8 +1454,10 @@ void zedc_hw_init(void)
 {
 	char *verb = getenv("ZLIB_VERBOSE");
 	char *accel = getenv("ZLIB_ACCELERATOR");
-	const char *inflate_impl = getenv("ZLIB_INFLATE_IMPL");;
-	const char *deflate_impl = getenv("ZLIB_DEFLATE_IMPL");;
+	char *ibuf_s = getenv("ZLIB_IBUF_TOTAL");
+	char *obuf_s = getenv("ZLIB_OBUF_TOTAL");
+	char *card = getenv("ZLIB_CARD");
+	char *xcheck_str = getenv("ZLIB_CROSS_CHECK");
 
 	if (verb != NULL) {
 		int z, c;
@@ -1512,29 +1470,44 @@ void zedc_hw_init(void)
 		zedc_lib_debug(z);
 	}
 
-	if (inflate_impl != NULL)
-		inflate_flags = strtol(inflate_impl, (char **)NULL, 0) &
-			~ZLIB_IMPL_MASK;
+	if (accel != NULL) {
+		if (strncmp(accel, "CAPI", 4) == 0)
+			zlib_accelerator = DDCB_TYPE_CAPI;
+		else
+			zlib_accelerator = DDCB_TYPE_GENWQE;
+	}
 
-	if (deflate_impl != NULL)
-		deflate_flags = strtol(deflate_impl, (char **)NULL, 0) &
-			~ZLIB_IMPL_MASK;
+	if (card != NULL) {
+		if (strncmp(card, "RED", 3) == 0)
+			zlib_card = ACCEL_REDUNDANT;
+		else
+			zlib_card = atoi(card);
+	}
+
+	if (xcheck_str != NULL)
+		zlib_xcheck = str_to_num(xcheck_str);
+
+	if (ibuf_s != NULL)
+		zlib_ibuf_total = str_to_num(ibuf_s);
+
+	if (obuf_s != NULL)
+		zlib_obuf_total = str_to_num(obuf_s);
 
 	/*
 	 * USE_FLAT_BUFFERS and CACHE_HANDLES only work for GenWQE.
 	 */
-	if ((accel != NULL) && (strncmp(accel, "GENWQE", 5) != 0)) {
-		deflate_flags &= ~(ZLIB_FLAG_USE_FLAT_BUFFERS |
-				   ZLIB_FLAG_CACHE_HANDLES);
-		inflate_flags &= ~(ZLIB_FLAG_USE_FLAT_BUFFERS |
-				   ZLIB_FLAG_CACHE_HANDLES);
+	if (zlib_accelerator != DDCB_TYPE_GENWQE) {
+		zlib_deflate_flags &= ~(ZLIB_FLAG_USE_FLAT_BUFFERS |
+					ZLIB_FLAG_CACHE_HANDLES);
+		zlib_inflate_flags &= ~(ZLIB_FLAG_USE_FLAT_BUFFERS |
+					ZLIB_FLAG_CACHE_HANDLES);
 	}
 }
 
 void zedc_hw_done(void)
 {
 	unsigned int card_no;
-	int flags = (inflate_flags | deflate_flags);
+	int flags = (zlib_inflate_flags | zlib_deflate_flags);
 
 	if ((flags & ZLIB_FLAG_CACHE_HANDLES) == 0x0)
 		return;
