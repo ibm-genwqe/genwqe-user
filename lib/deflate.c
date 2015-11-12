@@ -735,8 +735,8 @@ int zedc_deflate(zedc_streamp strm, int flush)
 	tries = 1;
 
 	if ((strm->flags & ZEDC_FLG_SKIP_LAST_DICT) &&
-	    (flush == ZEDC_FINISH) && (strm->avail_out >= strm->avail_in)) {
-		//static int count = 0;
+	    (((flush == ZEDC_FINISH) || (flush == ZEDC_FULL_FLUSH)) &&
+	     (strm->avail_out >= strm->avail_in))) {
 
 		out_dict = asiv->out_dict;
 		out_dict_len = asiv->out_dict_len;
@@ -745,11 +745,6 @@ int zedc_deflate(zedc_streamp strm, int flush)
 		asiv->out_dict = 0x0;
 		asiv->out_dict_len = 0x0;
 		tries = 2;
-
-		//if (count++ < 2)
-		//	fprintf(stderr, "[%s] Try to optimize dict transfer: "
-		//		"avail_in=%d avail_out=%d\n", __func__,
-		//		strm->avail_in, strm->avail_out);
 	}
 
 	for (i = 0; i < tries; i++) {
@@ -782,8 +777,8 @@ int zedc_deflate(zedc_streamp strm, int flush)
 
 		/* What a pitty, need to repeat to get back dictionary */
 		if ((strm->flags & ZEDC_FLG_SKIP_LAST_DICT) &&
-		    (flush == ZEDC_FINISH) &&
-		    (strm->avail_out >= strm->avail_in)) {
+		    (((flush == ZEDC_FINISH) || (flush == ZEDC_FULL_FLUSH)) &&
+		     (strm->avail_out >= strm->avail_in))) {
 			cmd->cmdopts |= DDCB_OPT_DEFL_SAVE_DICT;
 			asiv->out_dict = out_dict;
 			asiv->out_dict_len = out_dict_len;

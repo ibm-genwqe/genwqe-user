@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 International Business Machines
+ * Copyright 2015, International Business Machines
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -75,11 +75,12 @@
 #define CONFIG_INFLATE_THRESHOLD (16 * 1024)  /* 0: disabled */
 
 int zlib_trace = 0x0;
+unsigned int zlib_inflate_impl = CONFIG_INFLATE_IMPL;
+unsigned int zlib_deflate_impl = CONFIG_DEFLATE_IMPL;
+unsigned int zlib_inflate_flags = 0x00000000;
+unsigned int zlib_deflate_flags = 0x00000000;
 
-static unsigned int zlib_inflate_impl = CONFIG_INFLATE_IMPL;
 static unsigned int zlib_inflate_threshold = CONFIG_INFLATE_THRESHOLD;
-static unsigned int zlib_deflate_impl = CONFIG_DEFLATE_IMPL;
-
 static pthread_mutex_t stats_mutex; /* mutex to protect global statistics */
 static struct zlib_stats stats;	/* global statistics */
 
@@ -226,6 +227,7 @@ static void _init(void)
 	deflate_impl  = getenv("ZLIB_DEFLATE_IMPL");
 	if (deflate_impl != NULL) {
 		zlib_deflate_impl = strtol(deflate_impl, (char **)NULL, 0);
+		zlib_deflate_flags = zlib_deflate_impl & ~ZLIB_IMPL_MASK;
 		zlib_deflate_impl &= ZLIB_IMPL_MASK;
 		if (zlib_deflate_impl >= ZLIB_MAX_IMPL)
 			zlib_deflate_impl = ZLIB_SW_IMPL;
@@ -234,6 +236,7 @@ static void _init(void)
 	inflate_impl = getenv("ZLIB_INFLATE_IMPL");
 	if (inflate_impl != NULL) {
 		zlib_inflate_impl = strtol(inflate_impl, (char **)NULL, 0);
+		zlib_inflate_flags = zlib_inflate_impl & ~ZLIB_IMPL_MASK;
 		zlib_inflate_impl &= ZLIB_IMPL_MASK;
 		if (zlib_inflate_impl >= ZLIB_MAX_IMPL)
 			zlib_inflate_impl = ZLIB_SW_IMPL;

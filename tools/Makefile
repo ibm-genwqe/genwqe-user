@@ -122,7 +122,7 @@ uninstall: uninstall_gzip_tools uninstall_manpages
 		$(RM) $(instdir)/bin/$$f;			\
 	done
 
-clean:
+clean distclean:
 	$(RM) *.o $(projs) $(objs:.o=.d) $(manpages)
 
 -include $(objs:.o=.d)
