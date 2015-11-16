@@ -272,9 +272,9 @@ int h_deflateInit2_(z_streamp strm,
 		}
 	}
 
-	hw_trace("[%p] h_deflateInit2_: card_type=%d card_no=%d card_type=%d "
+	hw_trace("[%p] h_deflateInit2_: card_type=%d card_no=%d "
 		 "zlib_ibuf_total=%d\n", strm, s->card_type, s->card_no,
-		 s->card_type, zlib_ibuf_total);
+		 zlib_ibuf_total);
 
 	rc = zedc_deflateInit2(&s->h, level, method, windowBits, memLevel,
 			       strategy);
@@ -715,9 +715,9 @@ int h_inflateInit2_(z_streamp strm, int  windowBits,
 	if (zlib_inflate_flags & ZLIB_FLAG_USE_POLLING)
 		s->mode |= DDCB_MODE_POLLING;
 
-	hw_trace("[%p] h_inflateInit2_: card_type=%d card_no=%d card_type=%d "
+	hw_trace("[%p] h_inflateInit2_: card_type=%d card_no=%d "
 		 "zlib_obuf_total=%d\n", strm, s->card_type, s->card_no,
-		 s->card_type, zlib_obuf_total);
+		 zlib_obuf_total);
 
 	zedc = __zedc_open(s->card_no, s->card_type, s->mode, &err_code);
 	if (!zedc) {
