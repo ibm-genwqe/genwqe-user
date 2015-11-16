@@ -670,7 +670,7 @@ static void *card_open(int card_no, unsigned int mode, int *card_rc,
 	/* Inc use count and initialize AFU on first open */
 	sem_init(&ttx->wait_sem, 0, 0);
 	ttx->card_no = card_no;	/* Save only right now */
-	ttx->card_next = 0;
+	ttx->card_next = rand() % NUM_CARDS;  /* start always random */
 	ttx->mode = mode;
 	ttx->verify = ttx;
 
@@ -686,12 +686,13 @@ static void *card_open(int card_no, unsigned int mode, int *card_rc,
 			ttx = NULL;
 		}
 	} else {
+		/* open all possible cards */
 		for (i = 0; i < NUM_CARDS; i++) {
-			rc = __client_inc(&my_ctx[i]);
-			if (rc == DDCB_OK) {
-				ttx->ctx = &my_ctx[i];
-				ttx->card_next = i;
-			}
+			rc = __client_inc(&my_ctx[ttx->card_next]);
+			if (rc == DDCB_OK)  /* remember last one which is ok */
+				ttx->ctx = &my_ctx[ttx->card_next];
+
+			ttx->card_next = (ttx->card_next + 1) %	NUM_CARDS;
 		}
 	}
 
@@ -1368,8 +1369,8 @@ static void capi_card_exit(void)
 
 		card_dev_close(ctx);
 
-		VERBOSE1("[ctx=%p] Completed DDCBs: %lld\n",
-			 ctx, (long long)ctx->completed_ddcbs);
+		VERBOSE1("[ctx=%p card_no=%d] Completed DDCBs: %lld\n",
+			 ctx, ctx->card_no, (long long)ctx->completed_ddcbs);
 		VERBOSE1("Tasks per run:\n");
 		for (i = 0; i < NUM_DDCBS + 1; i++)
 			VERBOSE1("  %d: %d\n", i, ctx->completed_tasks[i]);
