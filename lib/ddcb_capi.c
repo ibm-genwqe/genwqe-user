@@ -799,6 +799,7 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 	struct	tx_waitq	*txq;
 	struct	ttxs		*ttx;
 
+	pthread_mutex_lock(&ctx->lock);
 	idx = ctx->ddcb_out;
 	ddcb = &ctx->ddcb[idx];
 	txq = &ctx->waitq[idx];
@@ -813,12 +814,12 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 		if (0 == ddcb->retc_16) {
 			VERBOSE2("\t[%s] seq: 0x%x slot: %d "
 				 "retc: 0 wait\n", __func__, txq->seqnum, idx);
+			pthread_mutex_unlock(&ctx->lock);
 			return false; /* do not continue */
 		}
 	}
 
 	if (DDCB_IN == txq->status) {
-		pthread_mutex_lock(&ctx->lock);
 		ttx = txq->ttx;
 		ddcb_2_cmd(ddcb, txq->cmd);	/* Copy DDCB back to CMD */
 		ttx->compl_code = compl_code;
@@ -841,6 +842,7 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 		pthread_mutex_unlock(&ctx->lock);
 		return true;		/* Continue */
 	}
+	pthread_mutex_unlock(&ctx->lock);
 	return false;			/* do not continue */
 }
 
