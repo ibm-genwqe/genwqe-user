@@ -931,11 +931,8 @@ static int __ddcb_process_irqs(struct dev_ctx *ctx)
 
 		rc = select(ctx->afu_fd + 1, &set, NULL, NULL, &timeout);
 		if (0 == rc) {
-			VERBOSE0("WARNING: %d sec timeout while waiting "
-				 "for interrupt! rc: %d --> %d\n",
-				 ctx->tout, rc, DDCB_ERR_IRQTIMEOUT);
+			/* Timeout will Post error code only if context is active */
 			__ddcb_done_post(ctx, DDCB_ERR_IRQTIMEOUT);
-			//rtc_trace_dump();
 			continue;
 		}
 		if ((rc == -1) && (errno == EINTR)) {
