@@ -450,7 +450,8 @@ static int __afu_open(struct dev_ctx *ctx)
 	cxl_afu_free(ctx->afu_h);
 	ctx->afu_h = NULL;
  err_exit:
-	VERBOSE1("       [%s] ERROR: rc: %d\n", __func__, rc);
+	VERBOSE1("       [%s] ERROR: rc: %d errno=%d %s\n", __func__, rc,
+		 errno, strerror(errno));
 	return rc;
 }
 
@@ -568,6 +569,7 @@ static int card_dev_open(struct dev_ctx *ctx)
 			__func__, rc);
 		/* Wait for done thread to join */
 		pthread_join(ctx->ddcb_done_tid, &res);
+		ctx->ddcb_done_tid = 0;
 	}
 
 	VERBOSE1("    [%s] Return rc: %d\n", __func__, rc);
@@ -1294,6 +1296,27 @@ static int card_free(void *card_data __attribute__((unused)),
 	return DDCB_OK;
 }
 
+static void __dev_dump(struct dev_ctx *ctx, FILE *fp)
+{
+	unsigned int i;
+
+	fprintf(fp, "  [ctx=%p card_no=%d] Completed DDCBs: %lld\n",
+		ctx, ctx->card_no, (long long)ctx->completed_ddcbs);
+	fprintf(fp, "  Tasks per run:\n");
+	for (i = 0; i < NUM_DDCBS + 1; i++)
+		fprintf(fp, "    %d: %d\n", i, ctx->completed_tasks[i]);
+}
+
+static int _accel_dump_statistics(FILE *fp)
+{
+	unsigned int card_no;
+
+	for (card_no = 0; card_no < NUM_CARDS; card_no++)
+		__dev_dump(&my_ctx[card_no], fp);
+
+	return 0;
+}
+
 static struct ddcb_accel_funcs accel_funcs = {
 	.card_type = DDCB_TYPE_CAPI,
 	.card_name = "CAPI",
@@ -1316,6 +1339,7 @@ static struct ddcb_accel_funcs accel_funcs = {
 	.card_free = card_free,
 
 	/* statistics */
+	.dump_statistics = _accel_dump_statistics,
 	.num_open = 0,
 	.num_close = 0,
 	.num_execute = 0,
@@ -1364,15 +1388,8 @@ static void capi_card_exit(void)
 	unsigned int card_no;
 
 	for (card_no = 0; card_no < NUM_CARDS; card_no++) {
-		unsigned int i;
 		struct dev_ctx *ctx = &my_ctx[card_no];
 
 		card_dev_close(ctx);
-
-		VERBOSE1("[ctx=%p card_no=%d] Completed DDCBs: %lld\n",
-			 ctx, ctx->card_no, (long long)ctx->completed_ddcbs);
-		VERBOSE1("Tasks per run:\n");
-		for (i = 0; i < NUM_DDCBS + 1; i++)
-			VERBOSE1("  %d: %d\n", i, ctx->completed_tasks[i]);
 	}
 }

@@ -125,6 +125,9 @@ cpus=`cat /proc/cpuinfo | grep processor | wc -l`
 bufsize=1MiB
 count=1
 
+# Generate core dumps, in case something needs debug
+ulimit -c unlimited
+
 echo
 uname -a
 echo "Accelerator:     ${ZLIB_ACCELERATOR}"
