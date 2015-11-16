@@ -149,6 +149,7 @@ for t in 1 2 3 4 8 16 32 64 128 160 ; do
 	zlib_mt_perf --version
 	echo "  Called with:"
 	echo "    export ZLIB_ACCELERATOR=${ZLIB_ACCELERATOR}"
+	echo "    export ZLIB_CARD=${ZLIB_CARD}"
 	echo "    export ZLIB_DEFLATE_IMPL=${ZLIB_DEFLATE_IMPL}"
 	echo "    export ZLIB_INFLATE_IMPL=${ZLIB_INFLATE_IMPL}"
 	echo "    zlib_mt_perf $verbose -i$bufsize -o$bufsize -D -f ${test_data} -c$count -t$t $print_hdr"
