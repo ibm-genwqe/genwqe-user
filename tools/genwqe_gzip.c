@@ -346,6 +346,8 @@ static void usage(FILE *fp, char *prog, int argc, char *argv[])
 		"  -9, --best        compress better\n"
 		"\n"
 		"Special options for testing and debugging:\n"
+		"  -A, --accelerator-type=GENWQE|CAPI CAPI is only available for System p\n"
+		"  -B, --card=<card_no> -1 is for automatic card selection\n"
 		"  -X, --cpu <cpu>   force to run on CPU <cpu>\n"
 		"  -s, --software    force to use software compression/decompression\n"
 		"  -i, --i_bufsize   input buffer size (%d KiB)\n"
@@ -651,6 +653,8 @@ int main(int argc, char **argv)
 	uint8_t *extra = NULL;
 	int extra_len = 0;
 	struct stat s;
+	const char *accel = "GENWQE";
+	int card_no = 0;
 
 	/* avoid end-of-line conversions */
 	SET_BINARY_MODE(stdin);
@@ -679,6 +683,8 @@ int main(int argc, char **argv)
 
 			/* our own options */
 			{ "cpu",	 required_argument, NULL, 'X' },
+			{ "accelerator-type", required_argument, NULL, 'A' },
+			{ "card_no",	 required_argument, NULL, 'B' },
 			{ "software",	 no_argument,	    NULL, 's' },
 			{ "extra",	 required_argument, NULL, 'E' },
 			{ "name",	 required_argument, NULL, 'N' },
@@ -689,16 +695,23 @@ int main(int argc, char **argv)
 		};
 
 		ch = getopt_long(argc, argv,
-				 "E:N:C:cdfqhlLsS:vV123456789?i:o:X:",
+				 "E:N:C:cdfqhlLsS:vV123456789?i:o:X:A:B:",
 				 long_options, &option_index);
 		if (ch == -1)    /* all params processed ? */
 			break;
 
 		switch (ch) {
-			/* which card to use */
+
 		case 'X':
 			cpu = strtoul(optarg, NULL, 0);
 			break;
+		case 'A':
+			accel = optarg;
+			break;
+		case 'B':
+			card_no = strtol(optarg, (char **)NULL, 0);
+			break;
+
 		case 'E':
 			extra_fname = optarg;
 			break;
@@ -789,6 +802,7 @@ int main(int argc, char **argv)
 		zlib_set_inflate_impl(ZLIB_SW_IMPL);
 		zlib_set_deflate_impl(ZLIB_SW_IMPL);
 	} else {
+		zlib_set_accelerator(accel, card_no);
 		zlib_set_inflate_impl(ZLIB_HW_IMPL);
 		zlib_set_deflate_impl(ZLIB_HW_IMPL);
 	}

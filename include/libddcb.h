@@ -365,6 +365,8 @@ struct ddcb_accel_funcs {
 	int (* card_free)(void *card_data, void *ptr, size_t size);
 
 	/* statistical information */
+	int (* dump_statistics)(FILE *fp);
+
 	pthread_mutex_t slock;
 	unsigned long num_open;
 	unsigned long num_execute;
@@ -378,6 +380,22 @@ struct ddcb_accel_funcs {
 	void *priv_data;
 };
 
+
+/*
+ * Dump card statistics for debugging and for performance analysis.
+ *
+ * @param [in] card      card handle
+ * @param [out] fp       filehandle to write the text too
+ */
+int accel_dump_statistics(struct ddcb_accel_funcs *accel, FILE *fp);
+
+
+/*
+ * Register accelerator for later usage. This needs ideally be done in
+ * a library constructor.
+ *
+ * @param [in] accel     accelerator function table
+ */
 int ddcb_register_accelerator(struct ddcb_accel_funcs *accel);
 
 #ifdef __cplusplus

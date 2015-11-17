@@ -199,6 +199,8 @@ uLong z_crc32_combine(uLong crc1, uLong crc2, z_off_t len2);
 const char *z_zError(int err);
 
 extern int zlib_trace;
+extern int zlib_accelerator;
+extern int zlib_card;
 extern unsigned int zlib_inflate_impl;
 extern unsigned int zlib_deflate_impl;
 extern unsigned int zlib_inflate_flags;

@@ -496,6 +496,17 @@ int accel_free(accel_t card, void *ptr, size_t size)
 	return accel->card_free(card->card_data, ptr, size);
 }
 
+int accel_dump_statistics(struct ddcb_accel_funcs *accel, FILE *fp)
+{
+	if (accel == NULL)
+		return DDCB_ERR_INVAL;
+
+	if (accel->dump_statistics == NULL)
+		return DDCB_ERR_NOTIMPL;
+
+	return accel->dump_statistics(fp);
+}
+
 int ddcb_register_accelerator(struct ddcb_accel_funcs *accel)
 {
 	int rc;
@@ -550,6 +561,7 @@ static void _done(void)
 				(long long)accel->time_close);
 			pthread_mutex_destroy(&accel->slock);
 		}
+		accel_dump_statistics(accel, stderr);
 	}
 	return;
 }
