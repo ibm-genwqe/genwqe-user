@@ -708,7 +708,7 @@ int main(int argc, char **argv)
 		case 'A':
 			accel = optarg;
 			break;
-		case 'n':
+		case 'B':
 			card_no = strtol(optarg, (char **)NULL, 0);
 			break;
 
