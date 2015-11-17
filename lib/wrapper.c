@@ -23,6 +23,7 @@
 #include <pthread.h>
 
 #include "../include/zlib.h"	/* standard interface */
+#include "libddcb.h"
 #include "wrapper.h"
 
 /*
@@ -75,6 +76,9 @@
 #define CONFIG_INFLATE_THRESHOLD (16 * 1024)  /* 0: disabled */
 
 int zlib_trace = 0x0;
+
+int zlib_accelerator = DDCB_TYPE_GENWQE;
+int zlib_card = 0;
 unsigned int zlib_inflate_impl = CONFIG_INFLATE_IMPL;
 unsigned int zlib_deflate_impl = CONFIG_DEFLATE_IMPL;
 unsigned int zlib_inflate_flags = 0x00000000;
@@ -130,6 +134,16 @@ static int has_wrapper_state(z_streamp strm)
 		return 0;
 
 	return ((w->magic0 == MAGIC0) && (w->magic1 == MAGIC1));
+}
+
+void zlib_set_accelerator(const char *accel, int card_no)
+{
+	if (strncmp(accel, "CAPI", 4) == 0)
+		zlib_accelerator = DDCB_TYPE_CAPI;
+	else
+		zlib_accelerator = DDCB_TYPE_GENWQE;
+
+	zlib_card = card_no;
 }
 
 void zlib_set_inflate_impl(enum zlib_impl impl)

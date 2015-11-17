@@ -85,8 +85,6 @@ struct hw_state {
 #define ZEDC_VERBOSE_DDCB	  0x00010000  /* dump DDCBs if requested */
 
 static int zedc_verbose  = 0x00000000; /* verbosity flag */
-static int zlib_accelerator = DDCB_TYPE_GENWQE;
-static int zlib_card = 0;
 static int zlib_xcheck = 1;
 static unsigned int zlib_ibuf_total = CONFIG_DEFLATE_BUF_SIZE;
 static unsigned int zlib_obuf_total = CONFIG_INFLATE_BUF_SIZE;

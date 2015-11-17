@@ -60,4 +60,16 @@ void zlib_set_inflate_impl(enum zlib_impl impl);
  */
 void zlib_set_deflate_impl(enum zlib_impl impl);
 
+/**
+ * zlib_set_accelerator() - Set accelerator type to be used
+ *
+ * @accel:          GENWQE or CAPI
+ * @card_no:        card id or -1 for automatic card selection
+ *
+ * We support different types of hardware acceleration
+ * devices. Examples are our PCIe based GenWQE accelerator or the CAPI
+ * implementation for IBM System p.
+ */
+void zlib_set_accelerator(const char *accel, int card_no);
+
 #endif	/* __ZADDONS_H__ */
