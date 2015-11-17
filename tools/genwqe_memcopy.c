@@ -783,7 +783,8 @@ int main(int argc, char *argv[])
 	}
 
 	switch_cpu(ip.cpu, verbose_flag);
-	ddcb_debug(verbose_flag);
+	if (verbose_flag > 1)
+	ddcb_debug(verbose_flag - 1);
 
 	/* Allocate Thread data */
 	tdata = (struct memcpy_thread_data*)

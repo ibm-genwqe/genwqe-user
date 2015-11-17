@@ -54,6 +54,10 @@ extern "C" {
 #define DDCB_MODE_ASYNC			0x0008 /* ... */
 #define DDCB_MODE_NONBLOCK		0x0010 /* non blocking, -EBUSY */
 #define DDCB_MODE_POLLING		0x0020 /* polling */
+#define DDCB_MODE_MASTER		0x08000000 /* Open Master Context, Slave is default, CAPI ony */
+#define DDCB_MODE_MASTER_F_CHECK	0x04000000 /* Master Context, FIR Check, CAPI ony */
+#define DDCB_MODE_MASTER_T_CHECK	0x02000000 /* Master Context, Time Check, CAPI ony */
+#define DDCB_MODE_MASTER_DT		0xF0000000 /* Master Context, Delay Time Mask, CAPI ony */
 
 #define DDCB_APPL_ID_IGNORE		0x0000000000000000 /* Ignore applid */
 #define DDCB_APPL_ID_MASK		0x00000000ffffffff /* Valid bits */
@@ -205,6 +209,7 @@ const char *accel_strerror(accel_t card, int card_rc); /* card errcode */
 
 void ddcb_hexdump(FILE *fp, const void *buff, unsigned int size);
 void ddcb_debug(int verbosity);
+void ddcb_debug_log(FILE *fd_out);
 
 /**
  * @brief Get accel_handle
