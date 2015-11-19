@@ -38,7 +38,7 @@ instdir = /opt/genwqe
 
 distro = $(shell lsb_release -d | cut -f2)
 subdirs += lib tools
-targets += zlib-1.2.8/z_libz.a $(subdirs)
+targets += zlib-1.2.8.log $(subdirs)
 
 UDEV_RULES_D ?= /etc/udev/rules.d
 MODPROBE_D ?= /etc/modprobe.d
@@ -58,17 +58,17 @@ all: $(targets)
 	install_src uninstall_src copy_test_code \
 	install_test_code build_testcode
 
-zlib-1.2.8/z_libz.a: zlib-1.2.8/libz.a
-	$(OBJCOPY) --prefix-symbols=z_ $< $@
-
-zlib-1.2.8/libz.a: zlib-1.2.8
+zlib-1.2.8.log: zlib-1.2.8
 	@touch zlib-1.2.8.log
-	@/bin/echo -e "	[CFG]\t$<"
-	@(cd $< && CFLAGS=-O2 ./configure --prefix=/opt/genwqe) \
+	@/bin/echo -e "	[CFG]\tzlib-1.2.8"
+	@(cd zlib-1.2.8 && CFLAGS=-O2 ./configure --prefix=/opt/genwqe) \
 		1>&2 >> zlib-1.2.8.log
-	@$(MAKE) -C $< 1>&2 >> zlib-1.2.8.log
+	@/bin/echo -e "	[BUILD]\tzlib-1.2.8"
+	@$(MAKE) -C zlib-1.2.8 1>&2 >> zlib-1.2.8.log
+	$(OBJCOPY) --prefix-symbols=z_ zlib-1.2.8/libz.a zlib-1.2.8/z_libz.a 
 
 zlib-1.2.8: zlib-1.2.8.tar.gz
+	@touch zlib-1.2.8.log
 	@/bin/echo -e "	[TAR]\t$<"
 	@tar xfz $< 1>&2 > zlib-1.2.8.log
 
