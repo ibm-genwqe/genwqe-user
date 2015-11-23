@@ -66,6 +66,7 @@ zlib-1.2.8.log: zlib-1.2.8
 	@/bin/echo -e "	[BUILD]\tzlib-1.2.8"
 	@$(MAKE) -C zlib-1.2.8 1>&2 >> zlib-1.2.8.log
 	$(OBJCOPY) --prefix-symbols=z_ zlib-1.2.8/libz.a zlib-1.2.8/z_libz.a 
+	@touch zlib-1.2.8.log
 
 zlib-1.2.8: zlib-1.2.8.tar.gz
 	@touch zlib-1.2.8.log
