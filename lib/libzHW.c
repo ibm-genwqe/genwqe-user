@@ -626,6 +626,9 @@ int zedc_alloc_workspace(zedc_streamp strm)
 	if (strm->wsp == NULL)
 		return ZEDC_MEM_ERROR;
 
+	/* FIXME valgrind complained about this memory piece not being initialized */
+	memset(strm->wsp, 0, sizeof(struct zedc_wsp));
+
 	return ZEDC_OK;
 }
 
