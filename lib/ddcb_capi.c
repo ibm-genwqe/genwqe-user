@@ -460,7 +460,7 @@ static int __afu_open(struct dev_ctx *ctx)
  *       ctx->afu_h must be valid
  *       ctx->clients must be 0
  */
-static inline int __afu_close(struct dev_ctx *ctx)
+static inline int __afu_close(struct dev_ctx *ctx, bool force)
 {
 	struct cxl_afu_h *afu_h;
 	uint64_t mmio_dat;
@@ -483,7 +483,8 @@ static inline int __afu_close(struct dev_ctx *ctx)
 	if (0 != ctx->clients) {
 		VERBOSE0("[%s] ERROR: Closing AFU[%d] with %d clients!\n",
 			 __func__, ctx->card_no, ctx->clients);
-		return DDCB_ERR_INVAL;
+		if (!force)
+			return DDCB_ERR_INVAL;
 	}
 
 	VERBOSE1("        [%s] Enter Card: %d Open Clients: %d\n",
@@ -901,7 +902,7 @@ static void __ddcb_done_thread_cleanup(void *arg __attribute__((unused)))
 	struct dev_ctx *ctx = (struct dev_ctx *)arg;
 
 	VERBOSE1("[%s]\n", __func__);
-	__afu_close(ctx);
+	__afu_close(ctx, true);
 }
 
 /**
@@ -1114,7 +1115,7 @@ static void *__ddcb_done_thread(void *card_data)
 	if (rc0 != 0) {
 		VERBOSE0("[%s] ERROR: %d %s\n", __func__, rc0,
 			 strerror(errno));
-		__afu_close(ctx);
+		__afu_close(ctx, false);
 		ctx->afu_rc = -1;
 		return NULL;
 	}
