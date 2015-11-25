@@ -54,6 +54,8 @@ endef
 
 all: $(targets)
 
+tools: lib
+
 .PHONY: $(subdirs) distclean clean build_dist install uninstall \
 	install_src uninstall_src copy_test_code \
 	install_test_code build_testcode

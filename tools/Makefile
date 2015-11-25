@@ -39,19 +39,21 @@ projs = genwqe_update genwqe_gzip genwqe_gunzip zlib_mt_perf genwqe_memcopy \
 	genwqe_vpdconv genwqe_vpdupdate csv2bin genwqe_loadtree genwqe_ffdc \
 	genwqe_maint
 
+all: $(projs)
+
+genwqe_memcopy: force_cpu.o
+genwqe_vpdconv genwqe_vpdupdate: genwqe_vpd_common.o
+
+$(projs): $(libs)
+
 objs = force_cpu.o genwqe_vpd_common.o $(projs:=.o)
 
 manpages = $(projs:=.1)
-
-all: $(libs) $(objs) $(projs)
 
 manpages: all $(manpages)
 
 genwqe_gunzip.o: genwqe_gzip.c
 	$(CC) -c $< $(CPPFLAGS) $(CFLAGS) -o $@
-
-$(libs):
-	$(MAKE) -C ../lib
 
 ### Deactivate existing implicit rule
 %: %.c
@@ -124,6 +126,6 @@ uninstall: uninstall_gzip_tools uninstall_manpages
 	done
 
 clean distclean:
-	$(RM) *.o $(projs) $(objs:.o=.d) $(manpages)
+	$(RM) $(objs) $(projs) $(objs:.o=.d) $(manpages)
 
 -include $(objs:.o=.d)

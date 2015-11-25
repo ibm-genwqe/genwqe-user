@@ -1154,13 +1154,24 @@ int zedc_inflate(zedc_streamp strm, int flush)
 			return ZEDC_NEED_DICT;
 		}
 
-		if (rc < 0) {
+		/*
+		 * GenWQE treats success or failure a little
+		 * differently than the CAPI implementation. CAPI
+		 * flags success, if the DDCB was treated by hardware
+		 * at all. This includes cases where RETC is not
+		 * 0x102. For GenWQE we flag success only if there is
+		 * a RETC of 0x102, this is done in the Linux driver.
+		 *
+		 * Doing this wrong, can lead to problems in the code
+		 * below, which processes DDCB result data, which
+		 * might not be valid, e.g. memmove() with wrong size.
+		 */
+		if ((rc < 0) || (cmd->retc != DDCB_RETC_COMPLETE)) {
 			struct ddcb_cmd *cmd = &strm->cmd;
 
 			pr_err("inflate failed rc=%d\n"
-			       "DDCB returned "
-			       "(RETC=%03x ATTN=%04x PROGR=%x) %s\n",
-			       rc, cmd->retc, cmd->attn, cmd->progress,
+			       "DDCB returned (RETC=%03x ATTN=%04x PROGR=%x) "
+			       "%s\n", rc, cmd->retc, cmd->attn, cmd->progress,
 			       cmd->retc == 0x102 ? "" : "ERR");
 			return ZEDC_STREAM_ERROR;
 		}
@@ -1213,15 +1224,6 @@ int zedc_inflate(zedc_streamp strm, int flush)
 	strm->next_in  += len;
 	strm->avail_in -= len;
 	strm->total_in += len;
-
-	/* Why is this error handling here? I believe all data from
-	   the DDCB must be treated as invalid in this case. Or other
-	   question the rc < 0 should have captured this already
-	   before. So does this really happen? And if so, why? */
-	if (cmd->retc != DDCB_RETC_COMPLETE) {
-		pr_err("ddcb processing failed RETC=%03x\n", cmd->retc);
-		goto abort;
-	}
 
 	zrc = ZEDC_OK;		/* preset 0 */
 
