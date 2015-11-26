@@ -465,8 +465,8 @@ int zedc_execute_request(zedc_handle_t zedc, struct ddcb_cmd *cmd)
 	zedc->card_rc = accel_ddcb_execute(zedc->card, cmd,
 					   NULL, &zedc->card_errno);
 
-	pr_info("  DDCB returned (RETC=%03x ATTN=%04x PROGR=%x) "
-		"%s\n", cmd->retc, cmd->attn, cmd->progress,
+	pr_info("  DDCB returned rc=%d (RETC=%03x ATTN=%04x PROGR=%x) "
+		"%s\n", zedc->card_rc, cmd->retc, cmd->attn, cmd->progress,
 		cmd->retc == 0x102 ? "" : "ERR");
 
 	return zedc->card_rc;
