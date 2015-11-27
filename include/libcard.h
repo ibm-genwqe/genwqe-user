@@ -387,6 +387,8 @@ void card_overwrite_slu_id(card_handle_t card, uint64_t slu_id);
 void card_overwrite_app_id(card_handle_t card, uint64_t app_id);
 uint64_t card_get_app_id(card_handle_t card);
 
+int genwqe_dump_statistics(FILE *fp);
+
 #ifdef __cplusplus
 }
 #endif

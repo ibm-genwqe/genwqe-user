@@ -146,6 +146,11 @@ static int card_free(void *card_data, void *ptr, size_t size)
 	return genwqe_card_free(card_data, ptr, size);
 }
 
+static int _card_dump_statistics(FILE *fp)
+{
+	return genwqe_dump_statistics(fp);
+}
+
 static struct ddcb_accel_funcs accel_funcs = {
 	.card_type = DDCB_TYPE_GENWQE,
 	.card_name = "GENWQE",
@@ -168,6 +173,7 @@ static struct ddcb_accel_funcs accel_funcs = {
 	.card_free = card_free,
 
 	/* statistics */
+	.dump_statistics = _card_dump_statistics,
 	.num_open = 0,
 	.num_close = 0,
 	.num_execute = 0,
