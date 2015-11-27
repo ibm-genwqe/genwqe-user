@@ -148,6 +148,11 @@ static struct lib_data_t lib_data;
 static struct dev_card_t *s_dev_head = NULL;	/* Head for Single Mode */
 static struct dev_card_t *m_dev_head = NULL;	/* Head for Multi Mode */
 static struct fd_node *__fd_m_list = NULL;
+
+/* statistics */
+static unsigned int card_completed_ddcbs = 0;
+static unsigned int card_retried_ddcbs = 0;
+
 static int _dbg_flag;
 
 static const char * const card_errlist[] = {
@@ -390,9 +395,9 @@ static int __m_open_add(int card_no, int mode)
 /*
  * Function: __genwqe_filter()
  *
- * 	@brief	Filter for scandir as helper function for __m_open_all()
- * 	@parm	Ptr. to name in dev
- * 	@return	1 if name matches any of my genwqe devices
+ *	@brief	Filter for scandir as helper function for __m_open_all()
+ *	@parm	Ptr. to name in dev
+ *	@return	1 if name matches any of my genwqe devices
  */
 static int __genwqe_filter(const struct dirent *name)
 {
@@ -419,7 +424,8 @@ static int __m_open_all(struct lib_data_t *ld)
 	if (n < 0)
 		return 0;
 	while (n--) {
-		rc = sscanf(namelist[n]->d_name, GENWQE_DEVNAME"%u_card", &card_no);
+		rc = sscanf(namelist[n]->d_name,
+			    GENWQE_DEVNAME"%u_card", &card_no);
 		if ((1 == rc) && (card_no >= 0) && (card_no < 256)) {
 			switch (ld->genwqe_state[card_no]) {
 			case CARD_CLOSED:	// Try to Open
@@ -626,7 +632,8 @@ static int __mhealth_check(struct lib_data_t *ld)
 		if (CARD_OPEN == state) {
 			__genwqe_card_get_state(fd, &card_state);
 			if (GENWQE_CARD_USED != card_state) {
-				pr_info("%s delete from List: %p Card: %d fd: %d\n",
+				pr_info("%s delete from List: %p Card: %d "
+					"fd: %d\n",
 					__func__, fd_list, card_no, fd);
 				__fd_m_del(fd);	   /* Remove from List */
 				__fd_m_head_all(); /* Reset all Devs to head
@@ -695,8 +702,8 @@ static void __inotify_termination_handler(int signum)
 
 /*
  * Function: __inotify_handle_event()
- * 	Called from:	__inotify_thread()
- * 	Handels data from inotify read.
+ *	Called from:	__inotify_thread()
+ *	Handels data from inotify read.
  */
 static void __inotify_handle_event(int len, char *buf, struct lib_data_t *ld)
 {
@@ -714,16 +721,22 @@ static void __inotify_handle_event(int len, char *buf, struct lib_data_t *ld)
 				if (1 == n) {
 					/* Make sure that the new card */
 					/* was gone before adding back in */
-					if (CARD_CLOSED == ld->genwqe_state[card]) {
+					if (CARD_CLOSED ==
+					    ld->genwqe_state[card]) {
 						/* Create was done, ATTRIB, */
-						/* was set, Post Health Sem to Open again */
+						/* was set, Post
+						   Health Sem to Open
+						   again */
 						ld->inotify_card = card;
-						ld->inotify_event = INOTIFY_ATTRIB;
+						ld->inotify_event =
+							INOTIFY_ATTRIB;
 						/* post __inotify_handle */
 						usleep(50000);
 						/* !!! need some delay */
 
-						pr_info("%s Start Health Thread for new Card: %s\n",
+						pr_info("%s Start Health "
+							"Thread for new "
+							"Card: %s\n",
 							__func__, ie->name);
 						sem_post(&ld->health_sem);
 					}
@@ -755,15 +768,16 @@ static void *__inotify_thread(void *data)
 	action.sa_handler = __inotify_termination_handler;
 	sigemptyset( &action.sa_mask );
 	action.sa_flags = 0;
-	sigaction(SIGUSR1, &action, NULL);	/* set SIGUSR1 to kill me */
+	sigaction(SIGUSR1, &action, NULL); /* set SIGUSR1 to kill me */
 
 	sigemptyset(&sig_empty_mask);
 
 	ld->inotify_run = true;
-	while (ld->inotify_run) {		/* Exit because of sig handler */
+	while (ld->inotify_run) { /* Exit because of sig handler */
 		FD_ZERO(&rfds);
 		FD_SET(ld->inotify_fd, &rfds);	/* Set fd */
-		rc = pselect(FD_SETSIZE, &rfds, NULL, NULL, NULL, &sig_empty_mask);
+		rc = pselect(FD_SETSIZE, &rfds, NULL, NULL, NULL,
+			     &sig_empty_mask);
 		if (rc > 0) {
 			len = read(ld->inotify_fd, buf, sizeof(buf));
 			if (-1 == len) {
@@ -840,7 +854,8 @@ static void *__health_thread(void *data)
 		else if (s_dev_head)
 			__shealth_check(ld);
 		if (true == ld->health_exit) {
-			pthread_mutex_unlock(&ld->fds_mutex);	/* need Unlock */
+			/* need Unlock */
+			pthread_mutex_unlock(&ld->fds_mutex);
 			break;	/* Exit called by destructor */
 		}
 		pthread_mutex_unlock(&ld->fds_mutex);
@@ -852,13 +867,19 @@ static void *__health_thread(void *data)
 		/* Wait until tread is running, than send kill signal */
 		while(1) {
 			if (true == ld->inotify_run) {
-				ld->inotify_run = false;		/* Make sure to exit */
-				pthread_kill(ld->inotify_tid, SIGUSR1);	/* Send kill Signal */
-				pthread_join(ld->inotify_tid, NULL);	/* and wait to Join */
+				 /* Make sure to exit */
+				ld->inotify_run = false;
+
+				/* Send kill Signal */
+				pthread_kill(ld->inotify_tid, SIGUSR1);
+
+				/* and wait to Join */
+				pthread_join(ld->inotify_tid, NULL);
 				ld->inotify_tid = -1;
 				break;
-			} else { 
-				pr_warn("Waiting for inotify Thread to enter Run State\n");
+			} else {
+				pr_warn("Waiting for inotify Thread to "
+					"enter Run State\n");
 				usleep(10000);
 			}
 		}
@@ -1356,12 +1377,12 @@ static int __genwqe_card_execute(card_handle_t dev,
 	fd = __fd_get(dev);
 	cmd = req;
 	while (cmd != NULL) {
-retry:	/* wait until DDCB is processed */
-		{
+	retry:			/* wait until DDCB is processed */
+		do {
 			rc = ioctl(fd, func, cmd);
 			dev->drv_errno = errno;
 			dev->drv_rc = rc;
-		}
+		} while (0);
 		if (rc < 0) {
 			if (GENWQE_CARD_REDUNDANT == dev->card_no) {
 				/* I can try to use next card in case
@@ -1379,16 +1400,22 @@ retry:	/* wait until DDCB is processed */
 				if (fd2 != fd)	     /* if there is a new fd */
 					fd = fd2;    /* swap to new fd */
 				else	usleep(1000000);/* no fd in queue */
+
+				card_retried_ddcbs++;
 				goto retry;	     /* and retry again */
 			}
-			if (errno == EBUSY)
+			if (errno == EBUSY) {
+				card_retried_ddcbs++;
 				goto retry;
+			}
 			pr_warn("%s exit fault: %d fd: %d\n", __func__,
-			       errno, fd);
+				errno, fd);
 			return GENWQE_ERR_EXEC_DDCB;
 		}
+		card_completed_ddcbs++;
 		cmd = (struct genwqe_ddcb_cmd *)(unsigned long)cmd->next_addr;
 	}
+
 	return GENWQE_OK;
 }
 
@@ -2017,5 +2044,15 @@ uint64_t card_get_app_id(card_handle_t dev)
 {
 	if (dev)
 		return dev->app_id;
+	return 0;
+}
+
+int genwqe_dump_statistics(FILE *fp)
+{
+	fprintf(fp,
+		"GenWQE card statistics\n"
+		"  Completed DDCBs: %d\n"
+		"  Retried DDCBs:   %d\n",
+		card_completed_ddcbs, card_retried_ddcbs);
 	return 0;
 }
