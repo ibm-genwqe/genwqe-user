@@ -372,11 +372,15 @@ static int __fd_m_get_and_inc(struct card_dev_t *dev)
 
 static int __fd_get(struct card_dev_t *dev)
 {
+	struct lib_data_t *ld = &lib_data;
 	int	fd;
 
+	pthread_mutex_lock(&ld->fds_mutex);
 	if (GENWQE_CARD_REDUNDANT == dev->card_no)
 		fd = __fd_m_get_and_inc(dev);
-	else	fd = dev->fd_s;	// Normal Mode, return fd_s
+	else
+		fd = dev->fd_s;	// Normal Mode, return fd_s
+	pthread_mutex_unlock(&ld->fds_mutex);
 	return fd;
 }
 
