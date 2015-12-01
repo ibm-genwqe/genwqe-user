@@ -57,6 +57,7 @@ genwqe_gunzip.o: genwqe_gzip.c
 
 ### Deactivate existing implicit rule
 %: %.c
+%: %.sh
 
 ### Generic rule to build a tool
 %: %.o
