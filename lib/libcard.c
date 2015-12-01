@@ -152,6 +152,7 @@ static struct fd_node *__fd_m_list = NULL;
 /* statistics */
 static unsigned int card_completed_ddcbs = 0;
 static unsigned int card_retried_ddcbs = 0;
+static unsigned int card_health_signal = 0;
 
 static int _dbg_flag;
 
@@ -372,11 +373,15 @@ static int __fd_m_get_and_inc(struct card_dev_t *dev)
 
 static int __fd_get(struct card_dev_t *dev)
 {
+	struct lib_data_t *ld = &lib_data;
 	int	fd;
 
+	pthread_mutex_lock(&ld->fds_mutex);
 	if (GENWQE_CARD_REDUNDANT == dev->card_no)
 		fd = __fd_m_get_and_inc(dev);
-	else	fd = dev->fd_s;	// Normal Mode, return fd_s
+	else
+		fd = dev->fd_s;	// Normal Mode, return fd_s
+	pthread_mutex_unlock(&ld->fds_mutex);
 	return fd;
 }
 
@@ -555,6 +560,7 @@ static void __health_sa_sigaction(int sig, siginfo_t *si, void *data)
 		"  out which file-descriptor is actually broken, when\n"
 		"  we are receving SIGIO.\n\n",
 		__func__, sig, si, data, si->si_fd, si->si_code);
+	card_health_signal++;
 	sem_post(&ld->health_sem);
 }
 
@@ -2052,7 +2058,8 @@ int genwqe_dump_statistics(FILE *fp)
 	fprintf(fp,
 		"GenWQE card statistics\n"
 		"  Completed DDCBs: %d\n"
-		"  Retried DDCBs:   %d\n",
-		card_completed_ddcbs, card_retried_ddcbs);
+		"  Retried DDCBs:   %d\n"
+		"  Health SIGIO:    %d\n",
+		card_completed_ddcbs, card_retried_ddcbs, card_health_signal);
 	return 0;
 }
