@@ -38,6 +38,7 @@ export PATH=./genwqe-user/tools:/opt/genwqe/bin/genwqe:/sbin:/usr/sbin:$PATH
 version="https://github.com/ibm-genwqe/genwqe-user"
 verbose=""
 test_data="/tmp/test_data.bin"
+logging=0
 
 # Print usage message helper function
 function usage() {
@@ -49,6 +50,9 @@ function usage() {
     echo "          RED (or -1) drive work to all available cards."
     echo "    [-P] Use polling to detect work-request completion/only CAPI."
     echo "    [-t] <test_data.bin>"
+    echo "    [-l] Enable system load logging"
+    echo "         sadc - System activity data collector and gnuplot"
+    echo "         must be installed"
     echo "    [-v] Print status and informational output."
     echo "    [-V] Print program version (${version})"
     echo "    [-h] Print this help message."
@@ -73,8 +77,55 @@ function usage() {
     echo
 }
 
+###############################################################################
+# System Load Logging
+###############################################################################
+
+function system_load_logging_start() {
+    rm -f system_load.sar system_load.pid
+    /usr/lib/sysstat/sadc 1 system_load.sar &
+    echo $! > system_load.pid
+}
+
+function system_load_logging_stop() {
+    kill -9 `cat system_load.pid`
+
+    # Skip the 1st 4 lines, since they container some header information
+    cp system_load.sar system_load.$ZLIB_ACCELERATOR.sar
+    sar -u -f system_load.sar | tail -n +3 > system_load.txt
+    grep -v Average system_load.txt > system_load.csv
+
+    start=`head -n1 system_load.csv | cut -f1 -d' '`
+    end=`tail -n1 system_load.csv | cut -f1 -d' '`
+
+    cat <<EOF > system_load.gnuplot
+# Gnuplot Config
+#
+set terminal pdf size 16,8
+set output "system_load.pdf"
+set autoscale
+set title "System Load using $ZLIB_ACCELERATOR"
+set xdata time
+set timefmt "%H:%M:%S"
+set xlabel "Time"
+set xrange ["$start":"$end"]
+set ylabel "CPU Utilization"
+set yrange ["0.00":"100.00"]
+set style data lines
+set grid
+# set datafile separator " "
+plot "system_load.csv" using 1:4 title "%user", '' using 1:6 title "%system", '' using 1:9 title "%idle"
+EOF
+
+    # Instructing gnuplot to generate a png with out CPU load statistics
+    cat system_load.gnuplot | gnuplot
+
+    # Safe it under an accelerator unique name
+    mv system_load.pdf system_load.${ZLIB_ACCELERATOR}.pdf
+}
+
 # Parse any options given on the command line
-while getopts "A:C:t:PvVh" opt; do
+while getopts "A:C:t:PvVhl" opt; do
     case ${opt} in
 	A)
 	ZLIB_ACCELERATOR=${OPTARG};
@@ -88,6 +139,9 @@ while getopts "A:C:t:PvVh" opt; do
 	;;	
 	t)
 	test_data=${OPTARG};
+	;;
+	l)
+	logging=1;
 	;;
         v)
 	verbose="-v";
@@ -139,6 +193,10 @@ du -h ${test_data}.gz
 
 echo "IBM Processing accelerators:"
 lspci | grep "Processing accelerators: IBM"
+
+if [ $logging -eq 1 ]; then
+    system_load_logging_start
+fi
 
 echo
 echo "DEFLATE Figure out maximum throughput and #threads which work best"
@@ -193,6 +251,10 @@ for b in 1KiB 4KiB 64KiB 128KiB 1MiB 4MiB 8MiB ; do
     # sleep 1 ;
     print_hdr="-N";
 done
+
+if [ $logging -eq 1 ]; then
+    system_load_logging_stop
+fi
 
 exit 0
 
