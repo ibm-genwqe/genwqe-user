@@ -26,6 +26,7 @@
 # distribute workload over all plugged cards.
 #
 
+export ZLIB_ACCELERATOR=GENWQE
 export ZLIB_CARD=-1
 
 # Directories used
@@ -108,6 +109,9 @@ function usage() {
     echo "          Default: 100"
     echo "    [-p]  <number of instances> of this test to run in parallel."
     echo "          Default: 10"
+    echo "    [-A]  <accelerator> use either GENWQE for the PCIe and CAPI for"
+    echo "          CAPI based solution available only on System p"
+    echo "          Use SW to use software compress/decompression"
     echo "    [-C]  <card> set the compression card to use (0, 1, ... )."
     echo "          RED (or -1) drive work to all available cards."
     echo "    [-v]  Print status and informational output."
@@ -228,7 +232,7 @@ function is_supported()
 
 # Prerequisite: the driver needs to be loaded for this function to
 #               be able to check the bit stream version
-function check_supported_bitstream_versions()
+function genwqe_check_supported_bitstream_versions()
 {
     if [ $ZLIB_CARD -ge 0 ]; then
         # check APPID
@@ -259,7 +263,7 @@ if [ ! -d ${TOOLS_DIR} ]; then
 fi
 
 # Parse any options given on the command line
-while getopts "vVhsSi:C:p:" opt; do
+while getopts "A:vVhsSi:C:p:" opt; do
     case ${opt} in
         s)
 	    driver_check=0;
@@ -276,6 +280,9 @@ while getopts "vVhsSi:C:p:" opt; do
         p)
             nr_instances=${OPTARG};
             ;;
+        A)
+            export ZLIB_ACCELERATOR=${OPTARG};
+	    ;;
 	C)
 	    ZLIB_CARD=${OPTARG};
             if [ "${OPTARG}" == "-1" -o  "${OPTARG}" == "RED" ]; then
@@ -316,8 +323,8 @@ if [ ${driver_check} -eq 1 ]; then
     fi
 fi
 
-if [ "${driver_loaded}" != "" -a ${driver_check} -eq 1 ]; then
-    check_supported_bitstream_versions $ZLIB_CARD
+if [ $ZLIB_ACCELERATOR == "GENWQE" -a "${driver_loaded}" != "" -a ${driver_check} -eq 1 ]; then
+    genwqe_check_supported_bitstream_versions $ZLIB_CARD
     if [ $bitstream_warning -eq 1 ]; then
         2>&1 echo "ERROR: Unsupported FPGA image (bitstream) detected on one"  \
                          "or more cards."
