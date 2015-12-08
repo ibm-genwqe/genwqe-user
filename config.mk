@@ -48,11 +48,10 @@ else
 CLEAN		= echo -n
 endif
 
-GIT_VERSION := $(shell git describe --abbrev=4 --dirty --always --tags)
 PLATFORM = $(shell uname -i)
 
 CFLAGS = -W -Wall -Werror -Wwrite-strings -Wextra -Os -g \
-	-DGIT_VERSION=\"$(GIT_VERSION)\" \
+	-DGIT_VERSION=\"$(VERSION)\" \
 	-I. -I/opt/genwqe/include -I../include -I../include/linux/uapi \
 	-Wmissing-prototypes # -Wstrict-prototypes -Warray-bounds
 
