@@ -104,21 +104,18 @@ rpmbuild: genwqe-tools genwqe-libz genwqe-vpd
 
 genwqe-tools genwqe-libz genwqe-vpd:
 	@$(MAKE) -s distclean
+	@rm version.mk
 	@echo "VERSION:=$(VERSION)" > version.mk
 	@echo "RPMVERSION:=$(RPMVERSION)" >> version.mk
-	@$(RM) -r /tmp/$@-$(RPMVERSION) /tmp/$@-$(RPMVERSION).tgz  \
-		~/rpmbuild/SOURCES/${@}* ~/rpmbuild/BUILD/${@}* \
-		~/tmp/$@-$(RPMVERSION)
-	@mkdir -p /tmp/$@-$(RPMVERSION)
-	@cp -ar .git /tmp/$@-$(RPMVERSION)/
-	@cp -ar * /tmp/$@-$(RPMVERSION)/
-	(cd /tmp && tar cfz $@-$(RPMVERSION).tgz $@-$(RPMVERSION))
-	@cp /tmp/$@-$(RPMVERSION).tgz ~/rpmbuild/SOURCES/
-	@cp spec/$@.spec ~/rpmbuild/SPECS/
-	rpmbuild -ba -v --define 'srcVersion $(RPMVERSION)' \
+	@rm -rf /tmp/genwqe-$(RPMVERSION)
+	@mkdir -p /tmp/genwqe-$(RPMVERSION)
+	@cp -ar .git /tmp/genwqe-$(RPMVERSION)/
+	@cp -ar * /tmp/genwqe-$(RPMVERSION)/
+	(cd /tmp && tar cfz genwqe-$(RPMVERSION).tar.gz genwqe-$(RPMVERSION))
+	rpmbuild -ta -v --define 'srcVersion $(RPMVERSION)' \
 		--define 'srcRelease 1'			\
-		--buildroot ~/tmp/$@-$(RPMVERSION)	\
-		~/rpmbuild/SPECS/$@.spec
+		--define 'Version $(RPMVERSION)'	\
+		/tmp/genwqe-$(RPMVERSION).tar.gz
 
 # Install/Uninstall
 install uninstall:
