@@ -33,15 +33,23 @@ endif
 
 version = $(shell git describe --abbrev=4 --dirty --always --tags)
 rpmversion = $(shell git describe --abbrev=0)
-
 instdir = /opt/genwqe
 
 distro = $(shell lsb_release -d | cut -f2)
 subdirs += lib tools
-targets += zlib-1.2.8.log $(subdirs)
+targets += $(subdirs)
 
 UDEV_RULES_D ?= /etc/udev/rules.d
 MODPROBE_D ?= /etc/modprobe.d
+
+all: $(targets)
+
+tools: lib
+
+# z_ prefixed version of libz, intended to be linked statically with
+# our libz version to provide the software zlib functionality.
+#
+ifeq ($(CONFIG_DLOPEN_MECHANISM),0)
 
 HAS_WGET = $(shell which wget > /dev/null 2>&1 && echo y || echo n)
 HAS_CURL = $(shell which curl > /dev/null 2>&1 && echo y || echo n)
@@ -52,28 +60,19 @@ define Q
   @$(3)
 endef
 
-all: $(targets)
+lib: zlib-1.2.8/libz.so
 
-tools: lib
+zlib-1.2.8/libz.so: zlib-1.2.8.cfg
+	@/bin/echo -e "	[BUILD]\tzlib-1.2.8"
+	@$(MAKE) -C zlib-1.2.8 1>&2 > /dev/null
 
-.PHONY: $(subdirs) distclean clean build_dist install uninstall \
-	install_src uninstall_src copy_test_code \
-	install_test_code build_testcode
-
-zlib-1.2.8.log: zlib-1.2.8
-	@touch zlib-1.2.8.log
+zlib-1.2.8.cfg: zlib-1.2.8.tar.gz
+	@/bin/echo -e "	[TAR]\t$<"
+	@tar xfz $<
 	@/bin/echo -e "	[CFG]\tzlib-1.2.8"
 	@(cd zlib-1.2.8 && CFLAGS=-O2 ./configure --prefix=/opt/genwqe) \
-		1>&2 >> zlib-1.2.8.log
-	@/bin/echo -e "	[BUILD]\tzlib-1.2.8"
-	@$(MAKE) -C zlib-1.2.8 1>&2 >> zlib-1.2.8.log
-	$(OBJCOPY) --prefix-symbols=z_ zlib-1.2.8/libz.a zlib-1.2.8/z_libz.a 
-	@touch zlib-1.2.8.log
-
-zlib-1.2.8: zlib-1.2.8.tar.gz
-	@touch zlib-1.2.8.log
-	@/bin/echo -e "	[TAR]\t$<"
-	@tar xfz $< 1>&2 > zlib-1.2.8.log
+		1>&2 > /dev/null
+	@touch zlib-1.2.8.cfg
 
 zlib-1.2.8.tar.gz:
 ifeq (${HAS_WGET},y)
@@ -82,7 +81,10 @@ else ifeq (${HAS_CURL},y)
 	$(call Q,CURL,zlib-1.2.8.tar.gz, curl -o zlib-1.2.8.tar.gz -s http://www.zlib.net/zlib-1.2.8.tar.gz)
 endif
 
+endif
+
 # Only build if the subdirectory is really existent
+.PHONY: $(subdirs)
 $(subdirs):
 	@if [ -d $@ ]; then			\
 		$(MAKE) -C $@ C=0 || exit 1;	\
@@ -155,8 +157,8 @@ clean:
 	done
 	@$(RM) *~ */*~ 					\
 		genwqe-tools-$(rpmversion).tgz 		\
-		genwqe-zlib-$(rpmversion).tgz		\
-		zlib-1.2.8/z_libz.a zlib-1.2.8.log
+		genwqe-zlib-$(rpmversion).tgz
+	@$(RM) libz.o libz_prefixed.o zlib-1.2.8.cfg
 	@if [ -d zlib-1.2.8 ]; then 			\
 		$(MAKE) -s -C zlib-1.2.8 distclean;	\
 	fi

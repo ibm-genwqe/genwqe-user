@@ -14,14 +14,24 @@
  * limitations under the License.
  */
 
+#define _LARGEFILE64_SOURCE
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+
+#include <zlib.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <malloc.h>
 #include <string.h>
 #include <dlfcn.h>
-#include <zlib.h>
 #include <wrapper.h>
+
+#if defined(CONFIG_DLOPEN_MECHANISM)
 
 typedef void * __attribute__ ((__may_alias__)) pvoid_t;
 
@@ -449,6 +459,8 @@ void zedc_sw_init(void)
 
 load_syms:
 	register_sym(zlibVersion);
+
+	sw_trace("Using dlopened libz.so\n");
 	sw_trace("  ZLIB_VERSION %s (header version)\n", ZLIB_VERSION);
 	sw_trace("  zlibVersion  %s (libz.so version)\n", z_zlibVersion());
 
@@ -515,9 +527,136 @@ load_syms:
 		 ZLIB_VERSION);
 }
 
-
 void zedc_sw_done(void)
 {
 	sw_trace("Closing software zlib\n");
 	dlclose(handle);
 }
+
+#else
+
+/*
+ * Prefixing symbols has nasty side effects. One of them is that libc
+ * symbols get prefixed too. Such that we see z_free and not free
+ * anymore. Let us fix this up here to see if it works in general.
+ */
+void *z_malloc(size_t size);
+void *z_malloc(size_t size)
+{
+	return malloc(size);
+}
+
+void z_free(void *ptr);
+void z_free(void *ptr)
+{
+	free(ptr);
+}
+
+void *z_memcpy(void *dest, const void *src, size_t n);
+void *z_memcpy(void *dest, const void *src, size_t n)
+{
+	return memcpy(dest, src, n);
+}
+
+size_t z_strlen(const char *s);
+size_t z_strlen(const char *s)
+{
+	return strlen(s);
+}
+
+void *z_memset(void *s, int c, size_t n);
+void *z_memset(void *s, int c, size_t n)
+{
+	return memset(s, c, n);
+}
+
+int z_close(int fd);
+int z_close(int fd)
+{
+	return close(fd);
+}
+
+int z_open(const char *pathname, int flags, mode_t mode);
+int z_open(const char *pathname, int flags, mode_t mode)
+{
+	return open(pathname, flags, mode);
+}
+
+ssize_t z_read(int fd, void *buf, size_t count);
+ssize_t z_read(int fd, void *buf, size_t count)
+{
+	return read(fd, buf, count);
+}
+
+ssize_t z_write(int fd, const void *buf, size_t count);
+ssize_t z_write(int fd, const void *buf, size_t count)
+{
+	return write(fd, buf, count);
+}
+
+long long z_lseek64(int fd, long long offset, int whence);
+long long z_lseek64(int fd, long long offset, int whence)
+{
+	return lseek64(fd, offset, whence);
+}
+
+int z_snprintf(char *str, size_t size, const char *format, ...);
+int z_snprintf(char *str, size_t size, const char *format, ...)
+{
+	int rc;
+	va_list ap;
+
+	va_start(ap, format);
+	rc = snprintf(str, size, format, ap);
+	va_end(ap);
+	return rc;
+}
+
+int z_vsnprintf(char *str, size_t size, const char *format, va_list ap);
+int z_vsnprintf(char *str, size_t size, const char *format, va_list ap)
+{
+	int rc;
+
+	rc = vsnprintf(str, size, format, ap);
+	return rc;
+}
+
+extern int *z___errno_location (void);
+extern int *z___errno_location (void)
+{
+	return __errno_location();
+}
+
+
+void *z_memchr(const void *s, int c, size_t n);
+void *z_memchr(const void *s, int c, size_t n)
+{
+	return memchr(s, c, n);
+}
+
+char *z_strerror(int errnum);
+char *z_strerror(int errnum)
+{
+	return strerror(errnum);
+}
+
+void zedc_sw_init(void)
+{
+	sw_trace("Using z_ prefixed libz.a\n");
+	sw_trace("  ZLIB_VERSION %s (header version)\n", ZLIB_VERSION);
+	sw_trace("  zlibVersion  %s (libz.so version)\n", z_zlibVersion());
+
+	if (strcmp(ZLIB_VERSION, z_zlibVersion()) != 0) {
+		pr_err("libz.so %s and zlib.h %s do not match!\n",
+		       z_zlibVersion(), ZLIB_VERSION);
+		return;
+	}
+}
+
+void zedc_sw_done(void)
+{
+	sw_trace("Closing software zlib\n");
+}
+
+#endif	/* CONFIG_DLOPEN_MECHANSIM */
+
