@@ -112,7 +112,7 @@ $(libname2)-$(libversion).so: __$(libname2).o
 	$(CC) $(LDFLAGS) -shared -Wl,-soname,$@ -o $@ $^
 
 ### libzADC
-__$(libname).o: $(objs)
+__$(libname).o: $(objs) $(libz_a)
 	$(LD) $(XLDFLAGS) -r -o $@ $^
 
 $(libname).a: __$(libname).o
@@ -124,6 +124,38 @@ $(libname).so: $(libname)-$(libversion).so
 $(libname)-$(libversion).so: __$(libname).o
 	$(CC) $(LDFLAGS) -shared -Wl,-soname,$@ \
 		 -Wl,--version-script=libzADC.map -o $@ $^
+
+# Produce z_ prefixed verson of software zlib. We need this when we
+# want to include libz statially instead of using dlopen/dlsym to use
+# it.
+#
+# Special version of libz.a which has z_ prefixed function
+# names. Required for software zlib fallback in case of small buffers
+# and accelerator unavailability.
+#
+libz_prefixed.o:
+
+zlib_objs = $(CONFIG_LIBZ_PATH)/adler32.lo  \
+	    $(CONFIG_LIBZ_PATH)/infback.lo  \
+	    $(CONFIG_LIBZ_PATH)/compress.lo \
+	    $(CONFIG_LIBZ_PATH)/gzclose.lo  \
+	    $(CONFIG_LIBZ_PATH)/inffast.lo  \
+	    $(CONFIG_LIBZ_PATH)/trees.lo    \
+	    $(CONFIG_LIBZ_PATH)/crc32.lo    \
+	    $(CONFIG_LIBZ_PATH)/gzlib.lo    \
+	    $(CONFIG_LIBZ_PATH)/inflate.lo  \
+	    $(CONFIG_LIBZ_PATH)/uncompr.lo  \
+	    $(CONFIG_LIBZ_PATH)/deflate.lo  \
+	    $(CONFIG_LIBZ_PATH)/gzread.lo   \
+	    $(CONFIG_LIBZ_PATH)/inftrees.lo \
+	    $(CONFIG_LIBZ_PATH)/zutil.lo    \
+	    $(CONFIG_LIBZ_PATH)/gzwrite.lo
+
+libz_prefixed.o: libz.o
+	$(OBJCOPY) --prefix-symbols=z_ $< $@
+
+libz.o: $(CONFIG_LIBZ_PATH)/libz.so
+	$(LD) $(XLDFLAGS) -r -o $@ $(zlib_objs)
 
 install: all install_zlib
 	mkdir -p $(instdir)/lib

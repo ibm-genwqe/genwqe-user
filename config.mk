@@ -42,6 +42,7 @@ MAKEFLAGS	+= --silent
 MAKE		+= -s
 CC		= printf "\t[CC]\t%s\n" `basename "$@"`; $(CROSS)gcc
 AS		= printf "\t[AS]\t%s\n" `basename "$@"`; $(CROSS)as
+AR		= printf "\t[AR]\t%s\n" `basename "$@"`; $(CROSS)ar
 LD		= printf "\t[LD]\t%s\n" `basename "$@"`; $(CROSS)ld
 OBJCOPY		= printf "\t[OBJCOPY]\t%s\n" `basename "$@"`; $(CROSS)objcopy
 else
@@ -107,4 +108,16 @@ ifneq ($(CONFIG_LIBCXL_PATH),)          # Use libcxl
 CFLAGS += -I$(CONFIG_LIBCXL_PATH) -I$(CONFIG_LIBCXL_PATH)/include
 LDFLAGS += -L$(CONFIG_LIBCXL_PATH)
 libcxl_a = $(CONFIG_LIBCXL_PATH)/libcxl.a
+endif
+
+# z_ prefixed version of libz, intended to be linked statically with
+# our libz version to provide the software zlib functionality.
+#
+CONFIG_DLOPEN_MECHANISM ?= 1
+
+ifeq ($(CONFIG_DLOPEN_MECHANISM),1)
+CFLAGS += -DCONFIG_DLOPEN_MECHANISM
+else
+CONFIG_LIBZ_PATH=../zlib-1.2.8
+libz_a=libz_prefixed.o
 endif
