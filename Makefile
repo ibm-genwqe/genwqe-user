@@ -31,8 +31,16 @@ ifeq ($(V),1)
 	MAKE		+= -s
 endif
 
-version = $(shell git describe --abbrev=4 --dirty --always --tags)
-rpmversion = $(shell git describe --abbrev=0)
+# VERSION string *cannot* be empty.  It must be provided either in the
+# version.mk file, in the command line as VERSION= or loaded by using
+# the git repository information.
+ifneq ("$(wildcard version.mk)", "")
+	include ./version.mk
+else
+	VERSION ?= $(shell git describe --abbrev=4 --dirty --always --tags)
+	RPMVERSION ?= $(shell git describe --abbrev=0 --tags)
+endif
+
 instdir = /opt/genwqe
 
 distro = $(shell lsb_release -d | cut -f2)
@@ -84,10 +92,10 @@ endif
 endif
 
 # Only build if the subdirectory is really existent
-.PHONY: $(subdirs)
+.PHONY: $(subdirs) install
 $(subdirs):
 	@if [ -d $@ ]; then			\
-		$(MAKE) -C $@ C=0 || exit 1;	\
+		$(MAKE) -C $@ C=0 VERSION=$(VERSION) || exit 1; \
 	fi
 
 rpmbuild_setup:
@@ -95,23 +103,20 @@ rpmbuild_setup:
 	$(RM) ~/.rpmmacros
 	echo '%_topdir %(echo $$HOME)/rpmbuild' >  ~/.rpmmacros
 
-rpmbuild: genwqe-tools genwqe-libz genwqe-vpd
-
-genwqe-tools genwqe-libz genwqe-vpd:
+rpmbuild:
 	@$(MAKE) -s distclean
-	@$(RM) -r /tmp/$@-$(rpmversion) /tmp/$@-$(rpmversion).tgz  \
-		~/rpmbuild/SOURCES/${@}* ~/rpmbuild/BUILD/${@}* \
-		~/tmp/$@-$(rpmversion)
-	@mkdir -p /tmp/$@-$(rpmversion)
-	@cp -ar .git /tmp/$@-$(rpmversion)/
-	@cp -ar * /tmp/$@-$(rpmversion)/
-	(cd /tmp && tar cfz $@-$(rpmversion).tgz $@-$(rpmversion))
-	@cp /tmp/$@-$(rpmversion).tgz ~/rpmbuild/SOURCES/
-	@cp spec/$@.spec ~/rpmbuild/SPECS/
-	rpmbuild -ba -v --define 'srcVersion $(rpmversion)' \
+	@rm version.mk
+	@echo "VERSION:=$(VERSION)" > version.mk
+	@echo "RPMVERSION:=$(RPMVERSION)" >> version.mk
+	@rm -rf /tmp/genwqe-$(RPMVERSION)
+	@mkdir -p /tmp/genwqe-$(RPMVERSION)
+	@cp -ar .git /tmp/genwqe-$(RPMVERSION)/
+	@cp -ar * /tmp/genwqe-$(RPMVERSION)/
+	(cd /tmp && tar cfz genwqe-$(RPMVERSION).tar.gz genwqe-$(RPMVERSION))
+	rpmbuild -ta -v --define 'srcVersion $(RPMVERSION)' \
 		--define 'srcRelease 1'			\
-		--buildroot ~/tmp/$@-$(rpmversion)	\
-		~/rpmbuild/SPECS/$@.spec
+		--define 'Version $(RPMVERSION)'	\
+		/tmp/genwqe-$(RPMVERSION).tar.gz
 
 # Install/Uninstall
 install uninstall:
@@ -156,9 +161,9 @@ clean:
 		fi					\
 	done
 	@$(RM) *~ */*~ 					\
-		genwqe-tools-$(rpmversion).tgz 		\
-		genwqe-zlib-$(rpmversion).tgz
-	@$(RM) libz.o libz_prefixed.o zlib-1.2.8.cfg
+	@$(RM) genwqe-tools-$(RPMVERSION).tgz 		\
+	       genwqe-zlib-$(RPMVERSION).tgz		\
+	@$(RM) 	libz.o libz_prefixed.o zlib-1.2.8.cfg
 	@if [ -d zlib-1.2.8 ]; then 			\
 		$(MAKE) -s -C zlib-1.2.8 distclean;	\
 	fi
