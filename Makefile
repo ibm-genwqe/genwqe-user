@@ -103,14 +103,17 @@ rpmbuild_setup:
 	$(RM) ~/.rpmmacros
 	echo '%_topdir %(echo $$HOME)/rpmbuild' >  ~/.rpmmacros
 
+#
+# Create required tar.gz archive and copy everything to the right
+# places. Create version.mk since the Fedora build system requires
+# running without git.
+#
 rpmbuild:
 	@$(MAKE) -s distclean
-	@rm version.mk
 	@echo "VERSION:=$(VERSION)" > version.mk
 	@echo "RPMVERSION:=$(RPMVERSION)" >> version.mk
 	@rm -rf /tmp/genwqe-$(RPMVERSION)
 	@mkdir -p /tmp/genwqe-$(RPMVERSION)
-	@cp -ar .git /tmp/genwqe-$(RPMVERSION)/
 	@cp -ar * /tmp/genwqe-$(RPMVERSION)/
 	(cd /tmp && tar cfz genwqe-$(RPMVERSION).tar.gz genwqe-$(RPMVERSION))
 	rpmbuild -ta -v --define 'srcVersion $(RPMVERSION)' \

@@ -51,6 +51,12 @@ GenWQE adapter VPD tools
 %install
 %{__make} %{?_smp_mflags} install instdir=%{buildroot}/%{_prefix} VERSION=%{version}
 
+#
+# FIXME Instead of trying to fixup things in the spec fike, let us consider
+#       changing the associated install rule, such that the spec file
+#       can get smaller and simpler.
+#
+
 # Move genwqe_vpd.csv to expected location.
 %{__mkdir} -p %{buildroot}/%{_sysconfdir}/
 %{__install} -m 0644 tools/genwqe_vpd.csv %{buildroot}/etc/
@@ -60,14 +66,14 @@ GenWQE adapter VPD tools
 %{__mv} %{buildroot}/usr/man/man1/* %{buildroot}/%{_mandir}/man1
 
 # Install example programs into /usr/lib/genwqe/
-%{__mkdir} -p %{buildroot}/%{_libdir}/%{name}
-%{__mv} %{buildroot}/usr/bin/genwqe/gunzip %{buildroot}/%{_libdir}/%{name}/
-%{__mv} %{buildroot}/usr/bin/genwqe/gzip %{buildroot}/%{_libdir}/%{name}/
-%{__mv} %{buildroot}/usr/bin/genwqe/zlib_mt_perf.sh %{buildroot}/%{_libdir}/%{name}/
-%{__mv} %{buildroot}/usr/bin/genwqe/zlib_test_gz.sh %{buildroot}/%{_libdir}/%{name}/
+#%{__mkdir} -p %{buildroot}/%{_libdir}/%{name}
+#%{__mv} %{buildroot}/usr/bin/genwqe/gunzip %{buildroot}/%{_libdir}/%{name}/
+#%{__mv} %{buildroot}/usr/bin/genwqe/gzip %{buildroot}/%{_libdir}/%{name}/
+#%{__mv} %{buildroot}/usr/bin/zlib_mt_perf.sh %{buildroot}/%{_libdir}/%{name}/
+#%{__mv} %{buildroot}/usr/bin/zlib_test_gz.sh %{buildroot}/%{_libdir}/%{name}/
 
 # Remove programs we don't want to package.
-%{__rm} %{buildroot}/usr/bin/genwqe/zlib_mt_perf
+# %{__rm} %{buildroot}/usr/bin/genwqe/zlib_mt_perf
 
 %files
 %doc LICENSE
@@ -84,11 +90,10 @@ GenWQE adapter VPD tools
 %{_bindir}/genwqe_peek
 %{_bindir}/genwqe_poke
 %{_bindir}/zlib_mt_perf
-%{_libdir}/%{name}/gunzip
-%{_libdir}/%{name}/gzip
-
-%{_libdir}/%{name}/zlib_mt_perf.sh
-%{_libdir}/%{name}/zlib_test_gz.sh
+%{_bindir}/zlib_mt_perf.sh
+%{_bindir}/zlib_test_gz.sh
+%{_bindir}/genwqe/gunzip
+%{_bindir}/genwqe/gzip
 
 %{_mandir}/man1/genwqe_cksum.1.gz
 %{_mandir}/man1/genwqe_echo.1.gz
@@ -120,6 +125,8 @@ GenWQE adapter VPD tools
 %{_mandir}/man1/genwqe_vpdupdate.1.gz
 
 %changelog
+* Fri Dec 11 2015 Frank Haverkamp <haverkam@de.ibm.com>
+- Changing some install directories again.
 * Tue Dec 08 2015 Gabriel Krisman Bertazi <krisman@linux.vnet.ibm.com> - 4.0.7-1
 - Create Fedora package.
 - Make genwqe-vpd and genwqe-libz subpackages of genwqe-tools.
