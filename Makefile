@@ -140,6 +140,19 @@ install_modprobe_d:
 uninstall_modprobe_d:
 	$(RM) $(MODPROBE_D)/genwqe.conf
 
+help:
+	@echo "Build GenWQE/CAPI hardware accelerator tools"
+	@echo
+	@echo "Possible Makefile options:"
+	@echo "  V=0 silent, 1 normal (default), 2 verbose"
+	@echo "  FORCE_32BIT=0 64-bit (default), 1 32-bit"
+	@echo "  BUILD_SIMCODE=1 use pslse version of libcxl, 0 use libcxl "
+	@echo "      (default)"
+	@echo "  CONFIG_DLOPEN_MECHANISM=0 statically link against private"
+	@echo "      software zlib, 1 use dlopen to include software zlib"
+	@echo "      (default)"
+	@echo
+
 # FIXME This is a problem which occurs on distributions which have a
 # genwqe_card.h header file which is different from our local one.  If
 # there is a better solution than renaming it to get it out of the way
