@@ -94,7 +94,8 @@ endif
 # Only build if the subdirectory is really existent
 .PHONY: $(subdirs) install
 $(subdirs):
-	@if [ -d $@ ]; then			\
+	@if [ -d $@ ]; then					\
+		@echo "Installing version $VERSION ...";	\
 		$(MAKE) -C $@ C=0 VERSION=$(VERSION) || exit 1; \
 	fi
 
@@ -120,10 +121,10 @@ rpmbuild:
 
 # Install/Uninstall
 install uninstall:
-	@for dir in $(subdirs); do 			\
-		if [ -d $$dir ]; then			\
-			$(MAKE) -C $$dir $@ || exit 1;	\
-		fi					\
+	@for dir in $(subdirs); do 					  \
+		if [ -d $$dir ]; then					  \
+			$(MAKE) -C $$dir VERSION=$(VERSION) $@ || exit 1; \
+		fi							  \
 	done
 
 install_udev_rules:

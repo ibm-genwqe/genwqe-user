@@ -70,26 +70,33 @@ genwqe_gunzip.o: genwqe_gzip.c
 %.1: %
 	$(HELP2MAN) -N --output=$@ --name "IBM Hardware Accelerator Tool." ./$<
 
-# NOTE: Distribute just genwqe_echo and genwqe_update
-#       Build them with restricted user-interface.
+#
+# Tools for card maintenance
+#
 install_release_tools: all
 	@mkdir -p $(instdir)/bin
-	cp -uv genwqe_memcopy genwqe_echo genwqe_update $(instdir)/bin
+	cp -uv genwqe_peek genwqe_poke genwqe_memcopy genwqe_echo genwqe_update \
+		$(instdir)/bin
 
+#
+# Example tools and testcases
+#   gzip and gunzip go into special directory, since they should not be
+#   in regular path to be mixed up with distro version of those tools.
+#   Nevertheless we need them to accelerate tar for example with our
+#   hardware accelerated version of gzip/gunzip.
+#
 install_gzip_tools: all
 	mkdir -p $(instdir)/bin/genwqe
-	cp genwqe_gzip $(instdir)/bin/genwqe/gzip
-	cp genwqe_gzip $(instdir)/bin/genwqe/gunzip
-	cp zlib_mt_perf $(instdir)/bin/genwqe/
-	cp zlib_mt_perf.sh $(instdir)/bin/genwqe/
-	cp zlib_test_gz.sh $(instdir)/bin/genwqe/
+	cp -uv genwqe_gzip $(instdir)/bin/genwqe/gzip
+	cp -uv genwqe_gzip $(instdir)/bin/genwqe/gunzip
+	cp -uv zlib_mt_perf zlib_mt_perf.sh zlib_test_gz.sh $(instdir)/bin
 
 uninstall_gzip_tools:
-	$(RM) $(instdir)/bin/genwqe/gzip		\
-	      $(instdir)/bin/genwqe/gunzip		\
-	      $(instdir)/bin/genwqe/zlib_mt_perf	\
-	      $(instdir)/bin/genwqe/zlib_mt_perf.sh	\
-	      $(instdir)/bin/genwqe/zlib_test_gz.sh
+	$(RM) $(instdir)/bin/genwqe/gzip	\
+	      $(instdir)/bin/genwqe/gunzip	\
+	      $(instdir)/bin/zlib_mt_perf	\
+	      $(instdir)/bin/zlib_mt_perf.sh	\
+	      $(instdir)/bin/zlib_test_gz.sh
 
 install_vpd_tools: all
 	@mkdir -p $(instdir)/bin

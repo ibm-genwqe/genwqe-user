@@ -26,7 +26,7 @@ libversion = $(VERSION)
 
 ### Accelerated libz implemenation (Accelerated Data Compression/ADC)
 libname=libzADC
-projs = $(libname).a $(libname)-$(libversion).so $(libname).so
+projA = $(libname).a $(libname)-$(libversion).so $(libname).so
 src = wrapper.c hardware.c software.c
 objs = __libzHW.o __libcard.o __libDDCB.o $(src:.c=.o)
 
@@ -53,7 +53,7 @@ libname2 = libDDCB
 proj2 = $(libname2).a $(libname2)-$(libversion).so $(libname2).so
 objs2 = $(src2:.c=.o)
 
-projs += $(proj0) $(proj1) $(proj2)
+projs += $(projA) $(proj0) $(proj1) $(proj2)
 
 all: ..check_libcxl $(projs)
 
@@ -158,38 +158,21 @@ libz_prefixed.o: libz.o
 libz.o: $(CONFIG_LIBZ_PATH)/libz.so
 	$(LD) $(XLDFLAGS) -r -o $@ $(zlib_objs)
 
-install: all install_zlib
-	mkdir -p $(instdir)/lib
-	cp $(projs) $(instdir)/lib
+install: install_zlib
 
 install_zlib: all
 	mkdir -p $(instdir)/lib/genwqe
-	cp -a $(projs) $(instdir)/lib/genwqe/
+	cp -uv $(projA) $(instdir)/lib/genwqe/
 	(cd $(instdir)/lib/genwqe/ && \
 		ln -sf $(libname).a libz.a && \
 		ln -sf $(libname)-$(libversion).so libz.so && \
 		ln -sf $(libname)-$(libversion).so libz.so.1)
 	mkdir -p $(instdir)/include/genwqe
-	cp -a ../include/zaddons.h $(instdir)/include/genwqe/
+	cp -uv ../include/zaddons.h $(instdir)/include/genwqe/
 
 uninstall:
-	@for f in $(projs) ; do				\
-		echo "removing $(instdir)/lib/$$f ...";	\
-		$(RM) $(instdir)/lib/$$f;		\
-		echo "removing $(instdir)/genwqe/lib/$$f ...";	\
-		$(RM) $(instdir)/lib/genwqe/$$f;		\
-	done
+	@echo "removing $(instdir)/include/genwqe $(instdir)/lib/genwqe"
 	$(RM) -r $(instdir)/include/genwqe $(instdir)/lib/genwqe
-
-
-# Special install rules for internal users
-install_src:
-	@mkdir -p $(GENWQETOOLSSRC)/lib
-	cp *.c *.h Makefile $(GENWQETOOLSSRC)/lib
-
-uninstall_src:
-	$(RM) $(GENWQETOOLSSRC)/lib/*.c $(GENWQETOOLSSRC)/lib/*.h \
-		$(GENWQETOOLSSRC)/lib/Makefile
 
 # general things
 %.o: %.c
