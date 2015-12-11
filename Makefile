@@ -95,7 +95,6 @@ endif
 .PHONY: $(subdirs) install
 $(subdirs):
 	@if [ -d $@ ]; then					\
-		@echo "Installing version $VERSION ...";	\
 		$(MAKE) -C $@ C=0 VERSION=$(VERSION) || exit 1; \
 	fi
 
