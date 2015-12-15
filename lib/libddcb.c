@@ -441,6 +441,19 @@ uint64_t accel_get_frequency(accel_t card)
 	return accel->card_get_frequency(card->card_data);
 }
 
+void accel_dump_hardware_version(accel_t card, FILE *fp)
+{
+	struct ddcb_accel_funcs *accel = card->accel;
+
+	if (accel == NULL)
+		return;
+
+	if (accel->card_dump_hardware_version == NULL)
+		return;
+
+	return accel->card_dump_hardware_version(card->card_data, fp);
+}
+
 int accel_pin_memory(accel_t card, const void *addr, size_t size,
 			 int dir)
 {
