@@ -258,8 +258,13 @@ accel_t accel_open(int card_no, unsigned int card_type,
 int accel_close(accel_t card)
 {
 	int rc;
-	struct ddcb_accel_funcs *accel = card->accel;
+	struct ddcb_accel_funcs *accel;
 	uint64_t s = 0, e = 0;
+
+	if (card == NULL)
+		return DDCB_ERR_INVAL;
+
+	accel = card->accel;
 
 	if (ddcb_gather_statistics())
 		s = get_usec();

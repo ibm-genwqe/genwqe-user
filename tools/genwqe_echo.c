@@ -431,6 +431,9 @@ int main(int argc, char *argv[])
 	frequency = accel_get_frequency(card);
 	wtime_usec = frequency ? (wtime_e - wtime_s) / (frequency/1000000) : 0;
 
+ close_card:
+	accel_close(card);
+
 	if (!flood && !quiet)
 		printf("\n");
 
@@ -445,9 +448,6 @@ int main(int argc, char *argv[])
 		       100 * (packets_send - packets_received)/packets_send,
 		       wtime_usec);
 	}
-
- close_card:
-	accel_close(card);
 
 	if (rc != DDCB_OK)
 		exit(EXIT_FAILURE);
