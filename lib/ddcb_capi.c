@@ -66,7 +66,7 @@
 #define MMIO_DDCBQ_CONFIG_REG	0x0000108ull
 #define MMIO_DDCBQ_COMMAND_REG	0x0000110ull
 #define MMIO_DDCBQ_STATUS_REG	0x0000118ull
-#define MMIO_DDCBQ_CID_REG   	0x0000120ull	/* Context ID REG */
+#define MMIO_DDCBQ_CID_REG	0x0000120ull	/* Context ID REG */
 #define MMIO_DDCBQ_WT_REG	0x0000180ull
 
 #define MMIO_FIR_REGS_BASE	0x0001000ull	/* FIR: 1000...1028 */
@@ -296,41 +296,41 @@ static void ddcb_2_cmd(ddcb_t *ddcb, struct ddcb_cmd *cmd)
 	cmd->retc = __be16_to_cpu(ddcb->retc_16);
 }
 
-static void afu_print_status(struct cxl_afu_h *afu_h)
+static void afu_print_status(struct cxl_afu_h *afu_h, FILE *fp)
 {
 	int i;
 	uint64_t addr, reg;
 
 	cxl_mmio_read64(afu_h, MMIO_IMP_VERSION_REG, &reg);
-	VERBOSE0(" Version Reg:        0x%016llx\n", (long long)reg);
+	fprintf(fp, " Version Reg:        0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_APP_VERSION_REG, &reg);
-	VERBOSE0(" Appl. Reg:          0x%016llx\n", (long long)reg);
+	fprintf(fp, " Appl. Reg:          0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_AFU_CONFIG_REG, &reg);
-	VERBOSE0(" Afu Config Reg:     0x%016llx\n", (long long)reg);
+	fprintf(fp, " Afu Config Reg:     0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_AFU_STATUS_REG, &reg);
-	VERBOSE0(" Afu Status Reg:     0x%016llx\n", (long long)reg);
+	fprintf(fp, " Afu Status Reg:     0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_AFU_COMMAND_REG, &reg);
-	VERBOSE0(" Afu Cmd Reg:        0x%016llx\n", (long long)reg);
+	fprintf(fp, " Afu Cmd Reg:        0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_FRT_REG, &reg);
-	VERBOSE0(" Free Run Timer:     0x%016llx\n", (long long)reg);
+	fprintf(fp, " Free Run Timer:     0x%016llx\n", (long long)reg);
 
 	cxl_mmio_read64(afu_h, MMIO_DDCBQ_START_REG, &reg);
-	VERBOSE0(" DDCBQ Start Reg:    0x%016llx\n", (long long)reg);
+	fprintf(fp, " DDCBQ Start Reg:    0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_DDCBQ_CONFIG_REG, &reg);
-	VERBOSE0(" DDCBQ Conf Reg:     0x%016llx\n", (long long)reg);
+	fprintf(fp, " DDCBQ Conf Reg:     0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_DDCBQ_COMMAND_REG, &reg);
-	VERBOSE0(" DDCBQ Cmd Reg:      0x%016llx\n", (long long)reg);
+	fprintf(fp, " DDCBQ Cmd Reg:      0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_DDCBQ_STATUS_REG, &reg);
-	VERBOSE0(" DDCBQ Stat Reg:     0x%016llx\n", (long long)reg);
+	fprintf(fp, " DDCBQ Stat Reg:     0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_DDCBQ_CID_REG, &reg);
-	VERBOSE0(" DDCBQ Context ID:   0x%016llx\n", (long long)reg);
+	fprintf(fp, " DDCBQ Context ID:   0x%016llx\n", (long long)reg);
 	cxl_mmio_read64(afu_h, MMIO_DDCBQ_WT_REG, &reg);
-	VERBOSE0(" DDCBQ WT Reg:       0x%016llx\n", (long long)reg);
+	fprintf(fp, " DDCBQ WT Reg:       0x%016llx\n", (long long)reg);
 
 	for (i = 0; i < MMIO_FIR_REGS_NUM; i++) {
 		addr = MMIO_FIR_REGS_BASE + (uint64_t)(i * 8);
 		cxl_mmio_read64(afu_h, addr, &reg);
-		VERBOSE0(" FIR Reg [%08llx]: 0x%016llx\n",
+		fprintf(fp, " FIR Reg [%08llx]: 0x%016llx\n",
 			(long long)addr, (long long)reg);
 	}
 }
@@ -439,7 +439,7 @@ static int __afu_open(struct dev_ctx *ctx)
 	ctx->app_id = mmio_dat;		/* Save it */
 
 	if (libddcb_verbose > 1)
-		afu_print_status(ctx->afu_h);
+		afu_print_status(ctx->afu_h, stderr);
 	ctx->verify = ctx;
 	VERBOSE1("       [%s] Exit rc: %d\n", __func__, rc);
 	return DDCB_OK;
@@ -507,7 +507,7 @@ static inline int __afu_close(struct dev_ctx *ctx, bool force)
 		}
 	}
 	if (libddcb_verbose > 1)
-		afu_print_status(ctx->afu_h);
+		afu_print_status(ctx->afu_h, stderr);
 
 	cxl_mmio_unmap(afu_h);
 	cxl_afu_free(afu_h);
@@ -995,7 +995,7 @@ static int __ddcb_process_irqs(struct dev_ctx *ctx)
 		 */
 		if (rc < 0) {
 			VERBOSE0("ERROR: waiting for interrupt! rc: %d\n", rc);
-			afu_print_status(ctx->afu_h);
+			afu_print_status(ctx->afu_h, stderr);
 			__ddcb_done_post(ctx, DDCB_ERR_SELECTFAIL);
 			continue;
 		}
@@ -1038,7 +1038,7 @@ static int __ddcb_process_irqs(struct dev_ctx *ctx)
 				ctx->event.fault.flags,
 				(long long)ctx->event.fault.addr,
 				(long long)ctx->event.fault.dsisr);
-			afu_print_status(ctx->afu_h);
+			afu_print_status(ctx->afu_h, stderr);
 			afu_dump_queue(ctx);
 			rt_trace_dump();
 			__ddcb_done_post(ctx, DDCB_ERR_EVENTFAIL);
@@ -1048,7 +1048,7 @@ static int __ddcb_process_irqs(struct dev_ctx *ctx)
 				 "error: 0x%016llx\n",
 				ctx->event.afu_error.flags,
 				(long long)ctx->event.afu_error.error);
-			afu_print_status(ctx->afu_h);
+			afu_print_status(ctx->afu_h, stderr);
 			__ddcb_done_post(ctx, DDCB_ERR_EVENTFAIL);
 			break;
 		default:
@@ -1265,6 +1265,22 @@ static uint64_t _card_get_frequency(void *card_data __attribute__((unused)))
 	return 250 * 1000000;
 }
 
+
+static void card_dump_hardware_version(void *card_data, FILE *fp)
+{
+	struct ttxs *ttx = (struct ttxs*)card_data;
+	struct	dev_ctx *ctx;
+
+	if (!(ttx && (ttx->verify == ttx)))
+		return;
+
+	ctx = ttx->ctx;
+	if (!ctx)
+		return;
+
+	afu_print_status(ctx->afu_h, fp);
+}
+
 static int card_pin_memory(void *card_data __attribute__((unused)),
 			   const void *addr __attribute__((unused)),
 			   size_t size __attribute__((unused)),
@@ -1334,6 +1350,7 @@ static struct ddcb_accel_funcs accel_funcs = {
 	.card_get_app_id = _card_get_app_id,
 	.card_get_queue_work_time = _card_get_queue_work_time,
 	.card_get_frequency = _card_get_frequency,
+	.card_dump_hardware_version = card_dump_hardware_version,
 	.card_pin_memory = card_pin_memory,
 	.card_unpin_memory = card_unpin_memory,
 	.card_malloc = card_malloc,

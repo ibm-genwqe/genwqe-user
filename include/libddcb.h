@@ -253,6 +253,7 @@ uint64_t accel_get_app_id(accel_t card);
  */
 uint64_t accel_get_queue_work_time(accel_t card);
 uint64_t accel_get_frequency(accel_t card);
+void accel_dump_hardware_version(accel_t card, FILE *fp);
 
 /**
  * @brief Prepare buffer to do DMA transactions. The driver will
@@ -353,6 +354,7 @@ struct ddcb_accel_funcs {
 	uint64_t (* card_get_app_id)(void *card_data);
 	uint64_t (* card_get_queue_work_time)(void *card_data); /* ticks */
 	uint64_t (* card_get_frequency)(void *card_data); /* Hz */
+	void (* card_dump_hardware_version)(void *card_data, FILE *fp);
 
 	/* Not all DDCB accelerators have this, GenWQE has it, but
 	   CAPI does not. If not executed wrapper functions will

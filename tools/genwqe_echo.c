@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <time.h>
 #include <signal.h>
 #include <sys/time.h>
@@ -61,6 +62,7 @@ static void usage(const char *prog)
 	       "for System p\n"
 	       "  -q, --quiet            quiece output\n"
 	       "  -V, --version\n"
+	       "  -H, --hardware-version\n"
 	       "  -c, --count=COUNT\n"
 	       "  -X, --cpu=CPU          only run on this CPU number\n"
 	       "  -D, --debug            create extended debug data on failure\n"
@@ -227,6 +229,7 @@ int main(int argc, char *argv[])
 	int card_type = DDCB_TYPE_GENWQE;
 	int preload = 1;
 	int flood = 0;
+	bool print_hardware_version = false;
 	int quiet = 0;
 	int exit_on_err = 0;
 	unsigned long count = 0;
@@ -262,6 +265,7 @@ int main(int argc, char *argv[])
 
 			/* misc/support */
 			{ "version",	no_argument,       NULL, 'V' },
+			{ "hardware-version", no_argument, NULL, 'H' },
 			{ "debug",	no_argument,	   NULL, 'D' },
 			{ "quiet",	no_argument,	   NULL, 'q' },
 			{ "verbose",	no_argument,       NULL, 'v' },
@@ -270,10 +274,10 @@ int main(int argc, char *argv[])
 		};
 
 #if defined (CONFIG_BUILD_4TEST)
-		ch = getopt_long(argc, argv, "DC:A:c:fhl:i:s:qvX:Vu:e",
+		ch = getopt_long(argc, argv, "DC:A:c:fhl:i:s:qvX:HVu:e",
 				long_options, &option_index);
 #else
-		ch = getopt_long(argc, argv, "DC:A:c:fhl:i:s:qvX:V",
+		ch = getopt_long(argc, argv, "DC:A:c:fhl:i:s:qvX:HV",
 				long_options, &option_index);
 #endif
 		if (ch == -1)	/* all params processed ? */
@@ -349,7 +353,9 @@ int main(int argc, char *argv[])
 			usage(argv[0]);
 			exit(EXIT_SUCCESS);
 			break;
-
+		case 'H':
+			print_hardware_version = true;
+			break;
 		default:
 			usage(argv[0]);
 			exit(EXIT_FAILURE);
@@ -374,6 +380,11 @@ int main(int argc, char *argv[])
 		rc = err_code;
 		goto err_out;
 	}
+	if (print_hardware_version) {
+		accel_dump_hardware_version(card, stderr);
+		goto close_card;
+	}
+
 
 	/* Note: I want to be able to send to an illegal unit as a
 	   testcase */
@@ -419,7 +430,6 @@ int main(int argc, char *argv[])
 	wtime_e = accel_get_queue_work_time(card);
 	frequency = accel_get_frequency(card);
 	wtime_usec = frequency ? (wtime_e - wtime_s) / (frequency/1000000) : 0;
-	accel_close(card);
 
 	if (!flood && !quiet)
 		printf("\n");
@@ -435,6 +445,9 @@ int main(int argc, char *argv[])
 		       100 * (packets_send - packets_received)/packets_send,
 		       wtime_usec);
 	}
+
+ close_card:
+	accel_close(card);
 
 	if (rc != DDCB_OK)
 		exit(EXIT_FAILURE);

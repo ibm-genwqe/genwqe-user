@@ -113,6 +113,20 @@ static uint64_t _card_get_frequency(void *card_data)
 	return speed_grade[speed] * 1000000;  /* in Hz */
 }
 
+static void card_dump_hardware_version(void *card_data, FILE *fp)
+{
+	uint64_t slu_unitcfg;
+	uint64_t app_unitcfg;
+
+	slu_unitcfg = card_read_reg64(card_data, IO_SLU_UNITCFG, NULL);
+	app_unitcfg = card_read_reg64(card_data, IO_APP_UNITCFG, NULL);
+
+	fprintf(fp,
+		" Version Reg:        0x%016llx\n"
+		" Appl. Reg:          0x%016llx\n",
+		(long long)slu_unitcfg, (long long)app_unitcfg);
+}
+
 /**
  * Special formular is required to get the right time for our GenWQE
  * implementation.
@@ -167,6 +181,7 @@ static struct ddcb_accel_funcs accel_funcs = {
 	.card_get_app_id = _card_get_app_id,
 	.card_get_queue_work_time = _card_get_queue_work_time,
 	.card_get_frequency = _card_get_frequency,
+	.card_dump_hardware_version = card_dump_hardware_version,
 	.card_pin_memory = card_pin_memory,
 	.card_unpin_memory = card_unpin_memory,
 	.card_malloc = card_malloc,
