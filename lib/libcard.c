@@ -895,10 +895,10 @@ static void *__health_thread(void *data)
 		ts.tv_sec += 4;
 		rc = sem_timedwait(&ld->health_sem, &ts);
 
-		//if (rc < 0)
-		fprintf(stderr, "sem_timedwait ... returned %d: %s\n",
-			rc, rc == -1 ? strerror(errno) : "OK");
-
+		/*
+		 * fprintf(stderr, "sem_timedwait ... returned %d: %s\n",
+		 *         rc, rc == -1 ? strerror(errno) : "OK");
+		 */
 		pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
 		pthread_mutex_lock(&ld->fds_mutex);
 		__fixup_fd_lists(ld);
