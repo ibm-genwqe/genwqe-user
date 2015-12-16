@@ -885,7 +885,7 @@ static void *__health_thread(void *data)
 	struct lib_data_t *ld = (struct lib_data_t *)data;
 
 	while (1) {
-		int rc;
+		/* int rc; */
 		struct timespec ts;
 
 		/* INOTIFY: Block, inotify and signal handler will post me */
@@ -893,12 +893,13 @@ static void *__health_thread(void *data)
 			perror("clock_gettime");
 
 		ts.tv_sec += 4;
-		rc = sem_timedwait(&ld->health_sem, &ts);
+		sem_timedwait(&ld->health_sem, &ts);
 
 		/*
 		 * fprintf(stderr, "sem_timedwait ... returned %d: %s\n",
 		 *         rc, rc == -1 ? strerror(errno) : "OK");
 		 */
+
 		pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
 		pthread_mutex_lock(&ld->fds_mutex);
 		__fixup_fd_lists(ld);
@@ -909,6 +910,7 @@ static void *__health_thread(void *data)
 
 	pr_info("%s exit S: %p:%d M: %p:%d\n", __func__,
 		s_dev_head, ld->fd_s_count, m_dev_head, ld->fd_m_count);
+
 	pthread_exit(&ld->thread_rc);
 }
 
