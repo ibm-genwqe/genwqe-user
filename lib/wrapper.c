@@ -365,12 +365,25 @@ static void __print_stats(void)
 		pr_info("  deflate_total_out %4i KiB: %ld\n",
 			(i + 1) * 4, s->deflate_total_out[i]);
 	}
-	pr_info("deflateReset: %ld\n", s->deflateReset);
-	pr_info("deflateParams: %ld\n", s->deflateParams);
-	pr_info("deflateSetDictionary: %ld\n", s->deflateSetDictionary);
-	pr_info("deflateSetHeader: %ld\n", s->deflateSetHeader);
-	pr_info("deflatePrime: %ld\n", s->deflatePrime);
-	pr_info("deflateCopy: %ld\n", s->deflateCopy);
+	if (s->deflateReset)
+		pr_info("deflateReset: %ld\n", s->deflateReset);
+
+	if (s->deflateParams)
+		pr_info("deflateParams: %ld\n", s->deflateParams);
+
+	if (s->deflateSetDictionary)
+		pr_info("deflateSetDictionary: %ld\n",
+			s->deflateSetDictionary);
+
+	if (s->deflateSetHeader)
+		pr_info("deflateSetHeader: %ld\n", s->deflateSetHeader);
+
+	if (s->deflatePrime)
+		pr_info("deflatePrime: %ld\n", s->deflatePrime);
+
+	if (s->deflateCopy)
+		pr_info("deflateCopy: %ld\n", s->deflateCopy);
+
 	pr_info("deflateEnd: %ld\n", s->deflateEnd);
 
 	pr_info("inflateInit: %ld\n", s->inflateInit);
@@ -402,20 +415,46 @@ static void __print_stats(void)
 		pr_info("  inflate_total_out %4i KiB: %ld\n",
 			(i + 1) * 4, s->inflate_total_out[i]);
 	}
-	pr_info("inflateReset: %ld\n", s->inflateReset);
-	pr_info("inflateReset2: %ld\n", s->inflateReset2);
-	pr_info("inflateSetDictionary: %ld\n", s->inflateSetDictionary);
-	pr_info("inflateGetDictionary: %ld\n", s->inflateGetDictionary);
-	pr_info("inflateGetHeader: %ld\n", s->inflateGetHeader);
-	pr_info("inflateSync: %ld\n", s->inflateSync);
-	pr_info("inflatePrime: %ld\n", s->inflatePrime);
-	pr_info("inflateCopy: %ld\n", s->inflateCopy);
+
+	if (s->inflateReset)
+		pr_info("inflateReset: %ld\n", s->inflateReset);
+
+	if (s->inflateReset2)
+		pr_info("inflateReset2: %ld\n", s->inflateReset2);
+
+	if (s->inflateSetDictionary)
+		pr_info("inflateSetDictionary: %ld\n",
+			s->inflateSetDictionary);
+
+	if (s->inflateGetDictionary)
+		pr_info("inflateGetDictionary: %ld\n",
+			s->inflateGetDictionary);
+
+	if (s->inflateGetHeader)
+		pr_info("inflateGetHeader: %ld\n", s->inflateGetHeader);
+
+	if (s->inflateSync)
+		pr_info("inflateSync: %ld\n", s->inflateSync);
+
+	if (s->inflatePrime)
+		pr_info("inflatePrime: %ld\n", s->inflatePrime);
+
+	if (s->inflateCopy)
+		pr_info("inflateCopy: %ld\n", s->inflateCopy);
+
 	pr_info("inflateEnd: %ld\n", s->inflateEnd);
 
-	pr_info("adler32: %ld\n", s->adler32);
-	pr_info("adler32_combine: %ld\n", s->adler32_combine);
-	pr_info("crc32: %ld\n", s->crc32);
-	pr_info("crc32_combine: %ld\n", s->crc32_combine);
+	if (s->adler32)
+		pr_info("adler32: %ld\n", s->adler32);
+
+	if (s->adler32_combine)
+		pr_info("adler32_combine: %ld\n", s->adler32_combine);
+
+	if (s->crc32)
+		pr_info("crc32: %ld\n", s->crc32);
+
+	if (s->crc32_combine)
+		pr_info("crc32_combine: %ld\n", s->crc32_combine);
 
 	pthread_mutex_unlock(&stats_mutex);
 }
