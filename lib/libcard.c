@@ -368,7 +368,10 @@ static int __fd_m_head(struct card_dev_t *dev)
 	return fd;
 }
 
-/* Get a fd in multi fd (Redundant) Mode and increment to next */
+/*
+ * Note: fds_mutex must be held. Get a fd in multi fd (Redundant)
+ * Mode and increment to next fd.
+ */
 static int __fd_m_get_and_inc(struct card_dev_t *dev, int *card_num)
 {
 	struct fd_node *now, *next;
@@ -1024,16 +1027,16 @@ static int __genwqe_open_all(struct card_dev_t *dev)
 }
 
 /**
- * Check correctness of the application id.
- *
+ * Check correctness of the application id. This function must not be
+ * verbose. It already returns a meaningful return code to indicate
+ * that the id was not right.
  */
 static int __card_check_app(struct card_dev_t *dev,
 		uint64_t app_id, uint64_t mask)
 {
 	if ((dev->app_id & mask) != (app_id & mask)) {
-		pr_err("Wrong AppID: %016llx Expect: %016llx Mask: %016llx "
-			"on fd %d\n",
-			(unsigned long long)dev->app_id,
+		pr_info("Wrong AppID: %016llx Expect: %016llx Mask: %016llx "
+			"on fd %d\n", (unsigned long long)dev->app_id,
 			(unsigned long long)app_id,
 			(unsigned long long)mask,
 			dev->fd_s);
@@ -1415,6 +1418,15 @@ static int __genwqe_card_execute(card_handle_t dev,
 		dev->drv_errno = errno;
 		dev->drv_rc = rc;
 		if (rc < 0) {
+			/*
+			 * Check all filedescriptors and close the
+			 * non-working ones. Retrying makes only sense
+			 * with a valid list of working cards. If this
+			 * is not done, it happened that we retried
+			 * with an card in trouble ...
+			 */
+			sem_post(&ld->health_sem);
+
 			if (GENWQE_CARD_REDUNDANT == dev->card_no) {
 				/*
 				 * We can try to use next card in case
