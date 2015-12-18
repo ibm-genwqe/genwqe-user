@@ -1403,6 +1403,7 @@ static int __genwqe_card_execute(card_handle_t dev,
 	int	rc, fd, fd2, card_num;
 	struct	genwqe_ddcb_cmd *cmd;
 	struct	timeval ts, te;	/* Start and End time */
+	struct lib_data_t *ld = &lib_data;
 
 	if (NULL == dev)
 		return GENWQE_ERR_EXEC_DDCB;
@@ -1456,8 +1457,9 @@ static int __genwqe_card_execute(card_handle_t dev,
 				card_retried_ddcbs[card_num]++;
 				goto retry;
 			}
-			pr_warn("%s exit fault: %d fd: %d\n", __func__,
-				errno, fd);
+			pr_err("%s exit fault: %d fd: %d rc: %d card_no: %d\n",
+			       __func__, errno, fd, rc, dev->card_no);
+
 			return GENWQE_ERR_EXEC_DDCB;
 		}
 		card_completed_ddcbs[card_num]++;
