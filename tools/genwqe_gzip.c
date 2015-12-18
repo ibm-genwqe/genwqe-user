@@ -654,7 +654,17 @@ int main(int argc, char **argv)
 	int extra_len = 0;
 	struct stat s;
 	const char *accel = "GENWQE";
+	const char *accel_env = getenv("ZLIB_ACCELERATOR");
 	int card_no = 0;
+	const char *card_no_env = getenv("ZLIB_CARD");
+
+	/* Use environment variables as defaults. Command line options
+	   can than overrule this. */
+	if (accel_env != NULL)
+		accel = accel_env;
+
+	if (card_no_env != NULL)
+		card_no = atoi(card_no_env);
 
 	/* avoid end-of-line conversions */
 	SET_BINARY_MODE(stdin);
