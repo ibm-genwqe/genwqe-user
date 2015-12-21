@@ -76,6 +76,9 @@
 #include "card_defs.h"
 #include "libcard.h"
 
+//#define CONFIG_USE_SIGNAL
+#undef CONFIG_USE_SIGNAL
+
 #define CRC32_POLYNOMIAL	0x20044009
 #define	MAX_GENWQ_CARDS	16
 #define	MAX_VFUNCTIONS	16
@@ -111,7 +114,6 @@ enum inotify_ev {INOTIFY_IDLE, INOTIFY_ATTRIB};
 struct lib_data_t {
 	uint32_t crc32_tab[256];	/* CRC32 calculation table */
 	pthread_t thread_id;		/* Thread id of Health thread or -1 */
-	bool	health_exit;		/* Set to True on Exit req. */
 	sem_t	health_sem;		/* Sem to post healt thread */
 	int	thread_rc;
 	pthread_mutex_t fds_mutex;	/* Lock Mutex */
@@ -123,8 +125,11 @@ struct lib_data_t {
 
 	/* State of each card */
 	enum genwqe_fd_state genwqe_state[MAX_FUNC_NUM];
+
+#if defined(CONFIG_USE_SIGNAL)
 	struct sigaction oldact;	/* Used for sigio */
 	struct sigaction newact;	/* Used for sigio */
+#endif
 
 	/* more data for inotify */
 	int	inotify_rc;		/* rc form inotify_thread */
@@ -133,7 +138,6 @@ struct lib_data_t {
 	int	inotify_card;		/* the decimal card num (0..256) */
 	pthread_t	inotify_tid;	/* tid form _inotify_thread */
 	enum	inotify_ev inotify_event;	/* IDLE or CREATE or DELETE */
-	bool	inotify_run;		/* Flag set to true if inotify runs */
 };
 
 /* This is a list of fd's when i run in Multi (Redundant) Mode */
@@ -150,9 +154,13 @@ static struct dev_card_t *m_dev_head = NULL;	/* Head for Multi Mode */
 static struct fd_node *__fd_m_list = NULL;
 
 /* statistics */
-static unsigned int card_completed_ddcbs = 0;
-static unsigned int card_retried_ddcbs = 0;
+#define NUM_CARDS 16 /* max number of GenWQE cards in system */
+static unsigned int card_completed_ddcbs[NUM_CARDS] = { 0, };
+static unsigned int card_retried_ddcbs[NUM_CARDS] = { 0, };
+
+#if defined(CONFIG_USE_SIGNAL)
 static unsigned int card_health_signal = 0;
+#endif
 
 static int _dbg_flag;
 
@@ -234,26 +242,32 @@ static int __mode_2_omode(int mode)
 
 static int __genwqe_dev_open(int card_no, int mode)
 {
-	int fd, oflags, omode;
+	int fd;
+	int omode;
 	char card_dev[256]; // temp dev name
 
 	omode = __mode_2_omode(mode);
 	snprintf(card_dev, sizeof(card_dev) - 1, CARD_DEVICE, card_no);
 	fd = open(card_dev, omode);
-	if (fd >= 0) {
-		if (GENWQE_MODE_ASYNC & mode) {
-			/* Set FASYNC flag to catch the SIGIO when a
-			   card gets removed */
-			fcntl(fd, F_SETOWN, getpid());
-			oflags = fcntl(fd, F_GETFL);
-			fcntl(fd, F_SETFL, oflags | FASYNC);
-		}
-		pr_info("__genwqe_dev_open: %s OK fd: %d "
-			"(omode: 0x%x mode: 0x%x)\n",
-			card_dev, fd, omode, mode);
-		return fd;
+	if (fd < 0)
+		return INVALID_FD;
+
+#if defined(CONFIG_USE_SIGNAL)
+	if (GENWQE_MODE_ASYNC & mode) {
+		int  oflags;
+
+		/*
+		 * Set FASYNC flag to catch the SIGIO when a card gets
+		 * removed.
+		 */
+		fcntl(fd, F_SETOWN, getpid());
+		oflags = fcntl(fd, F_GETFL);
+		fcntl(fd, F_SETFL, oflags | FASYNC);
 	}
-	return INVALID_FD;
+#endif
+	pr_info("__genwqe_dev_open: %s OK fd: %d (omode: 0x%x mode: 0x%x)\n",
+		card_dev, fd, omode, mode);
+	return fd;
 }
 
 static struct fd_node *__fd_m_new(struct fd_node *parent,
@@ -354,8 +368,11 @@ static int __fd_m_head(struct card_dev_t *dev)
 	return fd;
 }
 
-/* Get a fd in multi fd (Redundant) Mode and increment to next */
-static int __fd_m_get_and_inc(struct card_dev_t *dev)
+/*
+ * Note: fds_mutex must be held. Get a fd in multi fd (Redundant)
+ * Mode and increment to next fd.
+ */
+static int __fd_m_get_and_inc(struct card_dev_t *dev, int *card_num)
 {
 	struct fd_node *now, *next;
 	int    fd = INVALID_FD;		// Set to INVALID
@@ -363,6 +380,9 @@ static int __fd_m_get_and_inc(struct card_dev_t *dev)
 	now = dev->m_fd_ptr;		// Get current Position of fd list
 	if (now) {
 		fd = now->m_fd;		// Take this fd
+		if (card_num)
+			*card_num = now->card_num;
+
 		next = now->next;	// Next
 		if (NULL == next)	// Check for end
 			next = __fd_m_list;	// Reset to Head
@@ -371,16 +391,19 @@ static int __fd_m_get_and_inc(struct card_dev_t *dev)
 	return fd;
 }
 
-static int __fd_get(struct card_dev_t *dev)
+static int __fd_get(struct card_dev_t *dev, int *card_num)
 {
 	struct lib_data_t *ld = &lib_data;
 	int	fd;
 
 	pthread_mutex_lock(&ld->fds_mutex);
 	if (GENWQE_CARD_REDUNDANT == dev->card_no)
-		fd = __fd_m_get_and_inc(dev);
-	else
+		fd = __fd_m_get_and_inc(dev, card_num);
+	else {
 		fd = dev->fd_s;	// Normal Mode, return fd_s
+		if (card_num)
+			*card_num = dev->card_no;
+	}
 	pthread_mutex_unlock(&ld->fds_mutex);
 	return fd;
 }
@@ -543,6 +566,8 @@ static void __node_delete(struct card_dev_t *node, void **head)
 }
 
 /* ------------------------- START of Health Function's -------------------- */
+
+#if defined(CONFIG_USE_SIGNAL)
 /**
  * FIXME The next task we need to solve is to figure out which
  * file-descriptor is actually broken, when we are receving SIGIO.
@@ -563,6 +588,7 @@ static void __health_sa_sigaction(int sig, siginfo_t *si, void *data)
 	card_health_signal++;
 	sem_post(&ld->health_sem);
 }
+#endif
 
 /*
  * Function:	__inotify_handle()
@@ -597,6 +623,7 @@ static int __mhealth_check(struct lib_data_t *ld)
 	pr_info("%s Enter %d open Fd's.\n", __func__, ld->fd_m_count);
 
 	__inotify_handle(ld);	// handle events from inotify
+
 	/* Delete pending Close dev's */
 	dev = (struct card_dev_t *)m_dev_head;
 	while (dev) {
@@ -700,11 +727,13 @@ static int __shealth_check(struct lib_data_t *ld)
 	return 0;
 }
 
+#if defined(CONFIG_USE_SIGNAL)
 static void __inotify_termination_handler(int signum)
 {
 	/* struct lib_data_t *ld = &lib_data; */  /* global variable */
 	pr_info("%s Signum: %d \n", __func__, signum);
 }
+#endif
 
 /*
  * Function: __inotify_handle_event()
@@ -720,32 +749,29 @@ static void __inotify_handle_event(int len, char *buf, struct lib_data_t *ld)
 	pr_info("__inotify_handle_event %d\n", len);
 	while (i < len) {
 		ie = (struct inotify_event*) &buf[i];
-		if (ie->mask & IN_ATTRIB) {
-			if (ie->len > 0) {
-				n = sscanf(ie->name,
-					   GENWQE_DEVNAME"%d", &card);
-				if (1 == n) {
-					/* Make sure that the new card */
-					/* was gone before adding back in */
-					if (CARD_CLOSED ==
-					    ld->genwqe_state[card]) {
-						/* Create was done, ATTRIB, */
-						/* was set, Post
-						   Health Sem to Open
-						   again */
-						ld->inotify_card = card;
-						ld->inotify_event =
-							INOTIFY_ATTRIB;
-						/* post __inotify_handle */
-						usleep(50000);
-						/* !!! need some delay */
+		if ((ie->mask & IN_ATTRIB) && (ie->len > 0)) {
+			n = sscanf(ie->name,
+				   GENWQE_DEVNAME"%d", &card);
+			if (1 == n) {
+				/* Make sure that the new card */
+				/* was gone before adding back in */
+				if (CARD_CLOSED ==
+				    ld->genwqe_state[card]) {
+					/* Create was done, ATTRIB, */
+					/* was set, Post Health Sem to
+					   Open again */
+					ld->inotify_card = card;
+					ld->inotify_event = INOTIFY_ATTRIB;
 
-						pr_info("%s Start Health "
-							"Thread for new "
-							"Card: %s\n",
-							__func__, ie->name);
-						sem_post(&ld->health_sem);
-					}
+					/* post __inotify_handle */
+					usleep(50000);
+					/* !!! need some delay */
+
+					pr_info("%s Start Health "
+						"Thread for new "
+						"Card: %s\n",
+						__func__, ie->name);
+					sem_post(&ld->health_sem);
 				}
 			}
 		}
@@ -763,9 +789,12 @@ static void *__inotify_thread(void *data)
 	int	len, rc;
 	struct lib_data_t *ld = (struct lib_data_t *)data;
 	char buf[sizeof(struct inotify_event) + PATH_MAX];
-	struct sigaction action;
-	sigset_t	sigmask, sig_empty_mask;
 	fd_set rfds;
+	sigset_t sig_empty_mask;
+
+#if defined(CONFIG_USE_SIGNAL)
+	struct sigaction action;
+	sigset_t sigmask;
 
 	sigemptyset(&sigmask);
 	sigaddset(&sigmask, SIGUSR1);
@@ -777,9 +806,9 @@ static void *__inotify_thread(void *data)
 	sigaction(SIGUSR1, &action, NULL); /* set SIGUSR1 to kill me */
 
 	sigemptyset(&sig_empty_mask);
+#endif
 
-	ld->inotify_run = true;
-	while (ld->inotify_run) { /* Exit because of sig handler */
+	while (1) { /* Exit because of sig handler */
 		FD_ZERO(&rfds);
 		FD_SET(ld->inotify_fd, &rfds);	/* Set fd */
 		rc = pselect(FD_SETSIZE, &rfds, NULL, NULL, NULL,
@@ -800,9 +829,8 @@ static void *__inotify_thread(void *data)
 			}
 		}
 	}
-	inotify_rm_watch(ld->inotify_fd, ld->inotify_wd);
-	pr_info("%s exit fd: %d wd: %d\n", __func__,
-		ld->inotify_fd, ld->inotify_wd);
+	pr_info("%s exit fd: %d wd: %d\n", __func__, ld->inotify_fd,
+		ld->inotify_wd);
 	pthread_exit(&ld->inotify_rc);
 }
 
@@ -838,6 +866,17 @@ static void __inotify_create(struct lib_data_t *ld)
 	return;
 }
 
+static void __fixup_fd_lists(struct lib_data_t *ld)
+{
+	pr_info("%s fd_s_count: %d fd_m_count: %d\n",
+		__func__, ld->fd_s_count, ld->fd_m_count);
+	/* Check m_list if there, only check s_list if no m_list */
+	if (m_dev_head)
+		__mhealth_check(ld);
+	else if (s_dev_head)
+		__shealth_check(ld);
+}
+
 /*
  * Function: __health_thread()
  *	runs every 10 second or when it gets a post from
@@ -849,50 +888,32 @@ static void *__health_thread(void *data)
 	struct lib_data_t *ld = (struct lib_data_t *)data;
 
 	while (1) {
+		/* int rc; */
+		struct timespec ts;
+
 		/* INOTIFY: Block, inotify and signal handler will post me */
-		sem_wait(&ld->health_sem);
+		if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
+			perror("clock_gettime");
+
+		ts.tv_sec += 4;
+		sem_timedwait(&ld->health_sem, &ts);
+
+		/*
+		 * fprintf(stderr, "sem_timedwait ... returned %d: %s\n",
+		 *         rc, rc == -1 ? strerror(errno) : "OK");
+		 */
+
+		pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
 		pthread_mutex_lock(&ld->fds_mutex);
-		pr_info("%s fd_s_count: %d fd_m_count: %d\n",
-			__func__, ld->fd_s_count, ld->fd_m_count);
-		/* Check m_list if there, olny check s_list if no m_list */
-		if (m_dev_head)
-			__mhealth_check(ld);
-		else if (s_dev_head)
-			__shealth_check(ld);
-		if (true == ld->health_exit) {
-			/* need Unlock */
-			pthread_mutex_unlock(&ld->fds_mutex);
-			break;	/* Exit called by destructor */
-		}
+		__fixup_fd_lists(ld);
 		pthread_mutex_unlock(&ld->fds_mutex);
+		pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
 	}
-	sigaction(SIGIO, &ld->oldact, NULL);
 
-	/* Check if inotify thread is active */
-	if ((pthread_t)-1 != ld->inotify_tid) {
-		/* Wait until tread is running, than send kill signal */
-		while(1) {
-			if (true == ld->inotify_run) {
-				 /* Make sure to exit */
-				ld->inotify_run = false;
-
-				/* Send kill Signal */
-				pthread_kill(ld->inotify_tid, SIGUSR1);
-
-				/* and wait to Join */
-				pthread_join(ld->inotify_tid, NULL);
-				ld->inotify_tid = -1;
-				break;
-			} else {
-				pr_warn("Waiting for inotify Thread to "
-					"enter Run State\n");
-				usleep(10000);
-			}
-		}
-	}
 
 	pr_info("%s exit S: %p:%d M: %p:%d\n", __func__,
 		s_dev_head, ld->fd_s_count, m_dev_head, ld->fd_m_count);
+
 	pthread_exit(&ld->thread_rc);
 }
 
@@ -911,22 +932,31 @@ static void *__health_thread(void *data)
  */
 static int __health_thread_start(struct lib_data_t *ld)
 {
+	int rc;
+
 	if ((pthread_t)-1 != ld->thread_id)
 		return 0;	// Thread already running
 
-	ld->health_exit = false;
-	if (0 == sem_init(&ld->health_sem, 0, 0)) {
-		if (0 == pthread_create(&ld->thread_id, NULL,
-				&__health_thread, ld)) {
-			sigemptyset(&ld->newact.sa_mask);
-			ld->newact.sa_sigaction = __health_sa_sigaction;
-			ld->newact.sa_flags = SA_SIGINFO;
-			if (0 == sigaction(SIGIO, &ld->newact, &ld->oldact))
-				return 0;
-		}
-	}
+	rc = sem_init(&ld->health_sem, 0, 0);
+	if (0 != rc)
+		goto err_out;
+
+	rc = pthread_create(&ld->thread_id, NULL, &__health_thread, ld);
+	if (0 != rc)
+		goto err_out;
+
+#if defined(CONFIG_USE_SIGNAL)
+	sigemptyset(&ld->newact.sa_mask);
+	ld->newact.sa_sigaction = __health_sa_sigaction;
+	ld->newact.sa_flags = SA_SIGINFO;
+	if (0 == sigaction(SIGIO, &ld->newact, &ld->oldact))
+		return 0;
+#endif
+	return 0;
+
+ err_out:
 	ld->thread_id = -1;
-	pr_err("%s failed.\n", __func__);
+	pr_err("%s failed rc=%d\n", __func__, rc);
 	return -1;
 }
 
@@ -997,16 +1027,16 @@ static int __genwqe_open_all(struct card_dev_t *dev)
 }
 
 /**
- * Check correctness of the application id.
- *
+ * Check correctness of the application id. This function must not be
+ * verbose. It already returns a meaningful return code to indicate
+ * that the id was not right.
  */
 static int __card_check_app(struct card_dev_t *dev,
 		uint64_t app_id, uint64_t mask)
 {
 	if ((dev->app_id & mask) != (app_id & mask)) {
-		pr_err("Wrong AppID: %016llx Expect: %016llx Mask: %016llx "
-			"on fd %d\n",
-			(unsigned long long)dev->app_id,
+		pr_info("Wrong AppID: %016llx Expect: %016llx Mask: %016llx "
+			"on fd %d\n", (unsigned long long)dev->app_id,
 			(unsigned long long)app_id,
 			(unsigned long long)mask,
 			dev->fd_s);
@@ -1091,7 +1121,7 @@ int genwqe_card_get_state(card_handle_t dev, enum genwqe_card_state *state)
 	if (NULL == dev)
 		return GENWQE_ERR_INVAL;
 
-	fd = __fd_get(dev);
+	fd = __fd_get(dev, NULL);
 	dev->drv_rc = __genwqe_card_get_state(fd, state);
 	if (0 == dev->drv_rc)
 		return GENWQE_OK;
@@ -1295,7 +1325,7 @@ int genwqe_card_fileno(card_handle_t dev)
 	int fd = GENWQE_ERR_INVAL;
 
 	if (dev)
-		fd = __fd_get(dev);
+		fd = __fd_get(dev, NULL);
 	return fd;
 }
 
@@ -1328,7 +1358,7 @@ int genwqe_pin_memory(card_handle_t dev, const void *addr, size_t size,
 		(unsigned long)addr, (unsigned long)size, direction, dev);
 	if (dev) {
 		if (dev == dev->verify) {
-			fd = __fd_get(dev);
+			fd = __fd_get(dev, NULL);
 			pr_info("Card %d\n", dev->card_no);
 			dev->drv_rc = rc = ioctl(fd, GENWQE_PIN_MEM, &m);
 			dev->drv_errno = errno;
@@ -1354,7 +1384,7 @@ int genwqe_unpin_memory(card_handle_t dev, const void *addr, size_t size)
 			(unsigned long)addr, (unsigned long)size, dev);
 	if (dev) {
 		if (dev == dev->verify) {
-			fd = __fd_get(dev);
+			fd = __fd_get(dev, NULL);
 			pr_info("Card %d fd %d\n", dev->card_no, fd);
 			dev->drv_rc = rc = ioctl(fd, GENWQE_UNPIN_MEM, &m);
 			dev->drv_errno = errno;
@@ -1370,9 +1400,10 @@ int genwqe_unpin_memory(card_handle_t dev, const void *addr, size_t size)
 static int __genwqe_card_execute(card_handle_t dev,
 				 struct genwqe_ddcb_cmd *req, int func)
 {
-	int	rc, fd, fd2;
+	int	rc, fd, fd2, card_num;
 	struct	genwqe_ddcb_cmd *cmd;
 	struct	timeval ts, te;	/* Start and End time */
+	struct lib_data_t *ld = &lib_data;
 
 	if (NULL == dev)
 		return GENWQE_ERR_EXEC_DDCB;
@@ -1380,20 +1411,29 @@ static int __genwqe_card_execute(card_handle_t dev,
 		return GENWQE_ERR_EXEC_DDCB;
 
 	gettimeofday(&ts, NULL);
-	fd = __fd_get(dev);
+	fd = __fd_get(dev, &card_num);
 	cmd = req;
 	while (cmd != NULL) {
 	retry:			/* wait until DDCB is processed */
-		do {
-			rc = ioctl(fd, func, cmd);
-			dev->drv_errno = errno;
-			dev->drv_rc = rc;
-		} while (0);
+		rc = ioctl(fd, func, cmd);
+		dev->drv_errno = errno;
+		dev->drv_rc = rc;
 		if (rc < 0) {
+			/*
+			 * Check all filedescriptors and close the
+			 * non-working ones. Retrying makes only sense
+			 * with a valid list of working cards. If this
+			 * is not done, it happened that we retried
+			 * with an card in trouble ...
+			 */
+			sem_post(&ld->health_sem);
+
 			if (GENWQE_CARD_REDUNDANT == dev->card_no) {
-				/* I can try to use next card in case
-				   of Busy or error */
-				/* if Multi mode was enabled. */
+				/*
+				 * We can try to use next card in case
+				 * of Busy or error if Multi mode was
+				 * enabled.
+				 */
 				gettimeofday(&te, NULL);
 				if ((te.tv_sec - ts.tv_sec) >
 				    CONFIG_RETRY_TIMEOUT) { /* Timeout */
@@ -1402,23 +1442,27 @@ static int __genwqe_card_execute(card_handle_t dev,
 						__func__, errno, fd);
 					return GENWQE_ERR_EXEC_DDCB;
 				}
-				fd2 = __fd_get(dev); /* next fd from queue */
+
+				/* next fd from queue */
+				fd2 = __fd_get(dev, &card_num);
 				if (fd2 != fd)	     /* if there is a new fd */
 					fd = fd2;    /* swap to new fd */
-				else	usleep(1000000);/* no fd in queue */
+				else
+					usleep(1000000);/* no fd in queue */
 
-				card_retried_ddcbs++;
+				card_retried_ddcbs[card_num]++;
 				goto retry;	     /* and retry again */
 			}
 			if (errno == EBUSY) {
-				card_retried_ddcbs++;
+				card_retried_ddcbs[card_num]++;
 				goto retry;
 			}
-			pr_warn("%s exit fault: %d fd: %d\n", __func__,
-				errno, fd);
+			pr_err("%s exit fault: %d fd: %d rc: %d card_no: %d\n",
+			       __func__, errno, fd, rc, dev->card_no);
+
 			return GENWQE_ERR_EXEC_DDCB;
 		}
-		card_completed_ddcbs++;
+		card_completed_ddcbs[card_num]++;
 		cmd = (struct genwqe_ddcb_cmd *)(unsigned long)cmd->next_addr;
 	}
 
@@ -1981,7 +2025,6 @@ static void libcard_init(void)
 	ld->inotify_rc = 1;	/* Set to some other value than 0 */
 	ld->inotify_tid = -1;	/* No thread id */
 	ld->inotify_event = INOTIFY_IDLE;
-	ld->inotify_run = false;
 }
 
 /* destructor */
@@ -1992,25 +2035,42 @@ static void libcard_exit(void)
 
 	pr_info("%s Enter (s:%p m:%p fd:%p)\n",
 		__func__, s_dev_head, m_dev_head, __fd_m_list);
-	if ((pthread_t)-1 != ld->thread_id) {
-		pthread_mutex_lock(&ld->fds_mutex);
-		dev = (struct card_dev_t *)s_dev_head;
-		while (dev) {
-			pr_info("Request Single List: %p to close.\n", dev);
-			dev->dev_state = DEV_REQ_CLOSE;
-			dev = dev->next;
-		}
-		dev = (struct card_dev_t *)m_dev_head;
-		while (dev) {
-			pr_info("Request Multi List: %p to close.\n", dev);
-			dev->dev_state = DEV_REQ_CLOSE;
-			dev = dev->next;
-		}
-		ld->health_exit = true;
-		pthread_mutex_unlock(&ld->fds_mutex);
-		sem_post(&ld->health_sem);
-		pthread_join(ld->thread_id, NULL);
+
+	pthread_mutex_lock(&ld->fds_mutex);
+	dev = (struct card_dev_t *)s_dev_head;
+	while (dev) {
+		pr_info("Request Single List: %p to close.\n", dev);
+		dev->dev_state = DEV_REQ_CLOSE;
+		dev = dev->next;
 	}
+	dev = (struct card_dev_t *)m_dev_head;
+	while (dev) {
+		pr_info("Request Multi List: %p to close.\n", dev);
+		dev->dev_state = DEV_REQ_CLOSE;
+		dev = dev->next;
+	}
+	pthread_mutex_unlock(&ld->fds_mutex);
+
+	if (ld->inotify_tid != (pthread_t)-1) {
+		/* Send kill Signal to inotify thread */
+		pthread_cancel(ld->inotify_tid);
+		/* and wait to Join */
+		pthread_join(ld->inotify_tid, NULL);
+		ld->inotify_tid = -1;
+		inotify_rm_watch(ld->inotify_fd, ld->inotify_wd);
+	}
+	if (ld->thread_id != (pthread_t)-1) {
+		/* Send kill Signal to inotify thread */
+		pthread_cancel(ld->thread_id);
+		/* and wait to Join */
+		pthread_join(ld->thread_id, NULL);
+		ld->thread_id = -1;
+	}
+
+	pthread_mutex_lock(&ld->fds_mutex);
+	__fixup_fd_lists(ld);
+	pthread_mutex_unlock(&ld->fds_mutex);
+
 	pthread_mutex_destroy(&ld->fds_mutex);
 	pr_info("%s EXIT (s:%p m:%p fd:%p)\n",
 		__func__, s_dev_head, m_dev_head, __fd_m_list);
@@ -2055,11 +2115,20 @@ uint64_t card_get_app_id(card_handle_t dev)
 
 int genwqe_dump_statistics(FILE *fp)
 {
-	fprintf(fp,
-		"GenWQE card statistics\n"
-		"  Completed DDCBs: %d\n"
-		"  Retried DDCBs:   %d\n"
-		"  Health SIGIO:    %d\n",
-		card_completed_ddcbs, card_retried_ddcbs, card_health_signal);
+	int card_num;
+
+	fprintf(fp, "GenWQE card statistics\n");
+	for (card_num = 0; card_num < NUM_CARDS; card_num++) {
+		if ((card_completed_ddcbs[card_num] == 0) &&
+		    (card_retried_ddcbs[card_num] == 0))
+			continue;
+		fprintf(fp,
+			"  genwqe%u_card completed DDCBs: %5d retried: %5d\n",
+			card_num, card_completed_ddcbs[card_num],
+			card_retried_ddcbs[card_num]);
+	}
+#if defined(CONFIG_USE_SIGNAL)
+	fprintf(fp,"  Health SIGIO:    %d\n", card_health_signal);
+#endif
 	return 0;
 }

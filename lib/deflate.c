@@ -757,10 +757,10 @@ int zedc_deflate(zedc_streamp strm, int flush)
 		if ((rc < 0) || (cmd->retc == 0x000)) {
 			struct ddcb_cmd *cmd = &strm->cmd;
 
-			pr_err("deflate failed rc=%d\n"
+			pr_err("deflate failed rc=%d card_rc=%d\n"
 			       "  DDCB returned "
 			       "(RETC=%03x ATTN=%04x PROGR=%x) %s\n",
-			       rc, cmd->retc,
+			       rc, zedc->card_rc, cmd->retc,
 			       cmd->attn, cmd->progress,
 			       cmd->retc == 0x102 ? "" : "ERR");
 

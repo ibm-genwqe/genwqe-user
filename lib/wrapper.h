@@ -58,8 +58,7 @@
 
 /* Informational printouts */
 #define pr_info(fmt, ...) do {						\
-		fprintf(stderr, "%s:%u: Info: " fmt,			\
-			__FILE__, __LINE__, ## __VA_ARGS__);		\
+		fprintf(stderr, "Info: " fmt, ## __VA_ARGS__);		\
 	} while (0)
 
 /* Trace zlib wrapper code */
