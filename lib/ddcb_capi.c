@@ -481,7 +481,15 @@ static inline int __afu_close(struct dev_ctx *ctx, bool force)
 	}
 
 	if (0 != ctx->clients) {
-		VERBOSE0("[%s] ERROR: Closing AFU[%d] with %d clients!\n",
+		/*
+		 * Enable this warning only in verbose mode. We have a
+		 * testcase which does not close the afu handles
+		 * properly, but just does exit(). This can cause the
+		 * usage count still be != 0. Force is applied when
+		 * the library destructor is being called. That should
+		 * be fine.
+		 */
+		VERBOSE1("[%s] WARNING: Closing AFU[%d] with %d clients!\n",
 			 __func__, ctx->card_no, ctx->clients);
 		if (!force)
 			return DDCB_ERR_INVAL;
@@ -489,6 +497,7 @@ static inline int __afu_close(struct dev_ctx *ctx, bool force)
 
 	VERBOSE1("        [%s] Enter Card: %d Open Clients: %d\n",
 		__func__, ctx->card_no, ctx->clients);
+
 	mmio_dat = 0x2ull;	/* Stop !! */
 	cxl_mmio_write64(afu_h, MMIO_DDCBQ_COMMAND_REG, mmio_dat);
 	while (1) {
