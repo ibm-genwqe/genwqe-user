@@ -18,11 +18,10 @@ include ../config.mk
 
 instdir ?= /opt/genwqe
 zlibver=1.2.8
-
-CFLAGS += -fPIC -fno-strict-aliasing \
-	-DCONFIG_ZLIB_PATH=\"/opt/genwqe/lib/libz.so\"
-
 libversion = $(VERSION)
+
+CFLAGS += -fPIC -fno-strict-aliasing
+
 
 ### Accelerated libz implemenation (Accelerated Data Compression/ADC)
 libname=libzADC
