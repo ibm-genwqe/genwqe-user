@@ -111,11 +111,14 @@ endif
 
 # z_ prefixed version of libz, intended to be linked statically with
 # our libz version to provide the software zlib functionality.
+# Allow overwriting the ZLIB_PATH to the right libz.so file e.g. via
+# spec file during RPM build.
 #
 CONFIG_DLOPEN_MECHANISM ?= 1
+CONFIG_ZLIB_PATH ?= /opt/genwqe/lib/libz.so
 
 ifeq ($(CONFIG_DLOPEN_MECHANISM),1)
-CFLAGS += -DCONFIG_DLOPEN_MECHANISM
+CFLAGS += -DCONFIG_DLOPEN_MECHANISM -DCONFIG_ZLIB_PATH=\"$(CONFIG_ZLIB_PATH)\"
 else
 CONFIG_LIBZ_PATH=../zlib-1.2.8
 libz_a=libz_prefixed.o
