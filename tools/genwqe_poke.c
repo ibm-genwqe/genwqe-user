@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
 	int quiet = 0;
 	unsigned long i, count = 1;
 	unsigned long interval = 0;
-	int mode = DDCB_MODE_WR;	/* Default open mode for CAPI and GENWQE Card's */
+	int mode = DDCB_MODE_WR; /* Default mode for CAPI and GENWQE Card's */
 	int xerrno;
 
 	while (1) {

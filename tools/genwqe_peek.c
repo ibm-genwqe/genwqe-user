@@ -191,8 +191,9 @@ int main(int argc, char *argv[])
 	ddcb_debug(verbose_flag);
 
 	/* CAPI need's master flag for Poke */
-        if (DDCB_TYPE_CAPI == card_type)
-                mode |= DDCB_MODE_MASTER;
+	if (DDCB_TYPE_CAPI == card_type)
+		mode |= DDCB_MODE_MASTER;
+
 	card = accel_open(card_no, card_type, mode, &err_code,
 			  0, DDCB_APPL_ID_IGNORE);
 	if (card == NULL) {

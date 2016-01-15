@@ -692,6 +692,7 @@ static void *card_open(int card_no, unsigned int mode, int *card_rc,
 	 */
 	if (ttx->card_no != ACCEL_REDUNDANT) {
 		ttx->ctx = &my_ctx[card_no];  /* select card context */
+		ttx->ctx->mode = mode;
 		rc = __client_inc(ttx->ctx);
 		if (rc != DDCB_OK) {
 			free(ttx);
@@ -700,10 +701,11 @@ static void *card_open(int card_no, unsigned int mode, int *card_rc,
 	} else {
 		/* open all possible cards */
 		for (i = 0; i < NUM_CARDS; i++) {
+			my_ctx[ttx->card_next].mode = mode;
 			rc = __client_inc(&my_ctx[ttx->card_next]);
-			if (rc == DDCB_OK)  /* remember last one which is ok */
+			if (rc == DDCB_OK) { /* remember last which is ok */
 				ttx->ctx = &my_ctx[ttx->card_next];
-
+			}
 			ttx->card_next = (ttx->card_next + 1) %	NUM_CARDS;
 		}
 	}
