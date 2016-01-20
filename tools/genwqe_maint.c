@@ -141,8 +141,10 @@ static void afu_m_close(struct mdev_ctx *mctx)
 static int afu_check_stime(struct mdev_ctx *mctx)
 {
 	int	gsel, bsel = 0, ctx = 0;
-	uint64_t	gmask = 0, data = 0, stat_reg, err_reg;
+	uint64_t gmask = 0, data = 0, stat_reg, err_reg, mstat_reg;
 
+	mmio_read(mctx->afu_h, MMIO_MASTER_CTX_NUMBER,
+		MMIO_AFU_STATUS_REG, &mstat_reg);
 	for (gsel = 0; gsel < MMIO_CASV_REG_NUM; gsel++) {
 		gmask = 0;
 		mmio_read(mctx->afu_h, MMIO_MASTER_CTX_NUMBER,
@@ -153,7 +155,7 @@ static int afu_check_stime(struct mdev_ctx *mctx)
 			ctx = (gsel * 64) + bsel + 1;	/* Active */
 
 			mmio_read(mctx->afu_h, ctx, MMIO_DDCBQ_STATUS_REG, &stat_reg);
-			if (0 == stat_reg) {
+			if (0 == (stat_reg & 0xffffffff00000000ull)) {
 				VERBOSE2("AFU[%d:%d] master skip\n",
 					mctx->card, ctx);
 				continue;	/* Skip Master */
@@ -169,6 +171,9 @@ static int afu_check_stime(struct mdev_ctx *mctx)
 				(long long) stat_reg);
 			if (0 != err_reg)
 				VERBOSE0("DMA Error: 0x%llx", (long long)err_reg);
+			/* tainted if not 0 */
+			if (0 != mstat_reg)
+				VERBOSE0("MSTAT: 0x%llx", (long long)mstat_reg);
 			VERBOSE0("\n");
 			
 		}
