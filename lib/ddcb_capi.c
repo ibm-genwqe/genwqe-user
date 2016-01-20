@@ -684,8 +684,8 @@ static void *card_open(int card_no, unsigned int mode, int *card_rc,
  card_open_exit:
 	if (card_rc)
 		*card_rc = rc;
-	VERBOSE1("[%s] AFU[%d:%d] Exit ttx: %p\n", __func__,
-		card_no, ttx->ctx->cid_id, ttx);
+	VERBOSE1("[%s] AFU[%d] Exit ttx: %p\n", __func__,
+		card_no, ttx);
 	return ttx;
 }
 
