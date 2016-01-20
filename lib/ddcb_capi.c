@@ -823,7 +823,7 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 
 	while (1) {
 		if (0 == pthread_mutex_trylock(&ctx->lock)) break;
-		VERBOSE0("trylock failed\n");
+		VERBOSE1("trylock failed\n");
 		usleep(10);
 	}
 	idx = ctx->ddcb_out;
