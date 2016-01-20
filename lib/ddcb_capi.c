@@ -51,62 +51,33 @@
 #include <libddcb.h>
 #include <ddcb.h>
 #include <libcxl.h>
-#include <memcopy_ddcb.h>
+#include "afu_regs.h"
 
 #define CONFIG_DDCB_TIMEOUT	5  /* max time for a DDCB to be executed */
-
-#define MMIO_IMP_VERSION_REG	0x0000000ull
-#define MMIO_APP_VERSION_REG	0x0000008ull
-#define MMIO_AFU_CONFIG_REG	0x0000010ull
-#define MMIO_AFU_STATUS_REG	0x0000018ull
-#define MMIO_AFU_COMMAND_REG	0x0000020ull
-#define MMIO_FRT_REG		0x0000080ull
-
-#define MMIO_DDCBQ_START_REG	0x0000100ull
-#define MMIO_DDCBQ_CONFIG_REG	0x0000108ull
-#define MMIO_DDCBQ_COMMAND_REG	0x0000110ull
-#define MMIO_DDCBQ_STATUS_REG	0x0000118ull
-#define MMIO_DDCBQ_CID_REG	0x0000120ull	/* Context ID REG */
-#define MMIO_DDCBQ_WT_REG	0x0000180ull
-
-#define MMIO_FIR_REGS_BASE	0x0001000ull	/* FIR: 1000...1028 */
-#define MMIO_FIR_REGS_NUM	6
-
-#define MMIO_ERRINJ_MMIO_REG	0x0001800ull
-#define MMIO_ERRINJ_GZIP_REG	0x0001808ull
-
-#define	MMIO_AGRV_REGS_BASE	0x0002000ull
-#define	MMIO_AGRV_REGS_NUM	16
-
-#define	MMIO_GZIP_REGS_BASE	0x0002100ull
-#define	MMIO_GZIP_REGS_NUM	16
-
-#define MMIO_DEBUG_REG		0x000FF00ull
 
 #define	NUM_DDCBS	4
 
 extern int libddcb_verbose;
-extern FILE *libddcb_fd_out;
 
 #include <sys/syscall.h>   /* For SYS_xxx definitions */
 
 #define VERBOSE0(fmt, ...) do {						\
-		fprintf(libddcb_fd_out, fmt, ## __VA_ARGS__);		\
+		fprintf(stderr, fmt, ## __VA_ARGS__);		\
 	} while (0)
 
 #define VERBOSE1(fmt, ...) do {						\
 		if (libddcb_verbose > 0)				\
-			fprintf(libddcb_fd_out, fmt, ## __VA_ARGS__);	\
+			fprintf(stderr, fmt, ## __VA_ARGS__);	\
 	} while (0)
 
 #define VERBOSE2(fmt, ...) do {						\
 		if (libddcb_verbose > 1)				\
-			fprintf(libddcb_fd_out, fmt, ## __VA_ARGS__);	\
+			fprintf(stderr, fmt, ## __VA_ARGS__);	\
 	} while (0)
 
 #define VERBOSE3(fmt, ...) do {						\
 		if (libddcb_verbose > 3)				\
-			fprintf(libddcb_fd_out, fmt, ## __VA_ARGS__);	\
+			fprintf(stderr, fmt, ## __VA_ARGS__);	\
 	} while (0)
 
 #define __free(ptr) free((ptr))
@@ -338,20 +309,6 @@ static void afu_print_status(struct cxl_afu_h *afu_h, FILE *fp)
 		cxl_mmio_read64(afu_h, addr, &reg);
 		fprintf(fp, " FIR Reg [%08llx]: 0x%016llx\n",
 			(long long)addr, (long long)reg);
-	}
-}
-
-static void afu_check_status(struct cxl_afu_h *afu_h)
-{
-	int i;
-	uint64_t addr, reg;
-
-	for (i = 0; i < MMIO_FIR_REGS_NUM; i++) {
-		addr = MMIO_FIR_REGS_BASE + (uint64_t)(i * 8);
-		cxl_mmio_read64(afu_h, addr, &reg);
-		if (0 != reg)
-			VERBOSE0(" FIR Reg [%08llx]: 0x%016llx\n",
-				(long long)addr, (long long)reg);
 	}
 }
 
@@ -720,7 +677,6 @@ static void *card_open(int card_no, unsigned int mode, int *card_rc,
 			rc = __client_inc(&my_ctx[ttx->card_next], mode);
 			if (rc == DDCB_OK)  /* remember last one which is ok */
 				ttx->ctx = &my_ctx[ttx->card_next];
-			}
 			ttx->card_next = (ttx->card_next + 1) %	NUM_CARDS;
 		}
 	}
@@ -1035,7 +991,7 @@ static int __ddcb_process_irqs(struct dev_ctx *ctx)
 		 */
 		if (rc < 0) {
 			VERBOSE0("ERROR: waiting for interrupt! rc: %d\n", rc);
-			afu_print_status(ctx->afu_h);
+			afu_print_status(ctx->afu_h, stderr);
 			while (__ddcb_done_post(ctx, DDCB_ERR_SELECTFAIL)) {
 				/* empty */
 			}
@@ -1090,7 +1046,7 @@ static int __ddcb_process_irqs(struct dev_ctx *ctx)
 				 "error: 0x%016llx\n",
 				ctx->event.afu_error.flags,
 				(long long)ctx->event.afu_error.error);
-			afu_print_status(ctx->afu_h);
+			afu_print_status(ctx->afu_h, stderr);
 			while (__ddcb_done_post(ctx, DDCB_ERR_EVENTFAIL)) {
 				/* empty */
 			}
@@ -1103,40 +1059,6 @@ static int __ddcb_process_irqs(struct dev_ctx *ctx)
 		}
 	}
 
-	return 0;
-}
-
-/**
- * Process Master
- */
-static int __ddcb_process_master(struct dev_ctx *ctx)
-{
-	uint64_t data, offs;
-	int	i, n;
-	int	dt = (ctx->mode & DDCB_MODE_MASTER_DT) >> 28;
-
-	n = 0;
-	if (0 == dt) dt = 1;	/* Default Master Delay poll Time is 1 sec */
-	while (1) {
-		VERBOSE1("[%s]Execute Loop: %d Delay: %d sec\n", __func__, n, dt);
-		if (DDCB_MODE_MASTER_F_CHECK & ctx->mode) {
-			VERBOSE0("Checking Master FIRS\n");
-			afu_check_status(ctx->afu_h);
-			fflush(libddcb_fd_out);
-		}
-		if (DDCB_MODE_MASTER_T_CHECK & ctx->mode) {
-			VERBOSE0("Checking Active Slaves\n");
-			for (i = 1; i < 511; i++) {
-				offs = (0x10000 * i) + MMIO_DDCBQ_WT_REG;
-				cxl_mmio_read64(ctx->afu_h, offs, &data);
-				if (0 != data)
-					VERBOSE0("Slave: %d offs: %llx data = %lld\n",
-						i, (long long)offs, (long long)data);
-			}
-		}
-		sleep(dt);
-		n++;
-	}
 	return 0;
 }
 
@@ -1177,8 +1099,13 @@ static void *__ddcb_done_thread(void *card_data)
 	/* Push the Cleanup Handler to close the AFU */
 	pthread_cleanup_push(__ddcb_done_thread_cleanup, ctx);
 
-	if ( DDCB_MODE_MASTER & ctx->mode)
-		__ddcb_process_master(ctx);
+	if ( DDCB_MODE_MASTER & ctx->mode) {
+		/* We do not have any code to execute when the master was oppend */
+		/* Master will be only used for peek and poke */
+		while (1) {
+			sleep(1);
+		}
+	}
 	if ( DDCB_MODE_POLLING & ctx->mode)
 		__ddcb_process_polling(ctx);
 	else
