@@ -26,6 +26,7 @@ alternative to the traditional software zlib.
         wrapper.h
 
     /include
+        afu_regs.h
         ddcb.h
         deflate_ddcb.h
         deflate_fifo.h
@@ -41,7 +42,10 @@ alternative to the traditional software zlib.
         force_cpu.h
         genwqe_echo.c       Test program to send "echo" command to GenWQE
         genwqe_gzip.c       Sample program for gzip using the GenWQE
+        genwqe_maint.c      Maintenance tool for CAPI Card (IBM System p only, see note below)
         genwqe_memcopy.c    Test Program for Memcopy using GenWQE
+        genwqe_peek.c       Debug Program to read certain Registers from Accelerator
+        genwqe_poke.c       Debug Program to write certain Registers in Accelerator
         genwqe_tools.h
         genwqe_update.c     Tool to update GenWQE flash
         genwqe_vpd_common.c Helper utilities

@@ -231,7 +231,7 @@ int main(int argc, char *argv[])
 	int flood = 0;
 	bool print_hardware_version = false;
 	int quiet = 0;
-	int exit_on_err = 0;
+	int exit_on_err = 1;
 	unsigned long count = 0;
 	int run_infinite = 1;
 	unsigned long interval = 1000000; /* 1sec is default */

@@ -35,15 +35,15 @@ static const char *version = GIT_VERSION;
 static void usage(const char *prog)
 {
 	printf("Usage: %s [-h] [-v,--verbose]\n"
-	       "  -C,--card <cardno>\n"
+	       "  -C,--card <cardno> can be (0...3)\n"
 	       "  -A, --accelerator-type=GENWQE|CAPI CAPI is only available "
 	       "for System p\n"
 	       "  -V, --version             print version.\n"
 	       "  -q, --quiet               quiece output.\n"
-	       "  -w, --width <32|64>       access width.\n"
+	       "  -w, --width <32|64>       access width, 64: default\n"
 	       "  -X, --cpu <id>            only run on this CPU.\n"
 	       "  -i, --interval <intv>     interval in usec, 0: default.\n"
-	       "  -c, --count <num>         number of peeks do be done.\n"
+	       "  -c, --count <num>         number of peeks do be done, 1: default.\n"
 	       "  -e, --must-be <value>     compare and exit if not equal.\n"
 	       "  -n, --must-not-be <value> compare and exit if equal.\n"
 	       "  -a, --and-mask <valud>    mask read value before compare.\n"
@@ -193,6 +193,12 @@ int main(int argc, char *argv[])
 	/* CAPI need's master flag for Poke */
 	if (DDCB_TYPE_CAPI == card_type)
 		mode |= DDCB_MODE_MASTER;
+
+	if ((card_no < 0) || (card_no > 4)) {
+		printf("(%d) is a invalid Card number !\n", card_no);
+		usage(argv[0]);
+		exit(EXIT_FAILURE);
+	}
 
 	card = accel_open(card_no, card_type, mode, &err_code,
 			  0, DDCB_APPL_ID_IGNORE);
