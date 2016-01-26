@@ -1,0 +1,4 @@
+EXTRA_CFLAGS := -Wuninitialized
+
+obj-m := cgzip.o
+cgzip-objs := card_base.o
