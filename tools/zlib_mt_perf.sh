@@ -33,7 +33,6 @@ export ZLIB_ACCELERATOR=GENWQE
 export ZLIB_CARD=0
 export ZLIB_DEFLATE_IMPL=0x01 # Use hardware by default
 export ZLIB_INFLATE_IMPL=0x01
-export PATH=./genwqe-user/tools:/opt/genwqe/bin/genwqe:/sbin:/usr/sbin:$PATH
 
 version="https://github.com/ibm-genwqe/genwqe-user"
 verbose=""
@@ -168,13 +167,43 @@ fi
 
 # Random data cannot being compressed. Performance values might be poor.
 # Text data e.g. logfiles work pretty well. Use those if available.
+# Download linux.tar.gz which is mainly text. That should perform well.
+#
+echo -n "Checking if example data is available ... "
 if [ ! -f ${test_data} ]; then
-    dd if=/dev/urandom of=${test_data} count=1024 bs=4096
+    echo "no"
+
+    if [ ! -f cantrbry.tar.gz ]; then
+	wget http://corpus.canterbury.ac.nz/resources/cantrbry.tar.gz
+	if [ $? -ne 0 ]; then
+	    echo "cantrbry.tar.gz is missing. Please download it first.";
+	    echo
+	    echo "E.g.:";
+	    echo "  wget http://corpus.canterbury.ac.nz/resources/cantrbry.tar.gz";
+	    echo
+	    exit -1;
+	fi
+    fi
+    echo -n "Duplicating test_data "
+    touch ${test_data}
+    for ((i=0; i<16; i++)); do
+	gzip -f -d -c cantrbry.tar.gz >> ${test_data}
+	echo -n "."
+    done
+    echo " ok"
+    # dd if=/dev/urandom of=${test_data} count=1024 bs=4096
+else
+    echo "yes, ${test_data} is there"
 fi
+echo -n "Compressing ${test_data} if needed ... "
 if [ ! -f ${test_data}.gz ]; then
     gzip -f -c ${test_data} > ${test_data}.gz
+    echo "ok"
+else
+    echo "no"
 fi
 
+export PATH=./genwqe-user/tools:/opt/genwqe/bin/genwqe:/sbin:/usr/sbin:$PATH
 cpus=`cat /proc/cpuinfo | grep processor | wc -l`
 bufsize=1MiB
 count=1
