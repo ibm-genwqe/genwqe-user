@@ -231,7 +231,7 @@ void zedc_asiv_infl_print(zedc_streamp strm)
 		"       CMDOPTS         = 0x%02x\n",
 		(long long)cmd->ats, cmd->cmd, cmd->cmdopts);
 
-	if (zedc_dbg > 1) {
+	if (zedc_dbg > 3) {
 		pr_info("Workspace/Dict0:\n");
 		ddcb_hexdump(stderr, wsp->dict[0], ZEDC_DICT_LEN);
 
@@ -382,7 +382,7 @@ void zedc_asv_infl_print(zedc_streamp strm)
 		"       CMDOPTS         = 0x%02x\n",
 		(long long)cmd->ats, cmd->cmd, cmd->cmdopts);
 
-	if (zedc_dbg > 1) {
+	if (zedc_dbg > 3) {
 		pr_info("Workspace/Dict0:\n");
 		ddcb_hexdump(stderr, wsp->dict[0], ZEDC_DICT_LEN);
 
