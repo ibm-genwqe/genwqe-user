@@ -17,6 +17,10 @@
 #pragma once
 __BEGIN_DECLS
 
+#define CGZIP_CR_DEVICE		0x00000602 /* 0x0000044c */
+#define CGZIP_CR_VENDOR		0x00001014
+#define CGZIP_CR_CLASS		0x00120000
+
 #define MMIO_IMP_VERSION_REG    0x00000000ull
 /*
 	-Bits-

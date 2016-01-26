@@ -54,30 +54,38 @@
 #include "afu_regs.h"
 
 #define CONFIG_DDCB_TIMEOUT	5  /* max time for a DDCB to be executed */
-
-#define	NUM_DDCBS	4
+#define	NUM_DDCBS		4  /* DDCB queue length */
 
 extern int libddcb_verbose;
 
 #include <sys/syscall.h>   /* For SYS_xxx definitions */
 
+static inline pid_t gettid(void)
+{
+	return (pid_t)syscall(SYS_gettid);
+}
+
 #define VERBOSE0(fmt, ...) do {						\
-		fprintf(stderr, fmt, ## __VA_ARGS__);		\
+		fprintf(stderr, "%08x.%08x: " fmt,			\
+			getpid(), gettid(), ## __VA_ARGS__);		\
 	} while (0)
 
 #define VERBOSE1(fmt, ...) do {						\
 		if (libddcb_verbose > 0)				\
-			fprintf(stderr, fmt, ## __VA_ARGS__);	\
+			fprintf(stderr, "%08x.%08x: " fmt,		\
+				getpid(), gettid(), ## __VA_ARGS__);	\
 	} while (0)
 
 #define VERBOSE2(fmt, ...) do {						\
 		if (libddcb_verbose > 1)				\
-			fprintf(stderr, fmt, ## __VA_ARGS__);	\
+			fprintf(stderr, "%08x.%08x: " fmt,		\
+				getpid(), gettid(), ## __VA_ARGS__);	\
 	} while (0)
 
 #define VERBOSE3(fmt, ...) do {						\
 		if (libddcb_verbose > 3)				\
-			fprintf(stderr, fmt, ## __VA_ARGS__);	\
+			fprintf(stderrr, "%08x.%08x: " fmt,		\
+				getpid(), gettid(), ## __VA_ARGS__);	\
 	} while (0)
 
 #define __free(ptr) free((ptr))
@@ -120,7 +128,7 @@ struct  tx_waitq {
 struct dev_ctx {
 	ddcb_t *ddcb;			/* ddcb queue */
 	struct tx_waitq waitq[NUM_DDCBS];
-	unsigned int completed_tasks[NUM_DDCBS+1];	/* used for DDCB_DEBUG=1 */
+	unsigned int completed_tasks[NUM_DDCBS+1]; /* used for DDCB_DEBUG=1 */
 	unsigned int completed_ddcbs;	/* used for DDCB_DEBUG=1 */
 	unsigned int process_irqs;	/* used for DDCB_DEBUG=1 */
 	int card_no;			/* Same card number as in ttx */
@@ -130,6 +138,9 @@ struct dev_ctx {
 	struct cxl_afu_h *afu_h;	/* afu_h != NULL device is open */
 	int		afu_fd;		/* fd from cxl_afu_fd() */
 	int		afu_rc;		/* rc from __afu_open() */
+	long cr_device;			/* config record device id */
+	long cr_vendor;			/* config record vendor id */
+	long api_version_compatible;
 	uint16_t	ddcb_seqnum;
 	uint16_t	ddcb_free1;	/* Not used */
 	unsigned int	ddcb_num;	/* How deep is my ddcb queue */
@@ -277,6 +288,16 @@ static void afu_print_status(struct cxl_afu_h *afu_h, FILE *fp)
 {
 	int i;
 	uint64_t addr, reg;
+	long cr_device = -1, cr_vendor = -1, cr_class = -1;
+
+	cxl_get_cr_device(afu_h, 0, &cr_device);
+	cxl_get_cr_vendor(afu_h, 0, &cr_vendor);
+	cxl_get_cr_class(afu_h, 0, &cr_class);
+	fprintf(fp,
+		" cr_device:          0x%016lx\n"
+		" cr_vendor:          0x%016lx\n"
+		" cr_class:           0x%016lx\n",
+		cr_device, cr_vendor, cr_class);
 
 	cxl_mmio_read64(afu_h, MMIO_IMP_VERSION_REG, &reg);
 	fprintf(fp, " Version Reg:        0x%016llx\n", (long long)reg);
@@ -369,6 +390,48 @@ static int __afu_open(struct dev_ctx *ctx)
 		rc = DDCB_ERR_CARD;
 		goto err_exit;
 	}
+
+
+	/* Check if the compiled in API version is compatible with the
+	   one reported by the kernel driver */
+	rc = cxl_get_api_version_compatible(ctx->afu_h,
+					    &ctx->api_version_compatible);
+	if (rc != 0) {
+		rc = DDCB_ERR_CARD;
+		goto err_afu_free;
+	}
+	if (ctx->api_version_compatible != CXL_KERNEL_API_VERSION) {
+		VERBOSE0("    [%s] ERROR: incompatible API version: %ld/%d\n",
+			 __func__, ctx->api_version_compatible,
+			 CXL_KERNEL_API_VERSION);
+		rc = DDCB_ERR_CARD;
+		goto err_afu_free;
+	}
+
+	/* FIXME This is still keeping the backwards compatibility */
+	/* Check vendor id */
+	rc = cxl_get_cr_vendor(ctx->afu_h, 0, &ctx->cr_vendor);
+	if (rc == 0) {
+		if (ctx->cr_vendor != CGZIP_CR_VENDOR) {
+			rc = DDCB_ERR_CARD;
+			goto err_afu_free;
+		}
+	} else
+		VERBOSE0("    [%s] WARNING: checking vendor id: %08lx/%d\n",
+			 __func__, ctx->cr_vendor, rc);
+
+	/* Check device id */
+	rc = cxl_get_cr_device(ctx->afu_h, 0, &ctx->cr_device);
+	if (rc == 0) {
+		if (ctx->cr_device != CGZIP_CR_DEVICE) {
+			rc = DDCB_ERR_CARD;
+			goto err_afu_free;
+		}
+	} else
+		VERBOSE0("    [%s] WARNING: checking device id: %08lx/%d\n",
+			 __func__, ctx->cr_device, rc);
+
+
 	ctx->afu_fd = cxl_afu_fd(ctx->afu_h);
 
 	rc = cxl_afu_attach(ctx->afu_h,
@@ -847,8 +910,8 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 			/* Still waiting for retc to be set */
 			rt_trace(0x001a, ddcb->retc_16, idx, 0);
 			VERBOSE2("\t[%s] AFU[%d:%d] seq: 0x%x slot: %d "
-			 	"retc: 0 wait\n", __func__,
-				ctx->card_no, ctx->cid_id, txq->seqnum, idx);
+				 "retc: 0 wait\n", __func__,
+				 ctx->card_no, ctx->cid_id, txq->seqnum, idx);
 			pthread_mutex_unlock(&ctx->lock);
 			return false; /* do not continue */
 		}
