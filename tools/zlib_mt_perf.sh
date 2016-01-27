@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# Copyright 2015, International Business Machines
+# Copyright 2015, 2016, International Business Machines
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -203,7 +203,7 @@ else
     echo "no"
 fi
 
-export PATH=./genwqe-user/tools:/opt/genwqe/bin/genwqe:/sbin:/usr/sbin:$PATH
+export PATH=./tools:./genwqe-user/tools:/opt/genwqe/bin/genwqe:/sbin:/usr/sbin:$PATH
 cpus=`cat /proc/cpuinfo | grep processor | wc -l`
 bufsize=1MiB
 count=1
