@@ -396,15 +396,12 @@ static int __afu_open(struct dev_ctx *ctx)
 	   one reported by the kernel driver */
 	rc = cxl_get_api_version_compatible(ctx->afu_h,
 					    &ctx->api_version_compatible);
-	if (rc != 0) {
-		rc = DDCB_ERR_CARD;
-		goto err_afu_free;
-	}
-	if (ctx->api_version_compatible != CXL_KERNEL_API_VERSION) {
-		VERBOSE0("    [%s] ERROR: incompatible API version: %ld/%d\n",
+	if ((rc != 0) ||
+	    (ctx->api_version_compatible != CXL_KERNEL_API_VERSION)) {
+		VERBOSE0(" [%s] ERR: incompatible API version: %ld/%d rc=%d\n",
 			 __func__, ctx->api_version_compatible,
-			 CXL_KERNEL_API_VERSION);
-		rc = DDCB_ERR_CARD;
+			 CXL_KERNEL_API_VERSION, rc);
+		rc = DDCB_ERR_VERS_MISMATCH;
 		goto err_afu_free;
 	}
 
@@ -413,7 +410,10 @@ static int __afu_open(struct dev_ctx *ctx)
 	rc = cxl_get_cr_vendor(ctx->afu_h, 0, &ctx->cr_vendor);
 	if (rc == 0) {
 		if (ctx->cr_vendor != CGZIP_CR_VENDOR) {
-			rc = DDCB_ERR_CARD;
+			VERBOSE0(" [%s] ERR: vendor_id: %ld/%d\n",
+				 __func__, (unsigned long)ctx->cr_vendor,
+				 CGZIP_CR_VENDOR);
+			rc = DDCB_ERR_VERS_MISMATCH;
 			goto err_afu_free;
 		}
 	} else
@@ -424,6 +424,9 @@ static int __afu_open(struct dev_ctx *ctx)
 	rc = cxl_get_cr_device(ctx->afu_h, 0, &ctx->cr_device);
 	if (rc == 0) {
 		if (ctx->cr_device != CGZIP_CR_DEVICE) {
+			VERBOSE0(" [%s] ERR: device_id: %ld/%d\n",
+				 __func__, (unsigned long)ctx->cr_device,
+				 CGZIP_CR_VENDOR);
 			rc = DDCB_ERR_CARD;
 			goto err_afu_free;
 		}
