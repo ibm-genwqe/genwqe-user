@@ -151,9 +151,11 @@ static int afu_check_stime(struct mdev_ctx *mctx)
 		gmask = 0;
 		mmio_read(mctx->afu_h, MMIO_MASTER_CTX_NUMBER,
 			MMIO_CASV_REG + (gsel*8), &gmask);
-		if (0 == gmask) continue;	/* No bit set, Skip */
+		if (0 == gmask)
+			continue;	/* No bit set, Skip */
+
 		for (bsel = 0; bsel < 64; bsel++) {
-			if (0 == (gmask & (1 << bsel)))
+			if (0 == (gmask & (1ull << bsel)))
 				continue;	/* Skip */
 
 			ctx = (gsel * 64) + bsel + 1;	/* Active */
