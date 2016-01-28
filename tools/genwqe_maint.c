@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, International Business Machines
+ * Copyright 2015, 2016, International Business Machines
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,32 +39,32 @@ static int verbose = 0;
 static FILE *fd_out;
 
 #define VERBOSE0(fmt, ...) do {					\
-                fprintf(fd_out, fmt, ## __VA_ARGS__);		\
-        } while (0)
+		fprintf(fd_out, fmt, ## __VA_ARGS__);		\
+	} while (0)
 
 #define VERBOSE1(fmt, ...) do {					\
-                if (verbose > 0)				\
-                        fprintf(fd_out, fmt, ## __VA_ARGS__);	\
-        } while (0)
+		if (verbose > 0)				\
+			fprintf(fd_out, fmt, ## __VA_ARGS__);	\
+	} while (0)
 
 #define VERBOSE2(fmt, ...) do {					\
-                if (verbose > 1)				\
-                        fprintf(fd_out, fmt, ## __VA_ARGS__);	\
-        } while (0)
+		if (verbose > 1)				\
+			fprintf(fd_out, fmt, ## __VA_ARGS__);	\
+	} while (0)
 
 struct mdev_ctx {
-	int			loop;		/* Loop Counter */
-	int			card;		/* Card no (0,1,2,3 */
-	struct cxl_afu_h	*afu_h;		/* The AFU handle */
-	int			dt;		/* Delay time in sec (1 sec default) */
-	int			count;		/* Number of loops to do, (-1) = forever */
-	bool			deamon;		/* TRUE if forked */
-	uint64_t		wed;		/* This is a dummy only for attach */
-	bool			quiet;		/* False or true -q option */
-	pid_t			pid;
-	pid_t			my_sid;		/* for sid */
-	int			mode;		/* See below */
-	int			process_irqs;	/* Master IRQ Counter */
+	int loop;		/* Loop Counter */
+	int card;		/* Card no (0,1,2,3 */
+	struct cxl_afu_h *afu_h;/* The AFU handle */
+	int dt;			/* Delay time in sec (1 sec default) */
+	int count;		/* Number of loops to do, (-1) = forever */
+	bool deamon;		/* TRUE if forked */
+	uint64_t wed;		/* This is a dummy only for attach */
+	bool quiet;		/* False or true -q option */
+	pid_t pid;
+	pid_t my_sid;		/* for sid */
+	int mode;		/* See below */
+	int process_irqs;	/* Master IRQ Counter */
 };
 
 /* Mode Bits for Master Loop */
@@ -74,7 +74,8 @@ struct mdev_ctx {
 static struct mdev_ctx	master_ctx;
 
 #if 0
-static int mmio_write(struct cxl_afu_h *afu_h, int ctx, uint32_t offset, uint64_t data)
+static int mmio_write(struct cxl_afu_h *afu_h, int ctx, uint32_t offset,
+		      uint64_t data)
 {
 	int rc = -1;
 	uint32_t offs = (ctx * MMIO_CTX_OFFSET) + offset;
@@ -87,7 +88,8 @@ static int mmio_write(struct cxl_afu_h *afu_h, int ctx, uint32_t offset, uint64_
 }
 #endif
 
-static int mmio_read(struct cxl_afu_h *afu_h, int ctx, uint32_t offset, uint64_t *data)
+static int mmio_read(struct cxl_afu_h *afu_h, int ctx, uint32_t offset,
+		     uint64_t *data)
 {
 	int rc = -1;
 	uint32_t offs = (ctx * MMIO_CTX_OFFSET) + offset;
@@ -151,31 +153,35 @@ static int afu_check_stime(struct mdev_ctx *mctx)
 			MMIO_CASV_REG + (gsel*8), &gmask);
 		if (0 == gmask) continue;	/* No bit set, Skip */
 		for (bsel = 0; bsel < 64; bsel++) {
-			if (0 == (gmask & (1 << bsel))) continue;	/* Skip */
+			if (0 == (gmask & (1 << bsel)))
+				continue;	/* Skip */
+
 			ctx = (gsel * 64) + bsel + 1;	/* Active */
 
-			mmio_read(mctx->afu_h, ctx, MMIO_DDCBQ_STATUS_REG, &stat_reg);
+			mmio_read(mctx->afu_h, ctx, MMIO_DDCBQ_STATUS_REG,
+				  &stat_reg);
 			if (0 == (stat_reg & 0xffffffff00000000ull)) {
 				VERBOSE2("AFU[%d:%d] master skip\n",
 					mctx->card, ctx);
 				continue;	/* Skip Master */
 			}
 			mmio_read(mctx->afu_h, ctx, MMIO_DDCBQ_WT_REG, &data);
-			data = data / 250;		/* makes time in usec */
+			data = data / 250; /* makes time in usec */
 
-			mmio_read(mctx->afu_h, ctx, MMIO_DDCBQ_DMAE_REG, &err_reg);
+			mmio_read(mctx->afu_h, ctx, MMIO_DDCBQ_DMAE_REG,
+				  &err_reg);
 
 			VERBOSE0("AFU[%d:%d] Time: %lld usec Status: 0x%llx ",
-				mctx->card, ctx,
-				(long long)data,
-				(long long) stat_reg);
+				 mctx->card, ctx, (long long)data,
+				 (long long) stat_reg);
 			if (0 != err_reg)
-				VERBOSE0("DMA Error: 0x%llx", (long long)err_reg);
+				VERBOSE0("DMA Err: 0x%llx",
+					 (long long)err_reg);
 			/* tainted if not 0 */
 			if (0 != mstat_reg)
-				VERBOSE0("MSTAT: 0x%llx", (long long)mstat_reg);
+				VERBOSE0("MSTAT: 0x%llx",
+					 (long long)mstat_reg);
 			VERBOSE0("\n");
-			
 		}
 	}
 	return mctx->dt;
@@ -203,8 +209,8 @@ static bool check_app(struct mdev_ctx *mctx)
 	uint64_t data;
 
 	/* Get MMIO_APP_VERSION_REG */
-        rc = mmio_read(mctx->afu_h, MMIO_MASTER_CTX_NUMBER,
-		MMIO_APP_VERSION_REG, &data);
+	rc = mmio_read(mctx->afu_h, MMIO_MASTER_CTX_NUMBER,
+		       MMIO_APP_VERSION_REG, &data);
 	if (0 != rc)
 		return false;
 
@@ -218,7 +224,7 @@ static bool check_app(struct mdev_ctx *mctx)
 	data = data >> 32;		/* RRRRFFII */
 	if (0x03 == (data & 0xff)) {	/* Check II */
 		data = data >> 16;	/* Check RRRR */
-		if (data > 0x0500) 	/* need > 0500 */
+		if (data > 0x0500)	/* need > 0500 */
 			return true;
 	}
 	return false;
@@ -250,26 +256,26 @@ static void sig_handler(int sig)
 	afu_m_close(mctx);
 	fflush(fd_out);
 	fclose(fd_out);
-	exit(0);
+
+	exit(EXIT_SUCCESS);
 }
 
 static void help(char *prog)
 {
 	printf("Usage: %s [-CvhVd] [-f file] [-c count] [-i delay]\n"
-		"\t-C, --card <num>	Card to use (default 0)\n"
-		"\t-V, --version	\tPrint Version number\n"
-		"\t-h, --help		This help message\n"
-		"\t-q, --quiet		No output at all\n"
-		"\t-v, --verbose	\tverbose mode, up to -vvv\n"
-		"\t-c, --count <num>	Loops to run (-1 = forever)\n"
-		"\t-i, --interval <num>	Interval time in sec (default 1 sec)\n"
-		"\t-d, --deamon		Start in Deamon process (background)\n"
-		"\t-m, --mode		Mode:\n"
-		"\t	1 = Check Master Firs\n"
-		"\t	2 = Watch Card worktimer\n"
-		"\t-f, --log-file <file> Log File name when running in -d (deamon)\n",
-		prog);
-	return;
+	       "\t-C, --card <num>	Card to use (default 0)\n"
+	       "\t-V, --version	\tPrint Version number\n"
+	       "\t-h, --help		This help message\n"
+	       "\t-q, --quiet		No output at all\n"
+	       "\t-v, --verbose	\tverbose mode, up to -vvv\n"
+	       "\t-c, --count <num>	Loops to run (-1 = forever)\n"
+	       "\t-i, --interval <num>	Interval time in sec (default 1 sec)\n"
+	       "\t-d, --deamon		Start in Deamon process (background)\n"
+	       "\t-m, --mode		Mode:\n"
+	       "\t	1 = Check Master Firs\n"
+	       "\t	2 = Watch Card worktimer\n"
+	       "\t-f, --log-file <file> Log File name when running in -d "
+	       "(deamon)\n", prog);
 }
 
 /**
@@ -277,7 +283,7 @@ static void help(char *prog)
  */
 int main(int argc, char *argv[])
 {
-	int rc;
+	int rc = EXIT_SUCCESS;
 	int ch;
 	char *log_file = NULL;
 	struct mdev_ctx *mctx = &master_ctx;
@@ -298,17 +304,17 @@ int main(int argc, char *argv[])
 	while (1) {
 		int option_index = 0;
 		static struct option long_options[] = {
-			{ "card",       required_argument, NULL, 'C' },
-			{ "version",    no_argument,       NULL, 'V' },
-			{ "quiet",      no_argument,       NULL, 'q' },
-			{ "help",       no_argument,       NULL, 'h' },
-			{ "verbose",    no_argument,       NULL, 'v' },
-			{ "count",      required_argument, NULL, 'c' },
-			{ "interval",   required_argument, NULL, 'i' },
-			{ "deamon",     no_argument,       NULL, 'd' },
-			{ "log-file",   required_argument, NULL, 'f' },
-			{ "mode",   	required_argument, NULL, 'm' },
-			{ 0,            0,       	   NULL,  0  }
+			{ "card",	required_argument, NULL, 'C' },
+			{ "version",	no_argument,	   NULL, 'V' },
+			{ "quiet",	no_argument,	   NULL, 'q' },
+			{ "help",	no_argument,	   NULL, 'h' },
+			{ "verbose",	no_argument,	   NULL, 'v' },
+			{ "count",	required_argument, NULL, 'c' },
+			{ "interval",	required_argument, NULL, 'i' },
+			{ "deamon",	no_argument,	   NULL, 'd' },
+			{ "log-file",	required_argument, NULL, 'f' },
+			{ "mode",	required_argument, NULL, 'm' },
+			{ 0,		0,		   NULL,  0  }
 		};
 		ch = getopt_long(argc, argv, "C:f:c:i:m:Vqhvd",
 			long_options, &option_index);
@@ -349,9 +355,9 @@ int main(int argc, char *argv[])
 			case 1: mctx->mode |= CHECK_FIRS_MODE; break;
 			case 2: mctx->mode |= CHECK_TIME_MODE; break;
 			default:
-				printf("Please provide correct Mode Option (1..2)\n");
-				exit(1);
-				break;
+				fprintf(stderr, "Please provide correct "
+					"Mode Option (1..2)\n");
+				exit(EXIT_FAILURE);
 			}
 			break;
 		case 'f':	/* --log-file */
@@ -364,23 +370,24 @@ int main(int argc, char *argv[])
 	}
 
 	if ((mctx->card < 0) || (mctx->card > 1)) {
-		printf("%d for Option -C is invalid, please provide either 0 or 1 !\n",
-			mctx->card);
+		fprintf(stderr, "%d for Option -C is invalid, please provide "
+			"either 0 or 1 !\n", mctx->card);
 		exit(EXIT_FAILURE);
 	}
 
 	if (mctx->deamon) {
 		if (NULL == log_file) {
-			printf("Please Provide log file name (-f) if running "
-				"in deamon mode !\n");
-			exit(1);
+			fprintf(stderr, "Please Provide log file name (-f) "
+				"if running in deamon mode !\n");
+			exit(EXIT_FAILURE);
 		}
 	}
 	if (log_file) {
 		fd_out = fopen(log_file, "w+");
 		if (NULL == fd_out) {
-			printf("Can not create/append to file %s\n", log_file);
-			exit(1);
+			fprintf(stderr, "Can not create/append to file %s\n",
+				log_file);
+			exit(EXIT_FAILURE);
 		}
 	}
 	signal(SIGCHLD,SIG_IGN);	/* ignore child */
@@ -396,38 +403,50 @@ int main(int argc, char *argv[])
 		mctx->pid = fork();
 		if (mctx->pid < 0) {
 			printf("Fork() failed\n");
-			exit(1);
+			exit(EXIT_FAILURE);
 		}
 		if (mctx->pid > 0) {
-			printf("Child Pid is %d Parent exit here\n", mctx->pid);
-			exit(0);
+			printf("Child Pid is %d Parent exit here\n",
+			       mctx->pid);
+			exit(EXIT_SUCCESS);
 		}
 		if (chdir("/")) {
-			printf("Can not chdir to / !!!\n");
-			exit(1);
+			fprintf(stderr, "Can not chdir to / !!!\n");
+			exit(EXIT_FAILURE);
 		}
 		umask(0);
-		//set new session
+		/* set new session */
 		mctx->my_sid = setsid();
-		printf("Child sid: %d from pid: %d\n", mctx->my_sid, mctx->pid);
+		printf("Child sid: %d from pid: %d\n",
+		       mctx->my_sid, mctx->pid);
+
 		if(mctx->my_sid < 0)
-			exit(1);
+			exit(EXIT_FAILURE);
+
 		close(STDIN_FILENO);
 		close(STDOUT_FILENO);
 		close(STDERR_FILENO);
 	}
 
+	/*
+	 * rc = cxl_mmio_install_sigbus_handler();
+	 * if (rc != 0) {
+	 *	VERBOSE0("Err: Install cxl sigbus_handler rc=%d\n", rc);
+	 *	exit(EXIT_FAILURE);
+	 * }
+	 */
+
 	if (0 != afu_m_open(mctx)) {
-		VERBOSE0("Error: failed to open Master Context for CAPI Card: %u\n",
-                        mctx->card);
+		VERBOSE0("Err: failed to open Master Context for "
+			 "CAPI Card: %u\n", mctx->card);
 		VERBOSE0("\tCheck Permissions in /dev/cxl/* or kernel log.\n");
-                exit(EXIT_FAILURE);
+		exit(EXIT_FAILURE);
 	}
 
 	if (false == check_app(mctx)) {
 		VERBOSE0("Err: Wrong Card Appl ID. Need to have > 0500\n");
 		afu_m_close(mctx);
-                exit(EXIT_FAILURE);
+		exit(EXIT_FAILURE);
 	}
 
 	while (1) {
@@ -436,17 +455,18 @@ int main(int argc, char *argv[])
 			sleep(dt);		/* Sleep Remaining time */
 		if (-1 == mctx->count)
 			continue;		/* Run Forever */
-		mctx->count--;		/* Decrement Runs */
+		mctx->count--;			/* Decrement Runs */
 		if (0 == mctx->count)
 			break;			/* Exit */
 	}
 
 	if (!mctx->quiet && verbose)
 		VERBOSE0("[%s] AFU[%d] after %d loops and %d Interrupts\n",
-			__func__, mctx->card,
-			mctx->loop, mctx->process_irqs);
+			 __func__, mctx->card, mctx->loop, mctx->process_irqs);
+
 	afu_m_close(mctx);
 	fflush(fd_out);
 	fclose(fd_out);
+
 	exit(rc);
 }
