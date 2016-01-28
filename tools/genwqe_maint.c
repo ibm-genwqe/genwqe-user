@@ -428,18 +428,17 @@ int main(int argc, char *argv[])
 		close(STDERR_FILENO);
 	}
 
-	/*
-	 * rc = cxl_mmio_install_sigbus_handler();
-	 * if (rc != 0) {
-	 *	VERBOSE0("Err: Install cxl sigbus_handler rc=%d\n", rc);
-	 *	exit(EXIT_FAILURE);
-	 * }
-	 */
+	rc = cxl_mmio_install_sigbus_handler();
+	if (rc != 0) {
+		VERBOSE0("Err: Install cxl sigbus_handler rc=%d\n", rc);
+		exit(EXIT_FAILURE);
+	}
 
 	if (0 != afu_m_open(mctx)) {
 		VERBOSE0("Err: failed to open Master Context for "
-			 "CAPI Card: %u\n", mctx->card);
-		VERBOSE0("\tCheck Permissions in /dev/cxl/* or kernel log.\n");
+			 "CAPI Card: %u\n"
+			 "\tCheck Permissions in /dev/cxl/* or kernel log.\n",
+			 mctx->card);
 		exit(EXIT_FAILURE);
 	}
 
