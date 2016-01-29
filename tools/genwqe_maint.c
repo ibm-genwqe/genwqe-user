@@ -65,6 +65,8 @@ struct mdev_ctx {
 	pid_t my_sid;		/* for sid */
 	int mode;		/* See below */
 	int process_irqs;	/* Master IRQ Counter */
+
+	uint64_t fir[MMIO_FIR_REGS_NUM];
 };
 
 /* Mode Bits for Master Loop */
@@ -189,18 +191,41 @@ static int afu_check_stime(struct mdev_ctx *mctx)
 	return mctx->dt;
 }
 
+/*
+ * Print FIRs only if they have changed. Always collect them.
+ */
 static int afu_check_mfirs(struct mdev_ctx *mctx)
 {
-	int	i;
-	uint64_t	data;
-	uint32_t	offs;
+	int i;
+	uint64_t data;
+	uint32_t offs;
+	bool changed = false;
+	int rc = 0;
+	time_t t;
 
 	for (i = 0; i < MMIO_FIR_REGS_NUM; i++) {
 		offs = MMIO_FIR_REGS_BASE + i * 8;
 		mmio_read(mctx->afu_h, MMIO_MASTER_CTX_NUMBER, offs, &data);
-		VERBOSE0("AFU[%d] FIR: %d : 0x%016llx\n",
-			mctx->card, i, (long long)data);
+		if (data != mctx->fir[i])
+			changed = true;
+		if (data == -1ull)
+			rc = -1;  /* dead!! */
+
+		mctx->fir[i] = data;
 	}
+	if (changed) {
+		t = time(NULL);
+		VERBOSE0("%s", ctime(&t));
+		for (i = 0; i < MMIO_FIR_REGS_NUM; i++)
+			VERBOSE0("  AFU[%d] FIR: %d : 0x%016llx\n",
+				 mctx->card, i, (long long)mctx->fir[i]);
+	}
+	if (rc) {
+		t = time(NULL);
+		VERBOSE0("%s  AFU[%d] card is dead, FIRs with -1 found!\n",
+			 ctime(&t), mctx->card);
+	}
+
 	return mctx->dt;
 }
 
@@ -287,12 +312,14 @@ int main(int argc, char *argv[])
 {
 	int rc = EXIT_SUCCESS;
 	int ch;
+	unsigned int i;
 	char *log_file = NULL;
 	struct mdev_ctx *mctx = &master_ctx;
 	int	dt;
 	int	mode;
 
 	fd_out = stdout;	/* Default */
+
 	mctx->loop = 0;		/* Counter */
 	mctx->quiet = false;
 	mctx->dt = 1;		/* Default, 1 sec delay time */
@@ -301,6 +328,9 @@ int main(int argc, char *argv[])
 	mctx->mode = 0;		/* Default, nothing to watch */
 	mctx->process_irqs = 0;	/* No Master IRQ's received */
 	mctx->deamon = false;	/* Not in Deamon mode */
+
+	for (i = 0; i < MMIO_FIR_REGS_NUM; i++)
+		mctx->fir[i] = -1;
 
 	rc = EXIT_SUCCESS;
 	while (1) {
