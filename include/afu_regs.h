@@ -163,20 +163,41 @@ __BEGIN_DECLS
 #define MMIO_FIR_REGS_NUM       6
 
 #define MMIO_ERRINJ_MMIO_REG    0x00001800ull
+
 /*
-	Error Injection MMIO
-	====================
-	Address: 0x0001800
-	63..1  RO: Reserved
-	    0  RS: Inject Parity error
+Error Injection Job-Manager
+===========================
+Address: 0x0001800
+  63..17 RO: Reserved
+      16 RS: Force DDCBQ Ctrl State Machine Hang
+  15..0  RO: Reserved
+
+Error Injection MMIO
+====================
+Address: 0x0001800
+  63..1  RO: Reserved
+      16 RS: Inject MMIO Read Response Data Parity error into PSL interface
+  15..1  RO: Reserved
+      0  RS: Inject MMIO Write Data Parity error
+
+Error Injection DMA
+===================
+Address: 0x0001800
+  63..1  RO: Reserved
+      1  RS: Inject error into DMA write path (flip data bit)
+      0  RS: Inject error into DMA read path (flip data bit)
 */
 
 #define MMIO_ERRINJ_GZIP_REG    0x00001808ull
 /*
-	Error Injection GZIP
-	====================
-	Address: 0x0001808
-	63..0  RS: Reserved (bits TBD)
+Error Injection GZIP
+====================
+Address: 0x0001808
+63..17 RO: Reserved
+    16 RS: Inject error into compression/decompression checker
+           (force miscompare)
+ 15..1 RO: Reserved
+     0 RS: Inject error into compression dictionary
 */
 
 #define MMIO_AGRV_REGS_BASE     0x00002000ull
