@@ -895,8 +895,9 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 	idx = ctx->ddcb_out;
 	ddcb = &ctx->ddcb[idx];
 	txq = &ctx->waitq[idx];
+
+	/* Check if Nothing to do, goto exit and wait again */
 	if (DDCB_IN != txq->status)
-		/* Nothing to do, exit and wait again */
 		goto post_exit_stop;
 
 	elapsed_time = (int)(get_msec() - txq->q_in_time);
@@ -907,7 +908,7 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 			goto post_exit_cont;	/* Continue until timeout */
 
 		VERBOSE2("\t[%s] AFU[%d:%d] seq: 0x%x slot: %d elappsed "
-			"time %d msec timout\n", __func__,
+			"time %d msec timeout\n", __func__,
 			ctx->card_no, ctx->cid_id, txq->seqnum,
 			idx, elapsed_time);
 	}
@@ -938,9 +939,10 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 	}
 
 	if (DDCB_OK != compl_code)
-		VERBOSE0("\t[%s] AFU[%d:%d] seq: 0x%x slot: %d compl_code: %d\n",
-			__func__, ctx->card_no, ctx->cid_id, txq->seqnum, idx,
-			compl_code);
+		VERBOSE0("\t[%s] AFU[%d:%d] seq: 0x%x slot: %d compl_code: %d"
+			" retc: %x after: %d msec\n", __func__,
+			ctx->card_no, ctx->cid_id, txq->seqnum, idx,
+			compl_code, ddcb->retc_16, elapsed_time);
 
 	ttx = txq->ttx;
 	ttx->compl_code = compl_code;
