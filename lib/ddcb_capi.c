@@ -117,6 +117,7 @@ struct  tx_waitq {
 	struct	ttxs	*ttx;	/* back Pointer to active ttx */
 	int	seqnum;		/* a copy of ddcb_seqnum at start time */
 	bool	thread_wait;	/* A thread is waiting to */
+	uint64_t q_in_time;	/* Time in msec when i added this ddcb */
 };
 
 /**
@@ -161,6 +162,14 @@ struct dev_ctx {
 static ddcb_t my_ddcbs[NUM_CARDS][NUM_DDCBS] __attribute__((aligned(64*1024)));
 static struct dev_ctx my_ctx[NUM_CARDS];
 
+static inline uint64_t get_msec(void)
+{
+	struct timeval t;
+
+	gettimeofday(&t, NULL);
+	return t.tv_sec * 1000 + t.tv_usec/1000;
+}
+
 /*	Add trace function by setting RT_TRACE */
 //#define RT_TRACE
 #ifdef RT_TRACE
@@ -190,9 +199,7 @@ static void rt_trace(uint32_t tok, uint32_t n1, uint32_t n2, void *p)
 
 	pthread_mutex_lock(&trc_lock);
 	i = trc_idx;
-	gettimeofday(&t, NULL);
-	t64 = t.tv_sec * 1000000 + t.tv_usec;
-	trc_buff[i].tid = (uint32_t)t64;
+	trc_buff[i].tid = (uint32_t)get_msec();
 	trc_buff[i].tok = tok;
 	trc_buff[i].n1 = n1;
 	trc_buff[i].n2= n2;
@@ -261,8 +268,9 @@ static inline void cmd_2_ddcb(ddcb_t *pddcb, struct ddcb_cmd *cmd,
 /**
  * Copy DDCB ASV to request struct. There is no endian conversion
  * made, since data structure in ASV is still unknown here
+ * return true if the receiced ddcb is good.
  */
-static int ddcb_2_cmd(ddcb_t *ddcb, struct ddcb_cmd *cmd)
+static bool ddcb_2_cmd(ddcb_t *ddcb, struct ddcb_cmd *cmd)
 {
 	memcpy(&cmd->asv[0], (void *) &ddcb->asv[0], cmd->asv_length);
 
@@ -274,14 +282,9 @@ static int ddcb_2_cmd(ddcb_t *ddcb, struct ddcb_cmd *cmd)
 	cmd->progress = __be32_to_cpu(ddcb->progress_32);
 	cmd->retc = __be16_to_cpu(ddcb->retc_16);
 	/* Check received seqnum here (this will become a copy from rsvd_0e field) */
-	if (ddcb->rsvd_0e != ddcb->rsvd_c0) {
-		VERBOSE0("Error: out of sequence: 0x%x expect: 0x%x received: 0x%x\n",
-			__be16_to_cpu(ddcb->seqnum),
-			__be16_to_cpu(ddcb->rsvd_0e),
-			__be16_to_cpu(ddcb->rsvd_c0));
-		return 1;
-	}
-	return 0;
+	if (ddcb->rsvd_0e != ddcb->rsvd_c0)
+		return false;
+	return true;
 }
 
 static void afu_print_status(struct cxl_afu_h *afu_h, FILE *fp)
@@ -829,6 +832,7 @@ static int __ddcb_execute_multi(void *card_data, struct ddcb_cmd *cmd)
 		seq = (int)ctx->ddcb_seqnum;	/* Get seq */
 		txq->cmd = my_cmd;		/* my command to txq */
 		txq->seqnum = ctx->ddcb_seqnum;	/* Save seq Number */
+		txq->q_in_time = get_msec();	/* Save now time in msec */
 		ctx->ddcb_seqnum++;		/* Next seq */
 		rt_trace(0x00a0, seq, idx, ttx);
 		VERBOSE1("[%s] AFU[%d:%d] seq: 0x%x slot: %d cmd: %p\n", __func__,
@@ -882,57 +886,70 @@ static int ddcb_execute(void *card_data, struct ddcb_cmd *cmd)
 
 static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 {
-	int	idx;
+	int	idx, elapsed_time;
 	ddcb_t	*ddcb;
 	struct	tx_waitq	*txq;
-	struct	ttxs		*ttx;
+	struct	ttxs		*ttx = NULL;
 
-	while (1) {
-		if (0 == pthread_mutex_trylock(&ctx->lock)) break;
-		VERBOSE1("trylock failed\n");
-		usleep(10);
-	}
+	pthread_mutex_lock(&ctx->lock);
 	idx = ctx->ddcb_out;
 	ddcb = &ctx->ddcb[idx];
 	txq = &ctx->waitq[idx];
-	if (DDCB_IN != txq->status) {
-		/* Nothing to do, exit and wait again */
-		rt_trace(0x001f, txq->seqnum, idx, 0);
-		pthread_mutex_unlock(&ctx->lock);
-		return false; /* do not continue */
+
+	/* Check if Nothing to do, goto exit and wait again */
+	if (DDCB_IN != txq->status)
+		goto post_exit_stop;
+
+	elapsed_time = (int)(get_msec() - txq->q_in_time);
+
+	if ((DDCB_ERR_IRQTIMEOUT == compl_code) && (0 == ddcb->retc_16)) {
+		/* Select Timeout and no data received */
+		if (elapsed_time < (ctx->tout * 1000))
+			goto post_exit_cont;	/* Continue until timeout */
+
+		VERBOSE2("\t[%s] AFU[%d:%d] seq: 0x%x slot: %d elappsed "
+			"time %d msec timeout\n", __func__,
+			ctx->card_no, ctx->cid_id, txq->seqnum,
+			idx, elapsed_time);
 	}
+
+	if ((DDCB_OK == compl_code) && (0 == ddcb->retc_16)) {
+		/* Still waiting for retc to be set */
+		rt_trace(0x001a, ddcb->retc_16, idx, 0);
+		VERBOSE2("\t[%s] AFU[%d:%d] seq: 0x%x slot: %d "
+			 "retc: 0 wait\n", __func__,
+			 ctx->card_no, ctx->cid_id, txq->seqnum, idx);
+		goto post_exit_stop;
+	}
+
 	if (libddcb_verbose > 3) {
+		/* For debug only */
 		VERBOSE0("AFU[%d:%d] DDCB %d [%016llx] after execution "
 			 "compl_code: %d retc16: %4.4x\n",
 			ctx->card_no, ctx->cid_id, idx, (long long)ddcb, compl_code,
 			ddcb->retc_16);
 		ddcb_hexdump(stderr, ddcb, sizeof(ddcb_t));
 	}
-	if (DDCB_OK == compl_code) {
-		if (0 == ddcb->retc_16) {
-			/* Still waiting for retc to be set */
-			rt_trace(0x001a, ddcb->retc_16, idx, 0);
-			VERBOSE2("\t[%s] AFU[%d:%d] seq: 0x%x slot: %d "
-				 "retc: 0 wait\n", __func__,
-				 ctx->card_no, ctx->cid_id, txq->seqnum, idx);
-			pthread_mutex_unlock(&ctx->lock);
-			return false; /* do not continue */
-		}
-	}
 
 	/* Copy the ddcb back to cmd, and check for error */
-	if (ddcb_2_cmd(ddcb, txq->cmd))
-		compl_code = DDCB_ERR_CARD;
+	if (false == ddcb_2_cmd(ddcb, txq->cmd)) {
+		/* Overwrite compl_code only if not set before */
+		if (DDCB_OK != compl_code)
+			compl_code = DDCB_ERR_EXEC_DDCB;
+	}
+
 	if (DDCB_OK != compl_code)
-		VERBOSE0("\t[%s] AFU[%d:%d] seq: 0x%x slot: %d compl_code: %d\n",
-			__func__, ctx->card_no, ctx->cid_id, txq->seqnum, idx,
-			compl_code);
+		VERBOSE0("\t[%s] AFU[%d:%d] seq: 0x%x slot: %d compl_code: %d"
+			" retc: %x after: %d msec\n", __func__,
+			ctx->card_no, ctx->cid_id, txq->seqnum, idx,
+			compl_code, ddcb->retc_16, elapsed_time);
+
 	ttx = txq->ttx;
 	ttx->compl_code = compl_code;
 	VERBOSE1("\t[%s] AFU[%d:%d] seq: 0x%x slot: %d "
-		 "compl_code: %d retc: %x\n", __func__,
+		 "compl_code: %d retc: %x after: %d msec\n", __func__,
 		ctx->card_no, ctx->cid_id, txq->seqnum, idx,
-		compl_code, ddcb->retc_16);
+		compl_code, ddcb->retc_16, elapsed_time);
 	rt_trace(0x0011, txq->seqnum, idx, ttx);
 	sem_post(&ctx->free_sem);
 	if (txq->thread_wait) {
@@ -946,8 +963,13 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 	/* Increment and wrap back to start */
 	ctx->ddcb_out = (ctx->ddcb_out + 1) % ctx->ddcb_num;
 	txq->status = DDCB_FREE;
+
+  post_exit_cont:
 	pthread_mutex_unlock(&ctx->lock);
-	return true;		/* Continue */
+	return true;		/* Continue Loop */
+  post_exit_stop:
+	pthread_mutex_unlock(&ctx->lock);
+	return false;		/* Stop Loop */
 }
 
 /**
@@ -1028,8 +1050,8 @@ static int __ddcb_process_irqs(struct dev_ctx *ctx)
 		FD_SET(ctx->afu_fd, &set);
 
 		/* Set timeout to "tout" seconds */
-		timeout.tv_sec = ctx->tout;
-		timeout.tv_usec = 0;
+		timeout.tv_sec = 0; // ctx->tout;
+		timeout.tv_usec = 100 * 1000;	/* 100 msec */
 
 		rc = select(ctx->afu_fd + 1, &set, NULL, NULL, &timeout);
 		rt_trace(0x0010, 0, 0, 0);
