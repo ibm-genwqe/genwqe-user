@@ -38,7 +38,7 @@ ORIG_DATA="${TMP_DIR}/orig"                  # directory for original data
 GZIPTOOL="${TOOLS_DIR}/gzip"
 GUNZIPTOOL="${TOOLS_DIR}/gunzip"
 
-# Global values
+# GenWQE Global values
 DEVICE_ID=":044b"
 SUPPORTED_APPID="GZIP"
 DRIVER_PREFIX=genwqe
@@ -47,7 +47,8 @@ PROGRAM=`basename $0`
 CWD=`pwd`
 ERRLOG=${TMP_DIR}/${PROGRAM}_$$_err.log
 CLASS_PATH="/sys/class/${DRIVER_PREFIX}/"
-# add supported bit stream version strings to this array:
+
+# GenWQE add supported bit stream for version strings to this array:
 BIT_STREAMS=( 00000b0330342260.00000002475a4950 \
               0000000330353090.00000002475a4950 )
 
@@ -120,6 +121,19 @@ function usage() {
     echo
 }
 
+# Check for tools availability
+function check_tools
+{
+    for t in ${GZIPTOOL} ${GUNZIPTOOL} ; do
+	echo -n "Checking if ${t} is there ... "
+	if [ ! -x ${t} ]; then
+	    echo "failure"
+	    exit -3;
+	fi
+	echo "ok"
+    done
+}
+
 # Check for and create directory holding the original data
 function prep_orig_data()
 {
@@ -133,7 +147,7 @@ function prep_orig_data()
 	echo "E.g.:";
 	echo "  wget http://corpus.canterbury.ac.nz/resources/cantrbry.tar.gz";
 	echo "  sudo mkdir -p ${INSTALL_DIR}/share/testdata/";
-	echo "  sudo mv cantrbry.tar.gz ${d}";
+	echo "  sudo cp cantrbry.tar.gz ${d}";
 	echo
 	exit -1;
     fi
@@ -230,8 +244,9 @@ function is_supported()
     fi
 }
 
-# Prerequisite: the driver needs to be loaded for this function to
-#               be able to check the bit stream version
+# GenWQE Prerequisite: The genwqe driver needs to be loaded for this
+#                      function to be able to check the bit stream version
+#
 function genwqe_check_supported_bitstream_versions()
 {
     if [ $ZLIB_CARD -ge 0 ]; then
@@ -254,6 +269,7 @@ function genwqe_check_supported_bitstream_versions()
 }
 
 # The tools RPM is a prerequisite for this test (see purpose description above)
+#
 if [ ! -d ${TOOLS_DIR} ]; then
     echo "$PROGRAM: ERROR: gzip and gunzip tools not found in $TOOLS_DIR."
     echo "Make sure the GenWQELibZ RPM Package is installed and gzip and gunzip"
@@ -287,11 +303,7 @@ while getopts "A:vVhsSi:C:p:" opt; do
 	    ZLIB_CARD=${OPTARG};
             if [ "${OPTARG}" == "-1" -o  "${OPTARG}" == "RED" ]; then
                 ZLIB_CARD=-1;
-            elif  [ ! -c /dev/${DRIVER_PREFIX}${OPTARG}_card ]; then
-	        1>&2 echo "$PROGRAM: ERROR: Card ${OPTARG} does not exist";
-                unset ZLIB_CARD;
-		exit -3;
-	    fi
+            fi
 	    ;;
         v)
             verbose+=1;
@@ -312,28 +324,34 @@ while getopts "A:vVhsSi:C:p:" opt; do
 done
 
 # Start of main program
+
+if [ $ZLIB_ACCELERATOR == "GENWQE" ]; then
 # warn user if the hardware acceleration for compression/decompression
 # is not ready
-driver_loaded=`lsmod|grep $DRIVER`
-if [ ${driver_check} -eq 1 ]; then
-    if [ "${driver_loaded}" = "" ]; then
-        echo "WARNING: ${DRIVER} is not loaded."                               \
-	     "No Hardware compression available!"
-	exit -2;
+    driver_loaded=`lsmod|grep $DRIVER`
+    if [ ${driver_check} -eq 1 ]; then
+	if [ "${driver_loaded}" = "" ]; then
+	    echo "WARNING: ${DRIVER} is not loaded." \
+		"No Hardware compression available!"
+	    exit -2;
+	fi
+    fi
+    if [ "${driver_loaded}" != "" -a ${driver_check} -eq 1 ]; then
+	genwqe_check_supported_bitstream_versions $ZLIB_CARD
+	if [ $bitstream_warning -eq 1 ]; then
+	    2>&1 echo "ERROR: Unsupported FPGA image (bitstream) detected on one"  \
+		"or more cards."
+	    2>&1 echo "       Check the bitstream versions on all of your cards and"
+	    2>&1 echo "       update to a supported version for the compression"   \
+		"solution."
+	    exit -3;
+	fi
     fi
 fi
 
-if [ $ZLIB_ACCELERATOR == "GENWQE" -a "${driver_loaded}" != "" -a ${driver_check} -eq 1 ]; then
-    genwqe_check_supported_bitstream_versions $ZLIB_CARD
-    if [ $bitstream_warning -eq 1 ]; then
-        2>&1 echo "ERROR: Unsupported FPGA image (bitstream) detected on one"  \
-                         "or more cards."
-        2>&1 echo "       Check the bitstream versions on all of your cards and"
-        2>&1 echo "       update to a supported version for the compression"   \
-                         "solution."
-        exit -3;
-    fi
-fi
+
+# Check if tools are available
+check_tools
 
 # provide source data
 prep_orig_data
