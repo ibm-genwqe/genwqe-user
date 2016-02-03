@@ -45,15 +45,17 @@
  */
 
 /*
- * 0: Software
- * 1: Hardware
+ * Select default setting for accelerated zlib. Older version used
+ * software as default. Since the library is packaged as extra
+ * libz.so, we assume that users of it like to use hardware as
+ * default.
  */
-#if 1
+#if 0
 #  define CONFIG_INFLATE_IMPL	 ZLIB_SW_IMPL
 #  define CONFIG_DEFLATE_IMPL	 ZLIB_SW_IMPL
 #else
-#  define CONFIG_INFLATE_IMPL	 ZLIB_HW_IMPL
-#  define CONFIG_DEFLATE_IMPL	 ZLIB_HW_IMPL
+#  define CONFIG_INFLATE_IMPL	 (ZLIB_HW_IMPL | ZLIB_FLAG_OMIT_LAST_DICT)
+#  define CONFIG_DEFLATE_IMPL	 (ZLIB_HW_IMPL | ZLIB_FLAG_OMIT_LAST_DICT)
 #endif
 
 #ifndef CONFIG_ZLIB_PATH
@@ -78,7 +80,8 @@
 int zlib_trace = 0x0;
 
 int zlib_accelerator = DDCB_TYPE_GENWQE;
-int zlib_card = 0;
+int zlib_card = -1;		/* Using redundant now as default */
+
 unsigned int zlib_inflate_impl = CONFIG_INFLATE_IMPL;
 unsigned int zlib_deflate_impl = CONFIG_DEFLATE_IMPL;
 unsigned int zlib_inflate_flags = 0x00000000;
