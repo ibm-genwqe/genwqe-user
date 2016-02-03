@@ -82,10 +82,10 @@ int zlib_trace = 0x0;
 int zlib_accelerator = DDCB_TYPE_GENWQE;
 int zlib_card = -1;		/* Using redundant now as default */
 
-unsigned int zlib_inflate_impl = CONFIG_INFLATE_IMPL;
-unsigned int zlib_deflate_impl = CONFIG_DEFLATE_IMPL;
-unsigned int zlib_inflate_flags = 0x00000000;
-unsigned int zlib_deflate_flags = 0x00000000;
+unsigned int zlib_inflate_impl  = (CONFIG_INFLATE_IMPL &  ZLIB_IMPL_MASK);
+unsigned int zlib_deflate_impl  = (CONFIG_DEFLATE_IMPL &  ZLIB_IMPL_MASK);
+unsigned int zlib_inflate_flags = (CONFIG_INFLATE_IMPL & ~ZLIB_IMPL_MASK);
+unsigned int zlib_deflate_flags = (CONFIG_DEFLATE_IMPL & ~ZLIB_IMPL_MASK);
 
 static unsigned int zlib_inflate_threshold = CONFIG_INFLATE_THRESHOLD;
 static pthread_mutex_t stats_mutex; /* mutex to protect global statistics */
