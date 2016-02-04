@@ -13,18 +13,21 @@
 # limitations under the License.
 #
 
+# FIXME How can we automatically set the version? Version changes from time
+#       to time, would be good if we could autoadjust this to avoid us editing
+#       the spec file on any version increase. Let me try %Version to fix that.
+#
+# zlib-devel 1.2.8 is better, but 1.2.7 should work too
+
 Summary: GenWQE userspace tools
 Name:    genwqe-tools
-Version: 4.0.7
+Version: %Version
 Release: 1%{?dist}
 License: Apache license
 Group: Development/Tools
 URL: https://github.com/ibm-genwqe/genwqe-user/
-
-Requires: zlib >= 1.2.8
-BuildRequires: zlib-devel >= 1.2.8
-
-#Source0: https://github.com/ibm-genwqe/genwqe-user/archive/%{version}.tar.gz
+# Requires: zlib >= 1.2.7
+# BuildRequires: zlib-devel >= 1.2.7
 Source0: https://github.com/ibm-genwqe/genwqe-user/archive/genwqe-%{version}.tar.gz
 
 %description
@@ -65,57 +68,27 @@ GenWQE adapter VPD tools
 %{__mkdir} -p %{buildroot}/%{_mandir}/man1
 %{__mv} %{buildroot}/usr/man/man1/* %{buildroot}/%{_mandir}/man1
 
-# Install example programs into /usr/lib/genwqe/
-#%{__mkdir} -p %{buildroot}/%{_libdir}/%{name}
-#%{__mv} %{buildroot}/usr/bin/genwqe/gunzip %{buildroot}/%{_libdir}/%{name}/
-#%{__mv} %{buildroot}/usr/bin/genwqe/gzip %{buildroot}/%{_libdir}/%{name}/
-#%{__mv} %{buildroot}/usr/bin/zlib_mt_perf.sh %{buildroot}/%{_libdir}/%{name}/
-#%{__mv} %{buildroot}/usr/bin/zlib_test_gz.sh %{buildroot}/%{_libdir}/%{name}/
-
-# Remove programs we don't want to package.
-# %{__rm} %{buildroot}/usr/bin/genwqe/zlib_mt_perf
-
-%files
+%files -n genwqe-tools
 %doc LICENSE
 %defattr(0755,root,root)
-%{_bindir}/genwqe_echo
-%{_bindir}/genwqe_update
-%{_bindir}/genwqe_memcopy
-%{_bindir}/genwqe_cksum
-%{_bindir}/genwqe_ffdc
-%{_bindir}/genwqe_gunzip
-%{_bindir}/genwqe_gzip
-%{_bindir}/genwqe_loadtree
-%{_bindir}/genwqe_maint
-%{_bindir}/genwqe_peek
-%{_bindir}/genwqe_poke
+%{_bindir}/genwqe_*
 %{_bindir}/zlib_mt_perf
 %{_bindir}/zlib_mt_perf.sh
 %{_bindir}/zlib_test_gz.sh
 %{_bindir}/genwqe/gunzip
 %{_bindir}/genwqe/gzip
 
-%{_mandir}/man1/genwqe_cksum.1.gz
-%{_mandir}/man1/genwqe_echo.1.gz
-%{_mandir}/man1/genwqe_ffdc.1.gz
-%{_mandir}/man1/genwqe_gunzip.1.gz
-%{_mandir}/man1/genwqe_gzip.1.gz
-%{_mandir}/man1/genwqe_loadtree.1.gz
-%{_mandir}/man1/genwqe_maint.1.gz
-%{_mandir}/man1/genwqe_memcopy.1.gz
-%{_mandir}/man1/genwqe_peek.1.gz
-%{_mandir}/man1/genwqe_poke.1.gz
-%{_mandir}/man1/genwqe_update.1.gz
+%{_mandir}/man1/genwqe_*.gz
 %{_mandir}/man1/zlib_mt_perf.1.gz
 
 %files -n genwqe-zlib
+%doc LICENSE
 %defattr(0755,root,root)
-%{_prefix}/lib/genwqe
-%{_prefix}/lib/
-%{_prefix}/include/genwqe
-%{_prefix}/include/
+%{_prefix}/lib/genwqe/*
+%{_prefix}/include/genwqe/*
 
 %files -n genwqe-vpd
+%doc LICENSE
 %{_sysconfdir}/genwqe_vpd.csv
 %{_bindir}/csv2bin
 %{_bindir}/genwqe_vpdconv
@@ -125,6 +98,8 @@ GenWQE adapter VPD tools
 %{_mandir}/man1/genwqe_vpdupdate.1.gz
 
 %changelog
+* Thu Feb 04 2016 Frank Haverkamp <haverkam@de.ibm.com>
+- Fix s390 and Intel build. Remove debug stuff from zlib rpm.
 * Fri Dec 11 2015 Frank Haverkamp <haverkam@de.ibm.com>
 - Changing some install directories again.
 * Tue Dec 08 2015 Gabriel Krisman Bertazi <krisman@linux.vnet.ibm.com> - 4.0.7-1

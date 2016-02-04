@@ -18,7 +18,7 @@
 #   V=0 means completely silent
 #   V=1 means brief output
 #   V=2 means full output
-V		?= 2
+V ?= 2
 
 ifeq ($(V),0)
 	Q		:= @
@@ -31,9 +31,10 @@ ifeq ($(V),1)
 	MAKE		+= -s
 endif
 
-# VERSION string *cannot* be empty.  It must be provided either in the
+# VERSION string *cannot* be empty. It must be provided either in the
 # version.mk file, in the command line as VERSION= or loaded by using
 # the git repository information.
+#
 ifneq ("$(wildcard version.mk)", "")
 	include ./version.mk
 else
@@ -41,8 +42,7 @@ else
 	RPMVERSION ?= $(shell git describe --abbrev=0 --tags)
 endif
 
-instdir = /opt/genwqe
-
+instdir = /usr
 distro = $(shell lsb_release -d | cut -f2)
 subdirs += lib tools
 targets += $(subdirs)
@@ -156,17 +156,6 @@ help:
 	@echo "      (default)"
 	@echo
 
-# FIXME This is a problem which occurs on distributions which have a
-# genwqe_card.h header file which is different from our local one.  If
-# there is a better solution than renaming it to get it out of the way
-# please fix this.
-#
-fixup_headerfile_problem:
-	@if [ -f /usr/src/kernels/`uname -r`/include/uapi/linux/genwqe/genwqe_card.h ]; then \
-		sudo mv /usr/src/kernels/`uname -r`/include/uapi/linux/genwqe/genwqe_card.h \
-			/usr/src/kernels/`uname -r`/include/uapi/linux/genwqe/genwqe_card.h.orig ; \
-	fi
-
 distclean: clean
 	@$(RM) -r sim_*	zlib-1.2.8 zlib-1.2.8.tar.gz
 
@@ -176,10 +165,7 @@ clean:
 			$(MAKE) -C $$dir $@ || exit 1;	\
 		fi					\
 	done
-	@$(RM) *~ */*~ 					\
-	@$(RM) genwqe-tools-$(RPMVERSION).tgz 		\
-	       genwqe-zlib-$(RPMVERSION).tgz		\
-	@$(RM) 	libz.o libz_prefixed.o zlib-1.2.8.cfg
+	@$(RM) genwqe-$(RPMVERSION).tgz	libz.o libz_prefixed.o zlib-1.2.8.cfg
 	@if [ -d zlib-1.2.8 ]; then 			\
 		$(MAKE) -s -C zlib-1.2.8 distclean;	\
 	fi
