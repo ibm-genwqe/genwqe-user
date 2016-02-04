@@ -18,6 +18,12 @@
 #       the spec file on any version increase. Let me try %Version to fix that.
 #
 # zlib-devel 1.2.8 is better, but 1.2.7 should work too
+#
+# The following switch tries to take care that the distros libz.so is been taken:
+#    CONFIG_ZLIB_PATH=%{_libdir}/libz.so
+# No special libz build should be needed anymore, since we added the right
+# dependency to the spec file. We want to have a zlib-devel installed.
+# 
 
 Summary: GenWQE userspace tools
 Name:    genwqe-tools
@@ -26,8 +32,8 @@ Release: 1%{?dist}
 License: Apache license
 Group: Development/Tools
 URL: https://github.com/ibm-genwqe/genwqe-user/
-# Requires: zlib >= 1.2.7
-# BuildRequires: zlib-devel >= 1.2.7
+Requires: zlib >= 1.2.7
+BuildRequires: zlib-devel >= 1.2.7
 Source0: https://github.com/ibm-genwqe/genwqe-user/archive/genwqe-%{version}.tar.gz
 
 %description
@@ -49,7 +55,8 @@ GenWQE adapter VPD tools
 %setup -q -n genwqe-%{version}
 
 %build
-%{__make} %{?_smp_mflags} tools lib VERSION=%{version}
+%{__make} %{?_smp_mflags} tools lib VERSION=%{version} \
+	CONFIG_ZLIB_PATH=%{_libdir}/libz.so
 
 %install
 %{__make} %{?_smp_mflags} install instdir=%{buildroot}/%{_prefix} VERSION=%{version}
