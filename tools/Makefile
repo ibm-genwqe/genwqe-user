@@ -16,7 +16,7 @@
 
 include ../config.mk
 
-instdir ?= /opt/genwqe
+instdir ?= /usr
 libs = ../lib/libDDCB.a ../lib/libzHW.a ../lib/libcard.a $(libcxl_a) # static
 LDLIBS += $(libs) -lpthread -lrt                                     # dynamic
 
@@ -102,11 +102,6 @@ uninstall_gzip_tools:
 	      $(instdir)/bin/zlib_mt_perf.sh	\
 	      $(instdir)/bin/zlib_test_gz.sh
 
-install_vpd_tools: all
-	@mkdir -p $(instdir)/bin
-	cp -uv genwqe_vpdconv genwqe_vpdupdate csv2bin \
-		$(instdir)/bin
-
 install_manpages: $(manpages)
 	@mkdir -p $(instdir)/man/man1
 	cp -uv $(manpages) $(instdir)/man/man1
@@ -116,18 +111,13 @@ install_release_manpages: $(manpages)
 	cp -uv genwqe_memcopy.1 genwqe_echo.1 genwqe_update.1 \
 		$(instdir)/man/man1
 
-install_vpd_manpages: $(manpages)
-	@mkdir -p $(instdir)/man/man1
-	cp -uv genwqe_vpdconv.1 genwqe_vpdupdate.1 csv2bin.1 \
-		$(instdir)/man/man1
-
 uninstall_manpages:
 	@for f in $(manpages) ; do				\
 		echo "removing $(instdir)/man/man1/$$f ...";	\
 		$(RM) $(instdir)/man/man1/$$f;			\
 	done
 
-install: all install_gzip_tools install_manpages
+install: install_gzip_tools install_manpages
 	@mkdir -p $(instdir)/bin
 	cp -uv $(projs) $(instdir)/bin
 

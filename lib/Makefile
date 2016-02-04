@@ -16,12 +16,11 @@
 
 include ../config.mk
 
-instdir ?= /opt/genwqe
+instdir ?= /usr
 zlibver=1.2.8
 libversion = $(VERSION)
 
 CFLAGS += -fPIC -fno-strict-aliasing
-
 
 ### Accelerated libz implemenation (Accelerated Data Compression/ADC)
 libname=libzADC
