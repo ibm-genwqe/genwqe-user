@@ -93,7 +93,7 @@ endif
 #
 
 ifeq ($(PLATFORM),ppc64le)              # Enable libcxl by default
-CONFIG_LIBCXL_PATH ?= ../../libcxl
+CONFIG_LIBCXL_PATH ?= ../ext/libcxl
 endif
 
 BUILD_SIMCODE ?= 0

@@ -1,0 +1,3 @@
+[submodule "ext/libcxl"]
+	path = ext/libcxl
+	url = https://github.com/ibm-capi/libcxl
