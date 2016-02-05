@@ -1052,7 +1052,6 @@ static int __ddcb_process_irqs(struct dev_ctx *ctx)
 		timeout.tv_usec = 100 * 1000;	/* 100 msec */
 
 		rc = select(ctx->afu_fd + 1, &set, NULL, NULL, &timeout);
-		rt_trace(0x0010, 0, 0, 0);
 		if (0 == rc) {
 			/* Timeout will Post error code only if context is active */
 			__ddcb_done_post(ctx, DDCB_ERR_IRQTIMEOUT);
@@ -1063,6 +1062,7 @@ static int __ddcb_process_irqs(struct dev_ctx *ctx)
 				 "and errno was EINTR, retrying\n");
 			continue;
 		}
+		rt_trace(0x0010, 0, 0, 0);
 
 		/*
 		 * FIXME I wonder if we must exit in this
