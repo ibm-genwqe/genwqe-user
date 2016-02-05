@@ -194,8 +194,6 @@ static void rt_trace_init(void)
 static void rt_trace(uint32_t tok, uint32_t n1, uint32_t n2, void *p)
 {
 	int	i;
-	struct timeval t;
-	uint64_t t64;
 
 	pthread_mutex_lock(&trc_lock);
 	i = trc_idx;
