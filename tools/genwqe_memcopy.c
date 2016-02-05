@@ -583,7 +583,7 @@ int main(int argc, char *argv[])
 	int	thread;
 	char	*out_f;		/* Output File name used */
 	int	err_code;
-	unsigned long long frequency, wtime_usec = 0, wtime_s = 0, wtime_e = 0;
+	unsigned long long frequency, wtime_usec = 0, wtime_e = 0;
 
 	/* Summ for all threads */
 	long long	bytes_copied = 0;
@@ -821,15 +821,8 @@ int main(int argc, char *argv[])
 			pt->err = EX_ERR_CARD;
 			continue;
 		}
-		if (thread == 0)
-			wtime_s = accel_get_queue_work_time(pt->accel);
-
 		/* Alloc ibuf */
 		pt->err = __memcpy_alloc_ibuf(&ip, pt);
-		//if (0 != pt->err) {
-			//accel_close(pt->accel);
-			//break;
-		//}
 	}
 	pt = &tdata[0];
 	for (thread = 0; thread < ip.threads; thread++, pt++) {
@@ -893,7 +886,7 @@ int main(int argc, char *argv[])
 		if (thread == ip.threads - 1) {
 			wtime_e = accel_get_queue_work_time(pt->accel);
 			frequency = accel_get_frequency(pt->accel);
-			wtime_usec = frequency ? (wtime_e - wtime_s) /
+			wtime_usec = frequency ? wtime_e /
 				(frequency/1000000) : 0;
 		}
 
