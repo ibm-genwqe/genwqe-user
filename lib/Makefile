@@ -16,12 +16,11 @@
 
 include ../config.mk
 
-instdir ?= /opt/genwqe
+instdir ?= /usr
 zlibver=1.2.8
 libversion = $(VERSION)
 
 CFLAGS += -fPIC -fno-strict-aliasing
-
 
 ### Accelerated libz implemenation (Accelerated Data Compression/ADC)
 libname=libzADC
@@ -54,12 +53,20 @@ objs2 = $(src2:.c=.o)
 
 projs += $(projA) $(proj0) $(proj1) $(proj2)
 
-all: ..check_libcxl $(projs)
+all: $(projs)
+
+$(libcxl_a): ..check_libcxl
 
 .PHONY: ..check_libcxl
 ..check_libcxl:
 ifneq ($(CONFIG_LIBCXL_PATH),)
 	@printf "\t[INFO]\tUsing $(libcxl_a).\n"
+	@if [ ! -f $(CONFIG_LIBCXL_PATH)/include/misc/cxl.h ]; then	\
+		mkdir -p $(CONFIG_LIBCXL_PATH)/include/misc/;		\
+		cp ../ext/include/misc/cxl.h 				\
+			$(CONFIG_LIBCXL_PATH)/include/misc/cxl.h;	\
+	fi
+	$(MAKE) -C $(CONFIG_LIBCXL_PATH)
 	@if [ ! -f $(libcxl_a) ]; then 					\
 	  printf  "\t[ERROR]\t$(libcxl_a) not found!\n"; 		\
 	  echo;								\
@@ -180,5 +187,8 @@ uninstall:
 
 clean distclean:
 	$(RM) *.o *.d $(projs) *.so
+ifneq ($(CONFIG_LIBCXL_PATH),)
+	$(MAKE) -C $(CONFIG_LIBCXL_PATH) $@
+endif
 
 -include $(objs:.o=.d) $(objs0:.o=.d) $(objs1:.o=.d) $(objs2:.o=.d)
