@@ -898,6 +898,12 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 	if (DDCB_IN != txq->status)
 		goto post_exit_stop;
 
+	/* it can happen that the timeout got set and the ddcb was
+	 * received in the meantime
+	 */
+	if (ddcb->retc_16)
+		compl_code = DDCB_OK;
+
 	elapsed_time = (int)(get_msec() - txq->q_in_time);
 
 	if ((DDCB_ERR_IRQTIMEOUT == compl_code) && (0 == ddcb->retc_16)) {
