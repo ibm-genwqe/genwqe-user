@@ -194,8 +194,6 @@ static void rt_trace_init(void)
 static void rt_trace(uint32_t tok, uint32_t n1, uint32_t n2, void *p)
 {
 	int	i;
-	struct timeval t;
-	uint64_t t64;
 
 	pthread_mutex_lock(&trc_lock);
 	i = trc_idx;
@@ -537,7 +535,7 @@ static inline int __afu_close(struct dev_ctx *ctx, bool force)
 	cxl_mmio_write64(afu_h, MMIO_DDCBQ_COMMAND_REG, mmio_dat);
 	while (1) {
 		cxl_mmio_read64(afu_h, MMIO_DDCBQ_STATUS_REG, &mmio_dat);
-		if (0x0ull == (mmio_dat & 0x4))
+		if (0x0ull == (mmio_dat & 0x10))
 			break;
 
 		usleep(100);
@@ -900,6 +898,12 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 	if (DDCB_IN != txq->status)
 		goto post_exit_stop;
 
+	/* it can happen that the timeout got set and the ddcb was
+	 * received in the meantime
+	 */
+	if (ddcb->retc_16)
+		compl_code = DDCB_OK;
+
 	elapsed_time = (int)(get_msec() - txq->q_in_time);
 
 	if ((DDCB_ERR_IRQTIMEOUT == compl_code) && (0 == ddcb->retc_16)) {
@@ -1054,7 +1058,6 @@ static int __ddcb_process_irqs(struct dev_ctx *ctx)
 		timeout.tv_usec = 100 * 1000;	/* 100 msec */
 
 		rc = select(ctx->afu_fd + 1, &set, NULL, NULL, &timeout);
-		rt_trace(0x0010, 0, 0, 0);
 		if (0 == rc) {
 			/* Timeout will Post error code only if context is active */
 			__ddcb_done_post(ctx, DDCB_ERR_IRQTIMEOUT);
@@ -1065,6 +1068,7 @@ static int __ddcb_process_irqs(struct dev_ctx *ctx)
 				 "and errno was EINTR, retrying\n");
 			continue;
 		}
+		rt_trace(0x0010, 0, 0, 0);
 
 		/*
 		 * FIXME I wonder if we must exit in this
