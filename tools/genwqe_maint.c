@@ -58,7 +58,7 @@ struct mdev_ctx {
 	struct cxl_afu_h *afu_h;/* The AFU handle */
 	int dt;			/* Delay time in sec (1 sec default) */
 	int count;		/* Number of loops to do, (-1) = forever */
-	bool deamon;		/* TRUE if forked */
+	bool daemon;		/* TRUE if forked */
 	uint64_t wed;		/* This is a dummy only for attach */
 	bool quiet;		/* False or true -q option */
 	pid_t pid;
@@ -347,12 +347,12 @@ static void help(char *prog)
 	       "\t-v, --verbose	\tverbose mode, up to -vvv\n"
 	       "\t-c, --count <num>	Loops to run (-1 = forever)\n"
 	       "\t-i, --interval <num>	Interval time in sec (default 1 sec)\n"
-	       "\t-d, --deamon		Start in Deamon process (background)\n"
+	       "\t-d, --daemon		Start in Daemon process (background)\n"
 	       "\t-m, --mode		Mode:\n"
 	       "\t	1 = Check Master Firs\n"
 	       "\t	2 = Watch Card worktimer\n"
 	       "\t-f, --log-file <file> Log File name when running in -d "
-	       "(deamon)\n", prog);
+	       "(daemon)\n", prog);
 }
 
 /**
@@ -377,7 +377,7 @@ int main(int argc, char *argv[])
 	mctx->card = 0;		/* Default, Card 0 */
 	mctx->mode = 0;		/* Default, nothing to watch */
 	mctx->process_irqs = 0;	/* No Master IRQ's received */
-	mctx->deamon = false;	/* Not in Deamon mode */
+	mctx->daemon = false;	/* Not in Daemon mode */
 
 	for (i = 0; i < MMIO_FIR_REGS_NUM; i++)
 		mctx->fir[i] = -1;
@@ -393,7 +393,7 @@ int main(int argc, char *argv[])
 			{ "verbose",	no_argument,	   NULL, 'v' },
 			{ "count",	required_argument, NULL, 'c' },
 			{ "interval",	required_argument, NULL, 'i' },
-			{ "deamon",	no_argument,	   NULL, 'd' },
+			{ "daemon",	no_argument,	   NULL, 'd' },
 			{ "log-file",	required_argument, NULL, 'f' },
 			{ "mode",	required_argument, NULL, 'm' },
 			{ 0,		0,		   NULL,  0  }
@@ -428,8 +428,8 @@ int main(int argc, char *argv[])
 		case 'i':	/* --interval */
 			mctx->dt = strtoul(optarg, NULL, 0);
 			break;
-		case 'd':	/* --deamon */
-			mctx->deamon = true;
+		case 'd':	/* --daemon */
+			mctx->daemon = true;
 			break;
 		case 'm':	/* --mode */
 			mode = strtoul(optarg, NULL, 0);
@@ -457,10 +457,10 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	if (mctx->deamon) {
+	if (mctx->daemon) {
 		if (NULL == log_file) {
 			fprintf(stderr, "Please Provide log file name (-f) "
-				"if running in deamon mode !\n");
+				"if running in daemon mode !\n");
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -478,10 +478,9 @@ int main(int argc, char *argv[])
 	signal(SIGTTIN,SIG_IGN);
 	signal(SIGHUP,sig_handler);	/* catch -1 hangup signal */
 	signal(SIGINT, sig_handler);	/* Catch -2 */
-	signal(SIGKILL,sig_handler);	/* catch -9 kill signal */
 	signal(SIGTERM,sig_handler);	/* catch -15 kill signal */
 
-	if (mctx->deamon) {
+	if (mctx->daemon) {
 		mctx->pid = fork();
 		if (mctx->pid < 0) {
 			printf("Fork() failed\n");
