@@ -19,6 +19,7 @@
 
 #include <stdint.h>
 #include <asm/byteorder.h>
+#include <linux/types.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -79,49 +80,49 @@ extern "C" {
  */
 struct ddcb_t {
 	union {
-		uint32_t icrc_hsi_shi_32; /**< CRC HW to SW/SW to HW Interlk */
+		__be32 icrc_hsi_shi_32; /**< CRC HW to SW/SW to HW Interlk */
 		struct {
-			uint16_t icrc_16;
+			__be16 icrc_16;
 			uint8_t  hsi;
 			uint8_t  shi;
 		};
 	};
-	uint8_t	 pre;		/**< Preamble */
-	uint8_t	 xdir;		/**< Execution Directives */
-	uint16_t seqnum;	/**< Sequence Number */
+	uint8_t pre;		/**< Preamble */
+	uint8_t xdir;		/**< Execution Directives */
+	__be16 seqnum;		/**< Sequence Number */
 
-	uint8_t	 acfunc;	/**< Accelerator Function.. */
-	uint8_t	 cmd;		/**< Command. */
-	uint16_t cmdopts_16;	/**< Command Options */
-	uint8_t	 sur;		/**< Status Update Rate */
-	uint8_t	 psp;		/**< Protection Section Pointer */
-	uint16_t rsvd_0e;	/**< Reserved invariant */
+	uint8_t acfunc;		/**< Accelerator Function.. */
+	uint8_t cmd;		/**< Command. */
+	__be16 cmdopts_16;	/**< Command Options */
+	uint8_t sur;		/**< Status Update Rate */
+	uint8_t psp;		/**< Protection Section Pointer */
+	__be16 rsvd_0e;		/**< Reserved invariant */
 
-	uint64_t fwiv;		/**< Firmware Invariant. */
+	__be64 fwiv;		/**< Firmware Invariant. */
 
 	union {
 		uint8_t __asiv[ASIV_LENGTH]; /**< Appl Spec Invariant */
 		struct {
-			uint64_t ats_64;  /**< Address Translation Spec */
+			__be64 ats_64;  /**< Address Translation Spec */
 			uint8_t  asiv[ASIV_LENGTH_ATS]; /**< New ASIV */
 		} n;
 	};
 	/* Note: 2nd Cache line starts here. */
 	uint8_t	 asv[ASV_LENGTH];   /**< Appl Spec Variant */
 
-	uint16_t rsvd_c0;	/**< Reserved Variant */
-	uint16_t vcrc_16;	/**< Variant CRC */
-	uint32_t rsvd;		/**< Reserved unprotected */
-	uint64_t deque_ts_64;	/**< Deque Time Stamp. */
-	uint16_t retc_16;	/**< Return Code. Note Must be cleared by SW */
-	uint16_t attn_16;	/**< Attention/Extended Error Codes */
-	uint32_t progress_32;	/**< Progress indicator. */
-	uint64_t cmplt_ts_64;	/**< Completion Time Stamp. */
-	uint32_t ibdc;
-	uint32_t obdc;
-	uint64_t rsvd_SLH;	/**< Dispatch TimeStamp */
-	uint8_t	 priv8[8];	/**< Driver usage */
-	uint64_t disp_ts_64;	/**< Dispatch TimeStamp */
+	__be16 rsvd_c0;		/**< Reserved Variant */
+	__be16 vcrc_16;		/**< Variant CRC */
+	__be32 rsvd;		/**< Reserved unprotected */
+	__be64 deque_ts_64;	/**< Deque Time Stamp. */
+	__be16 retc_16;		/**< Return Code. Note Must be cleared by SW */
+	__be16 attn_16;		/**< Attention/Extended Error Codes */
+	__be32 progress_32;	/**< Progress indicator. */
+	__be64 cmplt_ts_64;	/**< Completion Time Stamp. */
+	__be32 ibdc;
+	__be32 obdc;
+	__be64 rsvd_SLH;	/**< Dispatch TimeStamp */
+	uint8_t priv8[8];	/**< Driver usage */
+	__be64 disp_ts_64;	/**< Dispatch TimeStamp */
 } __attribute__((__packed__));
 
 typedef struct ddcb_t ddcb_t;
@@ -144,8 +145,8 @@ typedef struct ddcb_t ddcb_t;
  * Example: icrc = ddcb_crc16((const uint8_t *)pddcb,
  *                            ICRC_LENGTH(cmd->asiv_length), 0xffff);
  */
-static inline uint16_t ddcb_crc16(const uint8_t *buff, size_t len,
-				  uint16_t init)
+static inline __be16 ddcb_crc16(const uint8_t *buff, size_t len,
+				uint16_t init)
 {
 	int i;
 	uint16_t crc = init;
