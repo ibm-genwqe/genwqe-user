@@ -22,7 +22,7 @@
 #include <limits.h>
 #include <pthread.h>
 
-#include "../include/zlib.h"	/* standard interface */
+#include <zlib.h>		/* standard interface */
 #include "libddcb.h"
 #include "wrapper.h"
 
