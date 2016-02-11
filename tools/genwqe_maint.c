@@ -109,26 +109,69 @@ static int mmio_read(struct cxl_afu_h *afu_h, int ctx, uint32_t offset,
 static int afu_m_open(struct mdev_ctx *mctx)
 {
 	int rc = 0;
-	char    device[64];
+	char device[64];
+	long api_version, cr_device, cr_vendor;
 
 	sprintf(device, "/dev/cxl/afu%d.0m", mctx->card);
 	VERBOSE2("[%s] Enter, Open Device: %s\n", __func__, device);
 	mctx->afu_h = cxl_afu_open_dev(device);
-	if (mctx->afu_h) {
-		rc = cxl_afu_attach(mctx->afu_h,
-			(__u64)(unsigned long)(void *)mctx->wed);
-		if (0 == rc) {
-			rc = cxl_mmio_map(mctx->afu_h, CXL_MMIO_BIG_ENDIAN);
-			if (0 == rc) {
-				VERBOSE2("[%s] Exit\n", __func__);
-				return 0;
-			}
-			cxl_afu_free(mctx->afu_h);
-		}
+	if (!mctx->afu_h) {
+		mctx->afu_h = NULL;
+		VERBOSE0("[%s] Exit, Card Open error rc: %d\n", __func__, rc);
+		return -1;
 	}
+
+	/* Check if the compiled in API version is compatible with the
+	   one reported by the kernel driver */
+	rc = cxl_get_api_version_compatible(mctx->afu_h, &api_version);
+	if ((rc != 0) || (api_version != CXL_KERNEL_API_VERSION)) {
+		VERBOSE0(" [%s] ERR: incompatible API version: %ld/%d rc=%d\n",
+			 __func__, api_version, CXL_KERNEL_API_VERSION, rc);
+		rc = -2;
+		goto err_afu_free;
+	}
+
+	/* Check vendor id */
+	rc = cxl_get_cr_vendor(mctx->afu_h, 0, &cr_vendor);
+	if ((rc != 0) || (cr_vendor != CGZIP_CR_VENDOR)) {
+		VERBOSE0(" [%s] ERR: vendor_id: %ld/%d rc=%d\n",
+			 __func__, (unsigned long)cr_vendor,
+			 CGZIP_CR_VENDOR, rc);
+		rc = -3;
+		goto err_afu_free;
+	}
+
+	/* Check device id */
+	rc = cxl_get_cr_device(mctx->afu_h, 0, &cr_device);
+	if ((rc != 0) || (cr_device != CGZIP_CR_DEVICE)) {
+		VERBOSE0(" [%s] ERR: device_id: %ld/%d rc=%d\n",
+			 __func__, (unsigned long)cr_device,
+			 CGZIP_CR_VENDOR, rc);
+		rc = -4;
+		goto err_afu_free;
+	}
+
+	rc = cxl_afu_attach(mctx->afu_h,
+			    (__u64)(unsigned long)(void *)mctx->wed);
+	if (0 != rc) {
+		rc = -5;
+		goto err_afu_free;
+	}
+
+	rc = cxl_mmio_map(mctx->afu_h, CXL_MMIO_BIG_ENDIAN);
+	if (rc != 0) {
+		rc = -6;
+		goto err_afu_free;
+	}
+
+	return 0;
+
+ err_afu_free:
+	cxl_afu_free(mctx->afu_h);
 	mctx->afu_h = NULL;
-	VERBOSE0("[%s] Exit, Card Open error rc: %d\n", __func__, rc);
-	return -1;
+
+	VERBOSE2("[%s] Exit rc=%d\n", __func__, rc);
+	return rc;
 }
 
 static void afu_m_close(struct mdev_ctx *mctx)
@@ -200,7 +243,8 @@ static int afu_check_mfirs(struct mdev_ctx *mctx)
 	uint64_t data;
 	uint32_t offs;
 	bool changed = false;
-	int rc = 0;
+	bool dead = false;
+	long cr_device = 0;
 	time_t t;
 
 	for (i = 0; i < MMIO_FIR_REGS_NUM; i++) {
@@ -209,21 +253,27 @@ static int afu_check_mfirs(struct mdev_ctx *mctx)
 		if (data != mctx->fir[i])
 			changed = true;
 		if (data == -1ull)
-			rc = -1;  /* dead!! */
+			dead = true;
 
 		mctx->fir[i] = data;
 	}
 	if (changed) {
 		t = time(NULL);
 		VERBOSE0("%s", ctime(&t));
+
+		/* Always print this ... */
+		cxl_get_cr_device(mctx->afu_h, 0, &cr_device);
+		VERBOSE0("  cr_device: 0x%04lx\n", (unsigned long)cr_device);
+
 		for (i = 0; i < MMIO_FIR_REGS_NUM; i++)
-			VERBOSE0("  AFU[%d] FIR: %d : 0x%016llx\n",
+			VERBOSE0("  AFU[%d] FIR: %d: 0x%016llx\n",
 				 mctx->card, i, (long long)mctx->fir[i]);
-	}
-	if (rc) {
-		t = time(NULL);
-		VERBOSE0("%s  AFU[%d] card is dead, FIRs with -1 found!\n",
-			 ctime(&t), mctx->card);
+
+		if (dead) {
+			t = time(NULL);
+			VERBOSE0("%s  AFU[%d] card is dead.\n",
+				 ctime(&t), mctx->card);
+		}
 	}
 
 	return mctx->dt;
@@ -323,7 +373,7 @@ int main(int argc, char *argv[])
 	mctx->loop = 0;		/* Counter */
 	mctx->quiet = false;
 	mctx->dt = 1;		/* Default, 1 sec delay time */
-	mctx->count = 1;	/* Default, run once */
+	mctx->count = -1;	/* Default, run once */
 	mctx->card = 0;		/* Default, Card 0 */
 	mctx->mode = 0;		/* Default, nothing to watch */
 	mctx->process_irqs = 0;	/* No Master IRQ's received */
