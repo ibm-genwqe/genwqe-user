@@ -42,7 +42,6 @@ else
 	RPMVERSION ?= $(shell git describe --abbrev=0 --tags)
 endif
 
-instdir = /usr
 distro = $(shell lsb_release -d | cut -f2)
 subdirs += lib tools
 targets += $(subdirs)
