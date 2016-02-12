@@ -1,0 +1,9 @@
+[Unit]
+Description=IBM CAPI GenWQE health daemon
+
+[Service]
+Type=forking
+ExecStart=/bin/genwqe_maint --daemon
+
+[Install]
+WantedBy=multi-user.target

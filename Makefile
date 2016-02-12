@@ -32,7 +32,7 @@ ifeq ($(V),1)
 endif
 
 distro = $(shell lsb_release -d | cut -f2)
-subdirs += lib tools
+subdirs += lib tools init
 targets += $(subdirs)
 
 UDEV_RULES_D ?= /etc/udev/rules.d
