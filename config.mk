@@ -31,6 +31,9 @@ STRIP		= $(CROSS)strip
 NM		= $(CROSS)nm
 HELP2MAN	= help2man
 
+VERSION=4.0.11
+RPMVERSION=$(VERSION)
+
 ifeq ($(V),0)
 Q		:= @
 MAKEFLAGS	+= --silent
