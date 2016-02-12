@@ -65,6 +65,8 @@ struct mdev_ctx {
 	pid_t my_sid;		/* for sid */
 	int mode;		/* See below */
 	int process_irqs;	/* Master IRQ Counter */
+	size_t errinfo_size;
+	char *errinfo;
 
 	uint64_t fir[MMIO_FIR_REGS_NUM];
 };
@@ -151,38 +153,56 @@ static int afu_m_open(struct mdev_ctx *mctx)
 		goto err_afu_free;
 	}
 
-	rc = cxl_afu_attach(mctx->afu_h,
-			    (__u64)(unsigned long)(void *)mctx->wed);
+	rc = cxl_errinfo_size(mctx->afu_h, &mctx->errinfo_size);
 	if (0 != rc) {
 		rc = -5;
 		goto err_afu_free;
 	}
 
-	rc = cxl_mmio_map(mctx->afu_h, CXL_MMIO_BIG_ENDIAN);
-	if (rc != 0) {
+	mctx->errinfo = malloc(mctx->errinfo_size);
+	if (mctx->errinfo == NULL) {
 		rc = -6;
 		goto err_afu_free;
 	}
 
+	rc = cxl_afu_attach(mctx->afu_h,
+			    (__u64)(unsigned long)(void *)mctx->wed);
+	if (0 != rc) {
+		rc = -7;
+		goto err_free_errinfo;
+	}
+
+	rc = cxl_mmio_map(mctx->afu_h, CXL_MMIO_BIG_ENDIAN);
+	if (rc != 0) {
+		rc = -8;
+		goto err_free_errinfo;
+	}
+
 	return 0;
 
+ err_free_errinfo:
+	free(mctx->errinfo);
  err_afu_free:
 	cxl_afu_free(mctx->afu_h);
 	mctx->afu_h = NULL;
-
 	VERBOSE2("[%s] Exit rc=%d\n", __func__, rc);
 	return rc;
 }
 
-static void afu_m_close(struct mdev_ctx *mctx)
+static int afu_m_close(struct mdev_ctx *mctx)
 {
 	VERBOSE2("[%s] Enter\n", __func__);
-	if (mctx->afu_h) {
-		cxl_mmio_unmap(mctx->afu_h);
-		cxl_afu_free(mctx->afu_h);
-		mctx->afu_h = NULL;
-	}
+	if (!mctx->afu_h)
+		return -1;
+
+	cxl_mmio_unmap(mctx->afu_h);
+	cxl_afu_free(mctx->afu_h);
+	mctx->afu_h = NULL;
+
+	free(mctx->errinfo);
+	mctx->errinfo = NULL;
 	VERBOSE2("[%s] Exit\n", __func__);
+	return 0;
 }
 
 static int afu_check_stime(struct mdev_ctx *mctx)
@@ -246,6 +266,7 @@ static int afu_check_mfirs(struct mdev_ctx *mctx)
 	bool dead = false;
 	long cr_device = 0;
 	time_t t;
+	int rc;
 
 	for (i = 0; i < MMIO_FIR_REGS_NUM; i++) {
 		offs = MMIO_FIR_REGS_BASE + i * 8;
@@ -264,6 +285,14 @@ static int afu_check_mfirs(struct mdev_ctx *mctx)
 		/* Always print this ... */
 		cxl_get_cr_device(mctx->afu_h, 0, &cr_device);
 		VERBOSE0("  cr_device: 0x%04lx\n", (unsigned long)cr_device);
+
+		rc = cxl_errinfo_read(mctx->afu_h, mctx->errinfo, 0,
+				      mctx->errinfo_size);
+		if (rc != (int)mctx->errinfo_size) {
+			VERBOSE0("  cxl_err_info_read returned %d!\n", rc);
+		}
+
+		ddcb_hexdump(fd_out, mctx->errinfo, mctx->errinfo_size);
 
 		for (i = 0; i < MMIO_FIR_REGS_NUM; i++)
 			VERBOSE0("  AFU[%d] FIR: %d: 0x%016llx\n",
