@@ -26,11 +26,11 @@
 
 accelerator=GENWQE
 card=0
-tools_dir=genwqe-user/tools
+tools_dir=tools
 verbose=0
-iterations=10
-processes=128
-killtimeout=4
+iterations=100000
+processes=160
+killtimeout=2
 preload=1
 runpids=""
 
@@ -135,7 +135,7 @@ function test_echo ()
 }
 
 echo "Build code ..."
-make -s || exit 1
+make -s -j32 || exit 1
 
 echo "********************************************************************"
 echo "Parallel echo TEST for ${accelerator} card ${card} starting ${processes}"
@@ -147,29 +147,33 @@ rm -f echo_*.cmd echo_*.stdout.log echo_*.stderr.log
 
 for i in `seq 1 ${iterations}` ; do
 
-    echo "Check if card is replying to an echo request ..."
-    $tools_dir/genwqe_echo -A ${accelerator} -C ${card} -c5
+    echo -n "(1) Check if card is replying to an echo request ($i) ... "
+    date
+
+    $tools_dir/genwqe_echo -A ${accelerator} -C ${card} -i0 -c5
     if [ $? -ne 0 ]; then
 	echo "Single echo took to long, please review results!"
 	exit 1
     fi
 
+    echo "(2) Perform massive interrupt stress and killing applications ..."
     test_echo;
 
-    echo "Check logfiles for string \"err\" ..."
+    echo "(3) Check logfiles for string \"err\" ..."
     grep err echo_*.stderr.log
     if [ $? -ne 1 ]; then
 	echo "Found potential errors ... please check logfiles"
 	exit 1
     fi
 
-    $tools_dir/genwqe_echo -A ${accelerator} -C ${card} -c5
+    echo "(4) Check if card is still replying to an echo request ..."
+    $tools_dir/genwqe_echo -A ${accelerator} -C ${card} -i0 -c5
     if [ $? -ne 0 ]; then
 	echo "Single echo took to long, please review results!"
 	exit 1
     fi
 
-    echo "Remove old logfiles ..."
+    echo "(5) Remove old logfiles ..."
     rm -f echo_*.cmd echo_*.stdout.log echo_*.stderr.log
 done
 
