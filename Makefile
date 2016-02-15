@@ -31,20 +31,8 @@ ifeq ($(V),1)
 	MAKE		+= -s
 endif
 
-# VERSION string *cannot* be empty. It must be provided either in the
-# version.mk file, in the command line as VERSION= or loaded by using
-# the git repository information.
-#
-ifneq ("$(wildcard version.mk)", "")
-	include ./version.mk
-else
-	VERSION ?= $(shell git describe --abbrev=4 --dirty --always --tags)
-	RPMVERSION ?= $(shell git describe --abbrev=0 --tags)
-endif
-
-instdir = /usr
 distro = $(shell lsb_release -d | cut -f2)
-subdirs += lib tools
+subdirs += lib tools init
 targets += $(subdirs)
 
 UDEV_RULES_D ?= /etc/udev/rules.d
@@ -95,7 +83,7 @@ endif
 .PHONY: $(subdirs) install
 $(subdirs):
 	@if [ -d $@ ]; then					\
-		$(MAKE) -C $@ C=0 VERSION=$(VERSION) || exit 1; \
+		$(MAKE) -C $@ C=0 || exit 1; \
 	fi
 
 rpmbuild_setup:
@@ -110,8 +98,6 @@ rpmbuild_setup:
 #
 rpmbuild:
 	@$(MAKE) -s distclean
-	@echo "VERSION:=$(VERSION)" > version.mk
-	@echo "RPMVERSION:=$(RPMVERSION)" >> version.mk
 	@rm -rf /tmp/genwqe-$(RPMVERSION)
 	@mkdir -p /tmp/genwqe-$(RPMVERSION)
 	@cp -ar * /tmp/genwqe-$(RPMVERSION)/
@@ -125,7 +111,7 @@ rpmbuild:
 install uninstall:
 	@for dir in $(subdirs); do 					  \
 		if [ -d $$dir ]; then					  \
-			$(MAKE) -C $$dir VERSION=$(VERSION) $@ || exit 1; \
+			$(MAKE) -C $$dir $@ || exit 1; \
 		fi							  \
 	done
 

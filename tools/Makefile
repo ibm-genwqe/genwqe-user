@@ -16,7 +16,7 @@
 
 include ../config.mk
 
-instdir ?= /usr
+DESTDIR ?= /usr
 libs = ../lib/libDDCB.a ../lib/libzHW.a ../lib/libcard.a $(libcxl_a) # static
 LDLIBS += $(libs) -lpthread -lrt                                     # dynamic
 
@@ -78,9 +78,9 @@ genwqe_gunzip.o: genwqe_gzip.c
 # Tools for card maintenance
 #
 install_release_tools: all
-	@mkdir -p $(instdir)/bin
+	@mkdir -p $(DESTDIR)/bin
 	cp -uv genwqe_peek genwqe_poke genwqe_memcopy genwqe_echo genwqe_update \
-		$(instdir)/bin
+		$(DESTDIR)/bin
 
 #
 # Example tools and testcases
@@ -90,41 +90,41 @@ install_release_tools: all
 #   hardware accelerated version of gzip/gunzip.
 #
 install_gzip_tools: all
-	mkdir -p $(instdir)/bin/genwqe
-	cp -uv genwqe_gzip $(instdir)/bin/genwqe/gzip
-	cp -uv genwqe_gzip $(instdir)/bin/genwqe/gunzip
-	cp -uv zlib_mt_perf zlib_mt_perf.sh zlib_test_gz.sh $(instdir)/bin
+	mkdir -p $(DESTDIR)/bin/genwqe
+	cp -uv genwqe_gzip $(DESTDIR)/bin/genwqe/gzip
+	cp -uv genwqe_gzip $(DESTDIR)/bin/genwqe/gunzip
+	cp -uv zlib_mt_perf zlib_mt_perf.sh zlib_test_gz.sh $(DESTDIR)/bin
 
 uninstall_gzip_tools:
-	$(RM) $(instdir)/bin/genwqe/gzip	\
-	      $(instdir)/bin/genwqe/gunzip	\
-	      $(instdir)/bin/zlib_mt_perf	\
-	      $(instdir)/bin/zlib_mt_perf.sh	\
-	      $(instdir)/bin/zlib_test_gz.sh
+	$(RM) $(DESTDIR)/bin/genwqe/gzip	\
+	      $(DESTDIR)/bin/genwqe/gunzip	\
+	      $(DESTDIR)/bin/zlib_mt_perf	\
+	      $(DESTDIR)/bin/zlib_mt_perf.sh	\
+	      $(DESTDIR)/bin/zlib_test_gz.sh
 
 install_manpages: $(manpages)
-	@mkdir -p $(instdir)/man/man1
-	cp -uv $(manpages) $(instdir)/man/man1
+	@mkdir -p $(DESTDIR)/man/man1
+	cp -uv $(manpages) $(DESTDIR)/man/man1
 
 install_release_manpages: $(manpages)
-	@mkdir -p $(instdir)/man/man1
+	@mkdir -p $(DESTDIR)/man/man1
 	cp -uv genwqe_memcopy.1 genwqe_echo.1 genwqe_update.1 \
-		$(instdir)/man/man1
+		$(DESTDIR)/man/man1
 
 uninstall_manpages:
 	@for f in $(manpages) ; do				\
-		echo "removing $(instdir)/man/man1/$$f ...";	\
-		$(RM) $(instdir)/man/man1/$$f;			\
+		echo "removing $(DESTDIR)/man/man1/$$f ...";	\
+		$(RM) $(DESTDIR)/man/man1/$$f;			\
 	done
 
 install: install_gzip_tools install_manpages
-	@mkdir -p $(instdir)/bin
-	cp -uv $(projs) $(instdir)/bin
+	@mkdir -p $(DESTDIR)/bin
+	cp -uv $(projs) $(DESTDIR)/bin
 
 uninstall: uninstall_gzip_tools uninstall_manpages
 	@for f in $(projs) ; do					\
-		echo "removing $(instdir)/bin/$$f ...";		\
-		$(RM) $(instdir)/bin/$$f;			\
+		echo "removing $(DESTDIR)/bin/$$f ...";		\
+		$(RM) $(DESTDIR)/bin/$$f;			\
 	done
 
 clean distclean:

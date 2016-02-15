@@ -59,7 +59,7 @@ GenWQE adapter VPD tools
 	CONFIG_ZLIB_PATH=%{_libdir}/libz.so
 
 %install
-%{__make} %{?_smp_mflags} install instdir=%{buildroot}/%{_prefix} VERSION=%{version}
+%{__make} %{?_smp_mflags} install DESTDIR=%{buildroot}/%{_prefix} VERSION=%{version}
 
 #
 # FIXME Instead of trying to fixup things in the spec fike, let us consider

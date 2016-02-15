@@ -16,7 +16,7 @@
 
 include ../config.mk
 
-instdir ?= /usr
+DESTDIR ?= /usr
 zlibver=1.2.8
 libversion = $(VERSION)
 
@@ -167,18 +167,18 @@ libz.o: $(CONFIG_LIBZ_PATH)/libz.so
 install: install_zlib
 
 install_zlib: all
-	mkdir -p $(instdir)/lib/genwqe
-	cp -uv $(projA) $(instdir)/lib/genwqe/
-	(cd $(instdir)/lib/genwqe/ && \
+	mkdir -p $(DESTDIR)/lib/genwqe
+	cp -uv $(projA) $(DESTDIR)/lib/genwqe/
+	(cd $(DESTDIR)/lib/genwqe/ && \
 		ln -sf $(libname).a libz.a && \
 		ln -sf $(libname)-$(libversion).so libz.so && \
 		ln -sf $(libname)-$(libversion).so libz.so.1)
-	mkdir -p $(instdir)/include/genwqe
-	cp -uv ../include/zaddons.h $(instdir)/include/genwqe/
+	mkdir -p $(DESTDIR)/include/genwqe
+	cp -uv ../include/zaddons.h $(DESTDIR)/include/genwqe/
 
 uninstall:
-	@echo "removing $(instdir)/include/genwqe $(instdir)/lib/genwqe"
-	$(RM) -r $(instdir)/include/genwqe $(instdir)/lib/genwqe
+	@echo "removing $(DESTDIR)/include/genwqe $(DESTDIR)/lib/genwqe"
+	$(RM) -r $(DESTDIR)/include/genwqe $(DESTDIR)/lib/genwqe
 
 # general things
 %.o: %.c
