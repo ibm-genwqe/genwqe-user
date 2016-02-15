@@ -153,35 +153,39 @@ static int afu_m_open(struct mdev_ctx *mctx)
 		goto err_afu_free;
 	}
 
+	/* If we cannot get it, continue with warning ... */
+	mctx->errinfo = NULL;
 	rc = cxl_errinfo_size(mctx->afu_h, &mctx->errinfo_size);
-	if (0 != rc) {
-		rc = -5;
+	if (0 == rc) {
+		mctx->errinfo = malloc(mctx->errinfo_size);
+		if (mctx->errinfo == NULL) {
+			rc = -5;
+			goto err_afu_free;
+		}
 		goto err_afu_free;
-	}
+	} else
+		VERBOSE0(" [%s] WARN: Cannot retrieve errinfo size rc=%d\n",
+			 __func__, rc);
 
-	mctx->errinfo = malloc(mctx->errinfo_size);
-	if (mctx->errinfo == NULL) {
+	rc = cxl_afu_attach(mctx->afu_h, (__u64)(unsigned long)
+			    (void *)mctx->wed);
+	if (0 != rc) {
 		rc = -6;
-		goto err_afu_free;
-	}
-
-	rc = cxl_afu_attach(mctx->afu_h,
-			    (__u64)(unsigned long)(void *)mctx->wed);
-	if (0 != rc) {
-		rc = -7;
 		goto err_free_errinfo;
 	}
 
 	rc = cxl_mmio_map(mctx->afu_h, CXL_MMIO_BIG_ENDIAN);
 	if (rc != 0) {
-		rc = -8;
+		rc = -7;
 		goto err_free_errinfo;
 	}
 
 	return 0;
 
  err_free_errinfo:
-	free(mctx->errinfo);
+	if (mctx->errinfo)
+		free(mctx->errinfo);
+	mctx->errinfo = NULL;
  err_afu_free:
 	cxl_afu_free(mctx->afu_h);
 	mctx->afu_h = NULL;
@@ -199,7 +203,8 @@ static int afu_m_close(struct mdev_ctx *mctx)
 	cxl_afu_free(mctx->afu_h);
 	mctx->afu_h = NULL;
 
-	free(mctx->errinfo);
+	if (mctx->errinfo)
+		free(mctx->errinfo);
 	mctx->errinfo = NULL;
 	VERBOSE2("[%s] Exit\n", __func__);
 	return 0;
@@ -286,13 +291,16 @@ static int afu_check_mfirs(struct mdev_ctx *mctx)
 		cxl_get_cr_device(mctx->afu_h, 0, &cr_device);
 		VERBOSE0("  cr_device: 0x%04lx\n", (unsigned long)cr_device);
 
-		rc = cxl_errinfo_read(mctx->afu_h, mctx->errinfo, 0,
-				      mctx->errinfo_size);
-		if (rc != (int)mctx->errinfo_size) {
-			VERBOSE0("  cxl_err_info_read returned %d!\n", rc);
+		if (mctx->errinfo) {
+			rc = cxl_errinfo_read(mctx->afu_h, mctx->errinfo, 0,
+					      mctx->errinfo_size);
+			if (rc != (int)mctx->errinfo_size) {
+				VERBOSE0("  cxl_err_info_read returned %d!\n",
+					 rc);
+			}
+			ddcb_hexdump(fd_out, mctx->errinfo,
+				     mctx->errinfo_size);
 		}
-
-		ddcb_hexdump(fd_out, mctx->errinfo, mctx->errinfo_size);
 
 		for (i = 0; i < MMIO_FIR_REGS_NUM; i++)
 			VERBOSE0("  AFU[%d] FIR: %d: 0x%016llx\n",
@@ -548,8 +556,9 @@ int main(int argc, char *argv[])
 	if (0 != afu_m_open(mctx)) {
 		VERBOSE0("Err: failed to open Master Context for "
 			 "CAPI Card: %u\n"
-			 "\tCheck Permissions in /dev/cxl/* or kernel log.\n",
-			 mctx->card);
+			 "\tCheck Permissions in /dev/cxl/* or kernel log.\n"
+			 "\terrno=%d %s\n",
+			 mctx->card, errno, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
