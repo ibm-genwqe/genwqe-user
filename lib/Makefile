@@ -57,6 +57,8 @@ all: $(projs)
 
 $(libcxl_a): ..check_libcxl
 
+ddcb_capi.o: ..check_libcxl
+
 .PHONY: ..check_libcxl
 ..check_libcxl:
 ifneq ($(CONFIG_LIBCXL_PATH),)
