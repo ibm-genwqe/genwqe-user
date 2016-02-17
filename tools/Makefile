@@ -36,7 +36,8 @@ zlib_mt_perf_libs = ../lib/libzADC.a -ldl	# statically link our libz
 
 projs = genwqe_update genwqe_gzip genwqe_gunzip zlib_mt_perf genwqe_memcopy \
 	genwqe_echo genwqe_peek genwqe_poke genwqe_cksum \
-	genwqe_vpdconv genwqe_vpdupdate csv2bin genwqe_loadtree genwqe_ffdc
+	genwqe_vpdconv genwqe_vpdupdate genwqe_csv2bin genwqe_loadtree \
+	genwqe_ffdc
 
 # Do this only on platforms where we have a libcxl available e.g. System p
 ifneq ($(CONFIG_LIBCXL_PATH),)

@@ -97,10 +97,10 @@ GenWQE adapter VPD tools
 %files -n genwqe-vpd
 %doc LICENSE
 %{_sysconfdir}/genwqe_vpd.csv
-%{_bindir}/csv2bin
+%{_bindir}/genwqe_csv2bin
 %{_bindir}/genwqe_vpdconv
 %{_bindir}/genwqe_vpdupdate
-%{_mandir}/man1/csv2bin.1.gz
+%{_mandir}/man1/genwqe_csv2bin.1.gz
 %{_mandir}/man1/genwqe_vpdconv.1.gz
 %{_mandir}/man1/genwqe_vpdupdate.1.gz
 
