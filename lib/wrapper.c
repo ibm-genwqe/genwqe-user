@@ -277,7 +277,7 @@ static void _init(void)
 
 	pr_trace("%s: BUILD=%s ZLIB_TRACE=%x ZLIB_INFLATE_IMPL=%d "
 		 "ZLIB_DEFLATE_IMPL=%d ZLIB_INFLATE_THRESHOLD=%d\n",
-		 __func__, __DATE__, zlib_trace,
+		 __func__, GIT_VERSION, zlib_trace,
 		 zlib_inflate_impl, zlib_deflate_impl, zlib_inflate_threshold);
 
 	if (zlib_gather_statistics()) {
