@@ -535,8 +535,6 @@ static inline int __afu_close(struct dev_ctx *ctx, bool force)
 
 	VERBOSE1("        [%s] AFU[%d:%d] Enter Open Clients: %d\n",
 		__func__, ctx->card_no, ctx->cid_id, ctx->clients);
-	mmio_dat = 0x2ull;	/* Stop !! */
-	cxl_mmio_write64(afu_h, MMIO_DDCBQ_COMMAND_REG, mmio_dat);
 	while (1) {
 		cxl_mmio_read64(afu_h, MMIO_DDCBQ_STATUS_REG, &mmio_dat);
 		if (0x0ull == (mmio_dat & 0x10))
