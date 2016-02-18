@@ -162,7 +162,6 @@ static int afu_m_open(struct mdev_ctx *mctx)
 			rc = -5;
 			goto err_afu_free;
 		}
-		goto err_afu_free;
 	} else
 		VERBOSE0(" [%s] WARN: Cannot retrieve errinfo size rc=%d\n",
 			 __func__, rc);
