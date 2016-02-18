@@ -59,7 +59,7 @@ CFLAGS = -W -Wall -Werror -Wwrite-strings -Wextra -Os -g \
 	-I. -I/opt/genwqe/include -I../include -I../include/linux/uapi \
 	-Wmissing-prototypes # -Wstrict-prototypes -Warray-bounds
 
-LDFLAGS += -L/opt/genwqe/lib
+LDFLAGS += -L/opt/genwqe/lib # -Wl,--no-undefined
 
 # Force 32-bit build
 #   This is needed to generate the code for special environments. We have
