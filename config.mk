@@ -68,10 +68,10 @@ endif
 
 PLATFORM ?= $(shell uname -i)
 
-CFLAGS = -W -Wall -Werror -Wwrite-strings -Wextra -Os -g \
-	-DGIT_VERSION=\"$(VERSION)\" \
-	-I. -I/opt/genwqe/include -I../include -I../include/linux/uapi \
+CFLAGS ?= -W -Wall -Werror -Wwrite-strings -Wextra -Os -g \
 	-Wmissing-prototypes # -Wstrict-prototypes -Warray-bounds
+CFLAGS += -DGIT_VERSION=\"$(VERSION)\" \
+	-I. -I/opt/genwqe/include -I../include -I../include/linux/uapi
 
 LDFLAGS += -L/opt/genwqe/lib # -Wl,--no-undefined
 
