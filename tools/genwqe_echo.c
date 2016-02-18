@@ -71,10 +71,11 @@ static void usage(const char *prog)
 	       "  -e, --exit-on-err      exit program when seeing an error\n"
 #endif
 	       "  -f, --flood\n"
-	       "  -l, --preload=1..N   N <= 64\n"
+	       "  -l, --preload=1..N     N <= 64\n"
 	       "  -i, --interval=INTERVAL_USEC\n"
 	       "  -s, --string=TESTSTRING\n"
-	       "  -q, --quiet          only summary output\n"
+	       "  -p, --polling          use DDCB polling mode.\n"
+	       "  -q, --quiet            only summary output\n"
 	       "\n"
 	       "This utility sends echo DDCBs either to the service layer\n"
 	       "or other chip units. It can be used to check the cards\n"
@@ -235,13 +236,14 @@ int main(int argc, char *argv[])
 	unsigned long count = 0;
 	int run_infinite = 1;
 	unsigned long interval = 1000000; /* 1sec is default */
-	uint8_t unit = DDCB_ACFUNC_APP;	/* 0=service layer / 1=ZCOMP/GZIP/... */
+	uint8_t unit = DDCB_ACFUNC_APP;	/* 0=Servicelayer/1=ZCOMP/GZIP/... */
 	accel_t card;
 	char *teststring =(char *)tstring_default;
 	unsigned long packets_send = 0, packets_received = 0;
 	int cpu = -1;
 	int err_code = 0;
 	unsigned long long frequency, wtime_usec = 0, wtime_s = 0, wtime_e = 0;
+	unsigned int mode = (DDCB_MODE_RDWR | DDCB_MODE_ASYNC);
 
 	while (1) {
 		int option_index = 0;
@@ -267,6 +269,7 @@ int main(int argc, char *argv[])
 			{ "version",	no_argument,       NULL, 'V' },
 			{ "hardware-version", no_argument, NULL, 'H' },
 			{ "debug",	no_argument,	   NULL, 'D' },
+			{ "polling",	no_argument,	   NULL, 'p' },
 			{ "quiet",	no_argument,	   NULL, 'q' },
 			{ "verbose",	no_argument,       NULL, 'v' },
 			{ "help",	no_argument,	   NULL, 'h' },
@@ -274,10 +277,10 @@ int main(int argc, char *argv[])
 		};
 
 #if defined (CONFIG_BUILD_4TEST)
-		ch = getopt_long(argc, argv, "DC:A:c:fhl:i:s:qvX:HVu:e",
+		ch = getopt_long(argc, argv, "pDC:A:c:fhl:i:s:qvX:HVu:e",
 				long_options, &option_index);
 #else
-		ch = getopt_long(argc, argv, "DC:A:c:fhl:i:s:qvX:HV",
+		ch = getopt_long(argc, argv, "pDC:A:c:fhl:i:s:qvX:HV",
 				long_options, &option_index);
 #endif
 		if (ch == -1)	/* all params processed ? */
@@ -343,6 +346,9 @@ int main(int argc, char *argv[])
 		case 'D':
 			/* debug_flag++; *//* FIXME disabled */
 			break;
+		case 'p':
+			mode |= DDCB_MODE_POLLING;
+			break;
 		case 'q':
 			quiet++;
 			break;
@@ -371,8 +377,8 @@ int main(int argc, char *argv[])
 	ddcb_debug(verbose_flag);
 
 	/* open card access (for DDCB) */
-	card = accel_open(card_no, card_type, DDCB_MODE_RDWR | DDCB_MODE_ASYNC,
-			  &err_code, 0, DDCB_APPL_ID_IGNORE);
+	card = accel_open(card_no, card_type, mode, &err_code, 0,
+			  DDCB_APPL_ID_IGNORE);
 	if (card == NULL) {
 		fprintf(stderr, "err: failed to open card %u type %u "
 			"(%d/%s)\n", card_no, card_type, err_code,

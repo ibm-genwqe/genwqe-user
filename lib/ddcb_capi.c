@@ -1015,8 +1015,10 @@ static int __ddcb_process_polling(struct dev_ctx *ctx)
 		 * avoid deadlock situations when competing for the
 		 * ctx->lock on shutdown ...
 		 */
-		while (pthread_mutex_trylock(&ctx->lock) != 0)
-			pthread_testcancel();
+		/* while (pthread_mutex_trylock(&ctx->lock) != 0)
+		   pthread_testcancel(); */
+
+		pthread_testcancel();
 
 		tasks = 0;
 		while (__ddcb_done_post(ctx, DDCB_OK))
@@ -1027,7 +1029,7 @@ static int __ddcb_process_polling(struct dev_ctx *ctx)
 		else
 			ctx->completed_tasks[NUM_DDCBS]++;
 
-		pthread_mutex_unlock(&ctx->lock);
+		/* pthread_mutex_unlock(&ctx->lock); */
 
 	}
 	VERBOSE1("[%s] AFU[%d:%d] Exit polling work loop\n", __func__,
@@ -1098,8 +1100,8 @@ static int __ddcb_process_irqs(struct dev_ctx *ctx)
 			continue;
 		}
 		VERBOSE2("\tcxl_read_event(...) = %d for context: %d "
-			"type: %d size: %d\n",
-			rc, ctx->cid_id, ctx->event.header.type, ctx->event.header.size);
+			 "type: %d size: %d\n", rc, ctx->cid_id,
+			 ctx->event.header.type, ctx->event.header.size);
 
 		switch (ctx->event.header.type) {
 		case CXL_EVENT_AFU_INTERRUPT: {
@@ -1191,14 +1193,15 @@ static void *__ddcb_done_thread(void *card_data)
 	/* Push the Cleanup Handler to close the AFU */
 	pthread_cleanup_push(__ddcb_done_thread_cleanup, ctx);
 
-	if ( DDCB_MODE_MASTER & ctx->mode) {
-		/* We do not have any code to execute when the master was oppend */
+	if (DDCB_MODE_MASTER & ctx->mode) {
+		/* We do not have any code to execute when the master
+		   was oppend */
 		/* Master will be only used for peek and poke */
 		while (1) {
 			sleep(1);
 		}
 	}
-	if ( DDCB_MODE_POLLING & ctx->mode)
+	if (DDCB_MODE_POLLING & ctx->mode)
 		__ddcb_process_polling(ctx);
 	else
 		__ddcb_process_irqs(ctx);
