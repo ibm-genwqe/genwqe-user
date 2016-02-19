@@ -384,7 +384,8 @@ static int __afu_open(struct dev_ctx *ctx)
 		return DDCB_ERRNO;
 	}
 
-	__setup_waitq(ctx);
+	if (!(DDCB_MODE_MASTER & ctx->mode))
+		__setup_waitq(ctx);
 
 	ctx->afu_h = cxl_afu_open_dev(device);
 	if (NULL == ctx->afu_h) {
@@ -450,18 +451,21 @@ static int __afu_open(struct dev_ctx *ctx)
 		goto err_afu_free;
 	}
 
-	cxl_mmio_write64(ctx->afu_h, MMIO_DDCBQ_START_REG,
-		(uint64_t)(void *)ctx->ddcb);
+	if (!(DDCB_MODE_MASTER & ctx->mode)) {
+		/* Only slaves can configure a Context for DMA */
+		cxl_mmio_write64(ctx->afu_h, MMIO_DDCBQ_START_REG,
+			(uint64_t)(void *)ctx->ddcb);
 
-	/* | 63..48 | 47....32 | 31........24 | 23....16 | 15.....0 | */
-	/* | Seqnum | Reserved | 1st ddcb num | max ddcb | Reserved | */
-	mmio_dat = (((uint64_t)ctx->ddcb_seqnum << 48) |
-		    ((uint64_t)ctx->ddcb_in  << 24)    |
-		    ((uint64_t)(ctx->ddcb_num - 1) << 16));
-	rc = cxl_mmio_write64(ctx->afu_h, MMIO_DDCBQ_CONFIG_REG, mmio_dat);
-	if (rc != 0) {
-		rc = DDCB_ERR_CARD;
-		goto err_mmio_unmap;
+		/* | 63..48 | 47....32 | 31........24 | 23....16 | 15.....0 | */
+		/* | Seqnum | Reserved | 1st ddcb num | max ddcb | Reserved | */
+		mmio_dat = (((uint64_t)ctx->ddcb_seqnum << 48) |
+		    	((uint64_t)ctx->ddcb_in  << 24)    |
+		    	((uint64_t)(ctx->ddcb_num - 1) << 16));
+		rc = cxl_mmio_write64(ctx->afu_h, MMIO_DDCBQ_CONFIG_REG, mmio_dat);
+		if (rc != 0) {
+			rc = DDCB_ERR_CARD;
+			goto err_mmio_unmap;
+		}
 	}
 
 	/* Get MMIO_APP_VERSION_REG */
@@ -531,8 +535,6 @@ static inline int __afu_close(struct dev_ctx *ctx, bool force)
 
 	VERBOSE1("        [%s] AFU[%d:%d] Enter Open Clients: %d\n",
 		__func__, ctx->card_no, ctx->cid_id, ctx->clients);
-	mmio_dat = 0x2ull;	/* Stop !! */
-	cxl_mmio_write64(afu_h, MMIO_DDCBQ_COMMAND_REG, mmio_dat);
 	while (1) {
 		cxl_mmio_read64(afu_h, MMIO_DDCBQ_STATUS_REG, &mmio_dat);
 		if (0x0ull == (mmio_dat & 0x10))

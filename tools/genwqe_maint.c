@@ -52,6 +52,11 @@ static FILE *fd_out;
 			fprintf(fd_out, fmt, ## __VA_ARGS__);	\
 	} while (0)
 
+#define VERBOSE3(fmt, ...) do {					\
+		if (verbose > 2)				\
+			fprintf(fd_out, fmt, ## __VA_ARGS__);	\
+	} while (0)
+
 struct mdev_ctx {
 	int loop;		/* Loop Counter */
 	int card;		/* Card no (0,1,2,3 */
@@ -64,16 +69,18 @@ struct mdev_ctx {
 	pid_t pid;
 	pid_t my_sid;		/* for sid */
 	int mode;		/* See below */
-	int process_irqs;	/* Master IRQ Counter */
 	size_t errinfo_size;
 	char *errinfo;
 
 	uint64_t fir[MMIO_FIR_REGS_NUM];
 };
 
+/*	Expect min this Release or higher */
+#define	MIN_REL_VERSION	0x0601
+
 /* Mode Bits for Master Loop */
-#define	CHECK_FIRS_MODE	0x0001	/* Mode 1 */
-#define	CHECK_TIME_MODE	0x0002	/* Mode 2 */
+#define	CHECK_FIRS_MODE		0x0001	/* Mode 1 */
+#define	CHECK_TIME_MODE		0x0002	/* Mode 2 */
 
 static struct mdev_ctx	master_ctx;
 
@@ -84,10 +91,10 @@ static int mmio_write(struct cxl_afu_h *afu_h, int ctx, uint32_t offset,
 	int rc = -1;
 	uint32_t offs = (ctx * MMIO_CTX_OFFSET) + offset;
 
-	VERBOSE2("[%s] Enter, Offset: 0x%x data: 0x%016llx\n",
+	VERBOSE3("[%s] Enter, Offset: 0x%x data: 0x%016llx\n",
 		__func__, offs, (long long)data);
 	rc = cxl_mmio_write64(afu_h, offs, data);
-	VERBOSE2("[%s] Exit, rc = %d\n", __func__, rc);
+	VERBOSE3("[%s] Exit, rc = %d\n", __func__, rc);
 	return rc;
 }
 #endif
@@ -98,9 +105,9 @@ static int mmio_read(struct cxl_afu_h *afu_h, int ctx, uint32_t offset,
 	int rc = -1;
 	uint32_t offs = (ctx * MMIO_CTX_OFFSET) + offset;
 
-	VERBOSE2("[%s] Enter, CTX: %d Offset: 0x%x\n", __func__, ctx, offs);
+	VERBOSE3("[%s] Enter, CTX: %d Offset: 0x%x\n", __func__, ctx, offs);
 	rc = cxl_mmio_read64(afu_h, offs, data);
-	VERBOSE2("[%s] Exit, rc = %d data: 0x%016llx\n",
+	VERBOSE3("[%s] Exit, rc = %d data: 0x%016llx\n",
 		__func__, rc, (long long)*data);
 	return rc;
 }
@@ -115,10 +122,9 @@ static int afu_m_open(struct mdev_ctx *mctx)
 	long api_version, cr_device, cr_vendor;
 
 	sprintf(device, "/dev/cxl/afu%d.0m", mctx->card);
-	VERBOSE2("[%s] Enter, Open Device: %s\n", __func__, device);
+	VERBOSE3("[%s] Enter, Open Device: %s\n", __func__, device);
 	mctx->afu_h = cxl_afu_open_dev(device);
-	if (!mctx->afu_h) {
-		mctx->afu_h = NULL;
+	if (NULL == mctx->afu_h) {
 		VERBOSE0("[%s] Exit, Card Open error rc: %d\n", __func__, rc);
 		return -1;
 	}
@@ -188,14 +194,14 @@ static int afu_m_open(struct mdev_ctx *mctx)
  err_afu_free:
 	cxl_afu_free(mctx->afu_h);
 	mctx->afu_h = NULL;
-	VERBOSE2("[%s] Exit rc=%d\n", __func__, rc);
+	VERBOSE3("[%s] Exit rc=%d\n", __func__, rc);
 	return rc;
 }
 
 static int afu_m_close(struct mdev_ctx *mctx)
 {
-	VERBOSE2("[%s] Enter\n", __func__);
-	if (!mctx->afu_h)
+	VERBOSE3("[%s] Enter\n", __func__);
+	if (NULL == mctx->afu_h)
 		return -1;
 
 	cxl_mmio_unmap(mctx->afu_h);
@@ -205,55 +211,93 @@ static int afu_m_close(struct mdev_ctx *mctx)
 	if (mctx->errinfo)
 		free(mctx->errinfo);
 	mctx->errinfo = NULL;
-	VERBOSE2("[%s] Exit\n", __func__);
+	VERBOSE3("[%s] Exit\n", __func__);
 	return 0;
 }
 
 static int afu_check_stime(struct mdev_ctx *mctx)
 {
 	int	gsel, bsel = 0, ctx = 0;
-	uint64_t gmask = 0, data = 0, stat_reg, err_reg, mstat_reg;
+	uint64_t gmask = 0, qstat_reg, err_reg, mstat_reg;
+	uint64_t wtime;
+	uint64_t cid_reg;
+	int	n_act = 0;
+	uint64_t s_time = 0;
+	char s[32];
 
-	mmio_read(mctx->afu_h, MMIO_MASTER_CTX_NUMBER,
-		MMIO_AFU_STATUS_REG, &mstat_reg);
 	for (gsel = 0; gsel < MMIO_CASV_REG_NUM; gsel++) {
-		gmask = 0;
 		mmio_read(mctx->afu_h, MMIO_MASTER_CTX_NUMBER,
 			MMIO_CASV_REG + (gsel*8), &gmask);
 		if (0 == gmask)
 			continue;	/* No bit set, Skip */
 
-		for (bsel = 0; bsel < 64; bsel++) {
+		for (bsel = 0; bsel < MMIO_CASV_REG_CTX; bsel++) {
 			if (0 == (gmask & (1ull << bsel)))
 				continue;	/* Skip */
 
-			ctx = (gsel * 64) + bsel + 1;	/* Active */
+			ctx = (gsel * MMIO_CASV_REG_CTX) + bsel;	/* Active */
 
-			mmio_read(mctx->afu_h, ctx, MMIO_DDCBQ_STATUS_REG,
-				  &stat_reg);
-			if (0 == (stat_reg & 0xffffffff00000000ull)) {
-				VERBOSE2("AFU[%d:%d] master skip\n",
+			mmio_read(mctx->afu_h, ctx+1, MMIO_DDCBQ_STATUS_REG, &qstat_reg);
+			if (0 == (qstat_reg & 0xffffffff00000000ull)) {
+				VERBOSE3("AFU[%d:%03d] master skip\n",
 					mctx->card, ctx);
 				continue;	/* Skip Master */
 			}
-			mmio_read(mctx->afu_h, ctx, MMIO_DDCBQ_WT_REG, &data);
-			data = data / 250; /* makes time in usec */
+			mmio_read(mctx->afu_h, ctx+1, MMIO_DDCBQ_WT_REG, &wtime);
+			wtime = wtime / 250; /* makes time in usec */
 
-			mmio_read(mctx->afu_h, ctx, MMIO_DDCBQ_DMAE_REG,
-				  &err_reg);
+			mmio_read(mctx->afu_h, ctx+1, MMIO_DDCBQ_CID_REG, &cid_reg);
+			uint16_t cur_cid = (uint16_t)(cid_reg >> 16);	/* Currect Context id */
+			uint16_t my_cid = (uint16_t)(cid_reg & 0xffff);	/* My Context id */
 
-			VERBOSE0("AFU[%d:%d] Time: %lld usec Status: 0x%llx ",
-				 mctx->card, ctx, (long long)data,
-				 (long long) stat_reg);
-			if (0 != err_reg)
-				VERBOSE0("DMA Err: 0x%llx",
-					 (long long)err_reg);
-			/* tainted if not 0 */
-			if (0 != mstat_reg)
-				VERBOSE0("MSTAT: 0x%llx",
-					 (long long)mstat_reg);
-			VERBOSE0("\n");
+			mmio_read(mctx->afu_h, ctx+1, MMIO_DDCBQ_DMAE_REG, &err_reg);
+
+			uint16_t cseq = (uint16_t)(qstat_reg >> 48ull);	/* Currect sequence */
+			uint16_t lseq = (uint16_t)(qstat_reg >> 32ull);	/* Last sequence */
+			uint8_t qidx = (uint8_t)(qstat_reg >> 24);	/* Q Index */
+			uint16_t qnfe = (uint16_t)(qstat_reg >> 8);	/* Context Non Fatal Error Bits */
+			uint8_t qstat = (uint8_t)(qstat_reg & 0xff);	/* Context Status */
+
+			/* Generate W for Waiting, I for Idle and R for Running */
+			char flag = 'W';		/* Default Context is Waiting to get executed */
+			if ((lseq + 1 ) == cseq)
+				flag = 'I';		/* Context is Idle, nothing to do */
+			else if (0x30 == qstat)		/* if Bits 4 + 5 on ? */
+					flag = 'R';	/* Context is Running */
+
+			if (qnfe) {
+				VERBOSE0("AFU[%d:%03d] ERR: CurrentCtx: %03d MyCtx: %03d CS: %04X LS: %04X ",
+					mctx->card, ctx, cur_cid, my_cid, cseq, lseq);
+				VERBOSE0("[%c] IDX: %02d QNFE: %04x QSTAT: %02x Time: %lld usec",
+					flag, qidx, qnfe, qstat, (long long)wtime);
+				if (0 != err_reg)
+					VERBOSE0("DMA Err: 0x%016llx", (long long)err_reg);
+				VERBOSE0("\n");
+			} else {
+				VERBOSE0("AFU[%d:%03d] CurrentCtx: %03d MyCtx: %03d CS: %04X LS: %04X ",
+					mctx->card, ctx, cur_cid, my_cid, cseq, lseq);
+				VERBOSE0("[%c] IDX: %02d QNFE: %04x QSTAT: %02x Time: %lld usec",
+					flag, qidx, qnfe, qstat, (long long)wtime);
+				if (0 != err_reg)
+					VERBOSE0("DMA Err: 0x%016llx", (long long)err_reg);
+				VERBOSE0("\n");
+			}
+			n_act++;
+			s_time += wtime;
 		}
+	}
+	if (n_act) {
+		time_t result = time(NULL);
+		struct tm * p = localtime(&result);
+		strftime(s, 32, "%T", p);
+
+		VERBOSE0("AFU[%d:XXX] at %s Running %d Active Contexts total %lld msec",
+			 mctx->card,  s, n_act, (long long)s_time/1000);
+		mmio_read(mctx->afu_h, MMIO_MASTER_CTX_NUMBER,
+			MMIO_AFU_STATUS_REG, &mstat_reg);
+		if (0 != mstat_reg)
+			VERBOSE0(" Status: 0x%016llx", (long long)mstat_reg);
+		VERBOSE0("\n");
 	}
 	return mctx->dt;
 }
@@ -316,7 +360,7 @@ static int afu_check_mfirs(struct mdev_ctx *mctx)
 }
 
 /* Return true if card Software Release is OK */
-static bool check_app(struct mdev_ctx *mctx)
+static bool check_app(struct mdev_ctx *mctx, uint16_t min_rel)
 {
 	int	rc;
 	uint64_t data;
@@ -334,10 +378,14 @@ static bool check_app(struct mdev_ctx *mctx)
 	/* FF       ==  8 bit Software Fix Level on card (01) */
 	/* II       ==  8 bit Software Interface ID (03) */
 	/* NNNNNNNN == 32 Bit Function (475a4950) = (GZIP) */
+
+	if (0x475a4950 != (data & 0xffffffff))
+		return false;
+
 	data = data >> 32;		/* RRRRFFII */
 	if (0x03 == (data & 0xff)) {	/* Check II */
 		data = data >> 16;	/* Check RRRR */
-		if (data > 0x0500)	/* need > 0500 */
+		if ((uint16_t)data >= min_rel)	/* need >= min_rel */
 			return true;
 	}
 	return false;
@@ -348,8 +396,8 @@ static int do_master(struct mdev_ctx *mctx)
 	int dt = mctx->dt;
 
 	mctx->loop++;
-	VERBOSE1("[%s] AFU[%d] Loop: %d Delay: %d sec mode: 0x%x left: %d\n",
-		__func__, mctx->card, mctx->loop,
+	VERBOSE2("AFU[%d:XXX] Loop: %d Delay: %d sec mode: 0x%x left: %d\n",
+		mctx->card, mctx->loop,
 		mctx->dt, mctx->mode, mctx->count);
 
 	if (CHECK_FIRS_MODE == (CHECK_FIRS_MODE & mctx->mode))
@@ -386,7 +434,7 @@ static void help(char *prog)
 	       "\t-d, --daemon		Start in Daemon process (background)\n"
 	       "\t-m, --mode		Mode:\n"
 	       "\t	1 = Check Master Firs\n"
-	       "\t	2 = Watch Card worktimer\n"
+	       "\t	2 = Report Context Details\n"
 	       "\t-f, --log-file <file> Log File name when running in -d "
 	       "(daemon)\n", prog);
 }
@@ -406,13 +454,13 @@ int main(int argc, char *argv[])
 
 	fd_out = stdout;	/* Default */
 
-	mctx->loop = 0;		/* Counter */
-	mctx->quiet = false;
+	mctx->afu_h = NULL;	/* No handle */
+	mctx->loop = 0;		/* Start Loop Counter */
+	mctx->quiet = false;	/* Default */
 	mctx->dt = 1;		/* Default, 1 sec delay time */
-	mctx->count = -1;	/* Default, run once */
+	mctx->count = -1;	/* Default, run forever */
 	mctx->card = 0;		/* Default, Card 0 */
 	mctx->mode = 0;		/* Default, nothing to watch */
-	mctx->process_irqs = 0;	/* No Master IRQ's received */
 	mctx->daemon = false;	/* Not in Daemon mode */
 
 	for (i = 0; i < MMIO_FIR_REGS_NUM; i++)
@@ -560,8 +608,9 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	if (false == check_app(mctx)) {
-		VERBOSE0("Err: Wrong Card Appl ID. Need to have > 0500\n");
+	if (false == check_app(mctx, MIN_REL_VERSION)) {
+		VERBOSE0("Err: Wrong Card Release. Need >= 0x%02x\n",
+			MIN_REL_VERSION);
 		afu_m_close(mctx);
 		exit(EXIT_FAILURE);
 	}
@@ -578,8 +627,8 @@ int main(int argc, char *argv[])
 	}
 
 	if (!mctx->quiet && verbose)
-		VERBOSE0("[%s] AFU[%d] after %d loops and %d Interrupts\n",
-			 __func__, mctx->card, mctx->loop, mctx->process_irqs);
+		VERBOSE0("[%s] AFU[%d] after %d loops\n",
+			 __func__, mctx->card, mctx->loop);
 
 	afu_m_close(mctx);
 	fflush(fd_out);
