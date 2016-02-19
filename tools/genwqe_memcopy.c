@@ -38,14 +38,30 @@
 
 static const char *version = GIT_VERSION;
 
-int	verbose_flag = 0;
+int verbose_flag = 0;
 
-#define VERBOSE0(...) {printf(__VA_ARGS__);}
-#define VERBOSE1(...) {if (verbose_flag > 0) printf(__VA_ARGS__);}
-#define VERBOSE2(...) {if (verbose_flag > 1) printf(__VA_ARGS__);}
-#define VERBOSE3(...) {if (verbose_flag > 3) printf(__VA_ARGS__);}
+#define VERBOSE0(...) do {					\
+		fprintf(stderr, __VA_ARGS__);			\
+	} while (0)
 
-#define EVERBOSE(...) {fprintf(stderr, __VA_ARGS__);}
+#define VERBOSE1(...) do {					\
+		if (verbose_flag > 0)				\
+			fprintf(stderr, __VA_ARGS__);		\
+	} while (0)
+
+#define VERBOSE2(...) do {					\
+		if (verbose_flag > 1)				\
+			fprintf(stderr, __VA_ARGS__);		\
+	} while (0)
+
+#define VERBOSE3(...) do {					\
+		if (verbose_flag > 3)				\
+			fprintf(stderr, __VA_ARGS__);		\
+	} while (0)
+
+#define EVERBOSE(...) do {					\
+		fprintf(stderr, __VA_ARGS__);			\
+	} while (0)
 
 struct memcpy_in_parms {
 	int card_no;		/* Card 0 default, changed with -C option */
