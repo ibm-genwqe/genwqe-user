@@ -109,7 +109,7 @@ function stop_cxl_traces {
 function collect_cxl_traces {
     if [ ${accelerator} == "CAPI" -a ${tracing} -eq 1 ]; then
 	echo "Collect CXL traces ...";
-	sudo sh -c 'cat /sys/kernel/debug/tracing/trace_pipe $trace_file';
+	sudo sh -c 'cat /sys/kernel/debug/tracing/trace_pipe > $trace_file';
     fi
 }
   
