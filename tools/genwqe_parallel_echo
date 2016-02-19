@@ -36,6 +36,7 @@ polling=""
 tracing=0
 trace_file="genwqe_parallel_echo.log"
 PLATFORM=`uname -p`
+start_time=`date`
 
 # Set default accelerator based on platform we are running on
 if [ ${PLATFORM} == "ppc64le" ]; then
@@ -204,6 +205,7 @@ for i in `seq 1 ${iterations}` ; do
     $tools_dir/genwqe_echo -A ${accelerator} -C ${card} -i0 -c5
     if [ $? -ne 0 ]; then
 	echo "Single echo took to long, please review results!"
+	stop_cxl_traces
 	exit 1
     fi
 
@@ -216,7 +218,7 @@ for i in `seq 1 ${iterations}` ; do
 	echo "Found potential errors ... please check logfiles"
 	collect_cxl_traces
 	stop_cxl_traces
-	exit 1
+	exit 2
     fi
 
     echo "(4) Check if card is still replying to an echo request ..."
@@ -225,11 +227,14 @@ for i in `seq 1 ${iterations}` ; do
 	echo "Single echo took to long, please review results!"
 	collect_cxl_traces
 	stop_cxl_traces
-	exit 1
+	exit 3
     fi
 
     echo "(5) Remove old logfiles ..."
     rm -f echo_*.cmd echo_*.stdout.log echo_*.stderr.log
+
+    echo "Running since ${start_time} until now `date` ($i)"
+    echo
 done
 
 stop_cxl_traces
