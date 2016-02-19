@@ -24,7 +24,6 @@
 # Start N echos and kill them after a couple of seconds.
 #
 
-accelerator=GENWQE
 card=0
 tools_dir=tools
 verbose=0
@@ -34,10 +33,20 @@ killtimeout=2
 preload=1
 runpids=""
 polling=""
+tracing=0
+trace_file="genwqe_parallel_echo.log"
+PLATFORM=`uname -p`
+
+# Set default accelerator based on platform we are running on
+if [ ${PLATFORM} == "ppc64le" ]; then
+    accelerator=CAPI
+else
+    accelerator=GENWQE
+fi
 
 function usage() {
     echo "Usage:"
-    echo "  parallel_echo.sh"
+    echo "  genwqe_parallel_echo"
     echo "     -A <accelerator> GENWQE|CAPI"
     echo "     -C <card>        card to be used for the test"
     echo "     -i <iterations>  repeat  multiple times for more testing"
@@ -45,6 +54,7 @@ function usage() {
     echo "     -k <seconds>     kill timeout"
     echo "     -l <N>           send <N> echos in one shot N <= 64"
     echo "     -P               run echo in experimental polling mode (CAPI only)"
+    echo "     -T               start traces (CAPI only)"
     echo
     echo "Example:"
     echo "  Repro the CAPI bitstream interrupt loss problem:"
@@ -79,12 +89,26 @@ function cleanup {
     echo "done"
     exit 0
 }
+
+function start_cxl_traces {
+    if [ ${accelerator} == "CAPI" -a ${tracing} -eq 1 ]; then
+	echo "Starting CXL tracing ...";
+	sudo sh -c 'echo 1 > /sys/kernel/debug/tracing/events/cxl/enable';
+    fi
+}
+
+function collect_cxl_traces {
+    if [ ${accelerator} == "CAPI" -a ${tracing} -eq 1 ]; then
+	echo "Collect CXL traces ...";
+	sudo sh -c 'cat /sys/kernel/debug/tracing/trace_pipe $trace_file';
+    fi
+}
   
 trap cleanup SIGINT
 trap cleanup SIGKILL
 trap cleanup SIGTERM
 
-while getopts "PA:C:p:i:k:l:h" opt; do
+while getopts "TPA:C:p:i:k:l:h" opt; do
     case $opt in
 	A)
 	accelerator=$OPTARG;
@@ -103,6 +127,9 @@ while getopts "PA:C:p:i:k:l:h" opt; do
 	;;
 	l)
 	preload=$OPTARG;
+	;;
+	T)
+	tracing=1;
 	;;
 	P)
 	polling="-p"
@@ -150,6 +177,8 @@ echo
 echo "Remove old logfiles ..."
 rm -f echo_*.cmd echo_*.stdout.log echo_*.stderr.log
 
+start_cxl_traces
+
 for i in `seq 1 ${iterations}` ; do
 
     echo -n "(1) Check if card is replying to an echo request ($i) ... "
@@ -168,6 +197,7 @@ for i in `seq 1 ${iterations}` ; do
     grep err echo_*.stderr.log
     if [ $? -ne 1 ]; then
 	echo "Found potential errors ... please check logfiles"
+	collect_cxl_traces
 	exit 1
     fi
 
@@ -175,6 +205,7 @@ for i in `seq 1 ${iterations}` ; do
     $tools_dir/genwqe_echo -A ${accelerator} -C ${card} -i0 -c5
     if [ $? -ne 0 ]; then
 	echo "Single echo took to long, please review results!"
+	collect_cxl_traces
 	exit 1
     fi
 
