@@ -36,57 +36,82 @@
 #include "force_cpu.h"
 #include "memcopy_ddcb.h"
 
+/* Error injection bitmask */
+#define ERR_INJ_NONE   0x0
+#define ERR_INJ_INPUT  0x1
+#define ERR_INJ_OUTPUT 0x2
+#define ERR_INJ_SIZE   0x4
+#define ERR_INJ_DDCB   0x8
+
 static const char *version = GIT_VERSION;
 
-int	verbose_flag = 0;
+int verbose_flag = 0;
 
-#define VERBOSE0(...) {printf(__VA_ARGS__);}
-#define VERBOSE1(...) {if (verbose_flag > 0) printf(__VA_ARGS__);}
-#define VERBOSE2(...) {if (verbose_flag > 1) printf(__VA_ARGS__);}
-#define VERBOSE3(...) {if (verbose_flag > 3) printf(__VA_ARGS__);}
+#define VERBOSE0(...) do {					\
+		fprintf(stderr, __VA_ARGS__);			\
+	} while (0)
 
-#define EVERBOSE(...) {fprintf(stderr, __VA_ARGS__);}
+#define VERBOSE1(...) do {					\
+		if (verbose_flag > 0)				\
+			fprintf(stderr, __VA_ARGS__);		\
+	} while (0)
+
+#define VERBOSE2(...) do {					\
+		if (verbose_flag > 1)				\
+			fprintf(stderr, __VA_ARGS__);		\
+	} while (0)
+
+#define VERBOSE3(...) do {					\
+		if (verbose_flag > 3)				\
+			fprintf(stderr, __VA_ARGS__);		\
+	} while (0)
+
+#define EVERBOSE(...) do {					\
+		fprintf(stderr, __VA_ARGS__);			\
+	} while (0)
 
 struct memcpy_in_parms {
-	int		card_no;	/* Card 0 default, changed with -C option */
-	int		card_type;	/* card type 0 default, changed with -A option */
-	int		mode;		/* Change with -n option */
-	bool		quiet;		/* quiet=false default, changed with -q option */
-	int		cpu;		/* -1 default, changed with - -C option */
-	int		count;		/* 1 default, change with -c option */
-	bool		force_cmp;	/* default false, Change with -F option */
-	int		use_sglist;	/* 0 default, change with -g option */
-	int		preload;	/* 1 default, chane with -l option */
-	int		threads;	/* 1 default, change with -t option */
-	FILE		*o_fp;		/* Output File pointer */
-	FILE		*fpattern;	/* pattern input file pointer */
-	uint64_t	in_ats_type;	/* ATS_TYPE_FLAT_RDWR or ATS_TYPE_SGL_RDWR */
-	unsigned int	page_size;
-	int		data_buf_size; /* 4k default, changed with -s option */
-	unsigned int	pgoffs_i;	/* offset in the 4k Alligned input buffer */
-	unsigned int	pgoffs_o;	/* offset in the 4k Alligned output buffer */
-	uint32_t	mcpy_crc32;	/* my value to compare */
-	uint32_t	mcpy_adler32;	/* my value to compare */
-	int		have_threads;
-	struct	timespec	stime;	/* Start time */
-	struct	timespec	etime;	/* End time */
+	int card_no;		/* Card 0 default, changed with -C option */
+	int card_type;		/* card type 0 def, changed with -A option */
+	int mode;		/* Change with -n option */
+	bool quiet;		/* quiet=false default, changed with -q opt */
+	int cpu;		/* -1 default, changed with - -C option */
+	int count;		/* 1 default, change with -c option */
+	bool force_cmp;		/* default false, Change with -F option */
+	int use_sglist;		/* 0 default, change with -g option */
+	int preload;		/* 1 default, chane with -l option */
+	int threads;		/* 1 default, change with -t option */
+	FILE *o_fp;		/* Output File pointer */
+	FILE *fpattern;		/* pattern input file pointer */
+	uint64_t in_ats_type;	/* ATS_TYPE_FLAT_RDWR or ATS_TYPE_SGL_RDWR */
+	unsigned int page_size;
+	int data_buf_size;	/* 4k default, changed with -s option */
+	unsigned int pgoffs_i;	/* offset in the 4k Alligned input buffer */
+	unsigned int pgoffs_o;	/* offset in the 4k Alligned output buffer */
+	uint32_t mcpy_crc32;	/* my value to compare */
+	uint32_t mcpy_adler32;	/* my value to compare */
+	int have_threads;
+	struct timespec stime;	/* Start time */
+	struct timespec etime;	/* End time */
+	unsigned int err_inj;	/* error injection while running DDCBs */
 };
 
 struct memcpy_thread_data {
-	int		thread;
-	pthread_t	tid;
-	accel_t		accel;
-	uint8_t		*ibuf4k;	/* 4 K alligned buffer */
- 	uint8_t		*ibuf;		/* the 4k alligned buffer + pgoffs_i */
-	struct		memcpy_in_parms *ip;
-	uint64_t	out_ats_type;	/* ATS_TYPE_FLAT_RDWR or ATS_TYPE_SGL_RDWR */
-	int		err;		/* Return code from Thread */
-	int		errors;		/* Return data */
-	int		memcopies;
-	long long	bytes_copied;	/* Return data */
-	uint64_t	total_usec;	/* Return time in usec */
-	struct	timespec	stime;	/* Thread Start time */
-	struct	timespec	etime;	/* Thread End time */
+	int thread;
+	pthread_t tid;
+	accel_t accel;
+	uint8_t	*ibuf4k;	/* 4 K alligned buffer */
+	uint8_t *ibuf;		/* the 4k alligned buffer + pgoffs_i */
+	struct memcpy_in_parms *ip;
+	uint64_t out_ats_type;	/* ATS_TYPE_FLAT_RDWR or
+					   ATS_TYPE_SGL_RDWR */
+	int err;		/* Return code from Thread */
+	int errors;		/* Return data */
+	int memcopies;
+	long long bytes_copied;	/* Return data */
+	uint64_t total_usec;	/* Return time in usec */
+	struct timespec stime;	/* Thread Start time */
+	struct timespec etime;	/* Thread End time */
 };
 
 static void *__memcpy_thread(void *data);
@@ -107,7 +132,8 @@ static void usage(const char *prog)
 	       "  -V, --version\n"
 	       "  -q, --quiet              quiece output\n"
 	       "  -c, --count <number>     do multiple memcopies\n"
-	       "  -l, --preload <number>   preload multiple ddcb's. (default 1, only for CAPI Card)\n"
+	       "  -l, --preload <number>   preload multiple ddcb's. "
+	       "(default 1, only for CAPI Card)\n"
 	       "  -X, --cpu <cpu>          only run on this CPU\n"
 	       "  -D, --debug              create debug data on failure\n"
 	       "  -G, --use-sglist         use the scatter gather list\n"
@@ -117,7 +143,8 @@ static void usage(const char *prog)
 	       "  -i, --pgoffs_i <offs>    byte offset for input buffer\n"
 	       "  -o, --pgoffs_o <offs>    byte offset for output buffer\n"
 	       "  -F, --force-compare <ouput_data.bin>\n"
-	       "  -t, --threads <number>   Run <number> threads, default is 1\n"
+	       "  -t, --threads <num>      run <num> threads, default is 1\n"
+	       "  -Y, --inject-error <err> IN:0x1, OUT:0x2, SIZE:0x4, DDCB:0x8\n"
 	       "\n"
 	       "This utility sends memcopy DDCBs to the application\n"
 	       "chip unit. It can be used to check the cards health and/or\n"
@@ -154,9 +181,9 @@ static inline uint64_t str_to_num(char *str)
 	else if (strcmp(s, "GiB") == 0)
 		num *= 1024 * 1024 * 1024;
 	else {
+		pr_err("--size or -s out of range, use KiB/MiB or GiB only\n");
 		num = ULLONG_MAX;
 		errno = ERANGE;
-		pr_err("--size or -s out of Range, Used KiB/MiB or GiB only\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -246,7 +273,8 @@ static int accel_memcpy(accel_t card, struct ddcb_cmd *cmd_list, int preload,
 			uint32_t *crc32,
 			uint32_t *adler32,
 			uint32_t *inp_processed,
-			uint32_t *outp_returned)
+			uint32_t *outp_returned,
+			unsigned int err_inj)
 {
 	int rc, i;
 	struct ddcb_cmd *cmd = cmd_list;
@@ -260,25 +288,49 @@ static int accel_memcpy(accel_t card, struct ddcb_cmd *cmd_list, int preload,
 		cmd->ddata_addr = 0ull;	/* FIXME */
 		cmd->acfunc	= DDCB_ACFUNC_APP;	/* goto accelerator */
 		cmd->cmd = ZCOMP_CMD_ZEDC_MEMCOPY;
-		cmd->cmdopts	= 0x0000;		/* pass addresses not lists */
+		cmd->cmdopts	= 0x0000;	/* pass addresses not lists */
 		cmd->asiv_length= 0x40 - 0x20;
-		cmd->asv_length	= 0xC0 - 0x80;		/* try to absorb all */
+		cmd->asv_length	= 0xC0 - 0x80;	/* try to absorb all */
 		cmd->ats = 0x0;
 
 		asiv->inp_buff      = __cpu_to_be64((unsigned long)src);
 		asiv->inp_buff_len  = __cpu_to_be32((unsigned long)src_n);
-		cmd->ats |= ATS_SET_FLAGS(struct asiv_memcpy, inp_buff, in_ats_type);
+		cmd->ats |= ATS_SET_FLAGS(struct asiv_memcpy, inp_buff,
+					  in_ats_type);
 
 		asiv->outp_buff     = __cpu_to_be64((unsigned long)dest);
 		asiv->outp_buff_len = __cpu_to_be32((uint32_t)dest_n);
-		cmd->ats |= ATS_SET_FLAGS(struct asiv_memcpy, outp_buff, out_ats_type);
+		cmd->ats |= ATS_SET_FLAGS(struct asiv_memcpy, outp_buff,
+					  out_ats_type);
 
 		/* Only relevant for the ZEDC variant. */
 		asiv->in_adler32    = __cpu_to_be32(1);
 		asiv->in_crc32      = __cpu_to_be32(0);
+
+		/* This will surely crash the application ... */
+		if (err_inj & ERR_INJ_INPUT) {
+			asiv->inp_buff ^= 0xffffffffffffffffull;
+			fprintf(stderr, "ERR_INJ_INPUT:  %016llx\n",
+				(long long)asiv->inp_buff);
+		}
+		if (err_inj & ERR_INJ_OUTPUT) {
+			asiv->outp_buff ^= 0xffffffffffffffffull;
+			fprintf(stderr, "ERR_INJ_OUTPUT: %016llx\n",
+				(long long)asiv->outp_buff);
+		}
+		if (err_inj & ERR_INJ_SIZE) {
+			asiv->inp_buff_len ^= 0xfffffffff;
+			asiv->outp_buff_len ^= 0xffffffff;
+			fprintf(stderr, "ERR_INJ_SIZE:   %08lx/%08lx\n",
+				(long)asiv->inp_buff_len,
+				(long)asiv->outp_buff_len);
+		}
+
 		if (i < (preload -1))
 			cmd->next_addr = (unsigned long)(cmd + 1);
-		else	cmd->next_addr = 0x0;
+		else
+			cmd->next_addr = 0x0;
+
 		cmd++;
 	}
 
@@ -331,12 +383,15 @@ static void *__memcpy_thread(void *data)
 	/* Allocate output buffer */
 	if (ip->use_sglist) {
 		pt->out_ats_type = ATS_TYPE_SGL_RDWR;
-		obuf4k = memalign(ip->page_size, ip->data_buf_size + ip->pgoffs_o);
+		obuf4k = memalign(ip->page_size,
+				  ip->data_buf_size + ip->pgoffs_o);
 		if (ip->use_sglist > 1)
-			accel_pin_memory(pt->accel, obuf4k, ip->data_buf_size + ip->pgoffs_o, 1);
+			accel_pin_memory(pt->accel, obuf4k,
+					 ip->data_buf_size + ip->pgoffs_o, 1);
 	} else	{
 		pt->out_ats_type = ATS_TYPE_FLAT_RDWR;
-		obuf4k = accel_malloc(pt->accel, ip->data_buf_size + ip->pgoffs_o);
+		obuf4k = accel_malloc(pt->accel,
+				      ip->data_buf_size + ip->pgoffs_o);
 	}
 	if ((ip->data_buf_size != 0) && (obuf4k == NULL)) {
 		pr_err("Can not allocate Output Buffer\n");
@@ -347,7 +402,8 @@ static void *__memcpy_thread(void *data)
 	obuf = obuf4k + ip->pgoffs_o;
 
 	/* Allocate ddcb list */
-	ddcb_list = (struct ddcb_cmd *)malloc(ip->preload * sizeof(struct ddcb_cmd));
+	ddcb_list = (struct ddcb_cmd *)
+		malloc(ip->preload * sizeof(struct ddcb_cmd));
 	if (NULL == ddcb_list) {
 		pr_err("Can not allocate %d DDCB List\n", ip->preload);
 		err = EX_MEMORY;
@@ -377,7 +433,8 @@ static void *__memcpy_thread(void *data)
 				  ip->in_ats_type,
 				  &mcpy_crc32, &mcpy_adler32,
 				  &mcpy_inp_processed,
-				  &mcpy_outp_returned);
+				  &mcpy_outp_returned,
+				  ip->err_inj);
 		xerrno = errno;
 
 		clock_gettime(CLOCK_MONOTONIC_RAW, &etime);
@@ -388,8 +445,11 @@ static void *__memcpy_thread(void *data)
 
 		if (rc != DDCB_OK) {
 			struct _asv_runtime_dma_error *d;
-			fprintf(stderr, "\nERR: Thread: %d MEMCOPY DDCB[%d] failed, %s (%d)\n"
-				"     errno=%d %s\n", pt->thread, pt->memcopies,
+			fprintf(stderr,
+				"\nERR: Thread: %d MEMCOPY DDCB[%d] failed, "
+				"%s (%d)\n"
+				"     errno=%d %s\n",
+				pt->thread, pt->memcopies,
 				ddcb_strerror(rc), rc, xerrno,
 				strerror(xerrno));
 			fprintf(stderr, "  RETC: %03x %s ATTN: %x PROGR: %x\n"
@@ -397,14 +457,18 @@ static void *__memcpy_thread(void *data)
 				"  original  CRC32: %08x ADLER: %08x\n",
 				ddcb0->retc, ddcb_retc_strerror(ddcb0->retc),
 				ddcb0->attn, ddcb0->progress,
-				mcpy_crc32, mcpy_adler32, ip->mcpy_crc32, ip->mcpy_adler32);
-			fprintf(stderr, "  DEQUEUE=%016llx CMPLT=%016llx DISP=%016llx\n",
+				mcpy_crc32, mcpy_adler32, ip->mcpy_crc32,
+				ip->mcpy_adler32);
+
+			fprintf(stderr, "  DEQUEUE=%016llx CMPLT=%016llx "
+				"DISP=%016llx\n",
 				(long long)ddcb0->deque_ts,
 				(long long)ddcb0->cmplt_ts,
 				(long long)ddcb0->disp_ts);
 			if ((ddcb0->retc == DDCB_RETC_UNEXEC) &&
 			    (ddcb0->attn == 0xe007)) {
-				d = (struct _asv_runtime_dma_error *)ddcb0->asv;
+				d = (struct _asv_runtime_dma_error *)
+					ddcb0->asv;
 				ddcb_print_dma_err(d);
 			}
 			ddcb_hexdump(stderr, ddcb0->asv, sizeof(ddcb0->asv));
@@ -412,22 +476,26 @@ static void *__memcpy_thread(void *data)
 			goto __memcpy_exit_3;
 		}
 		/* Check CRC and Adler */
-		if ((mcpy_crc32 != ip->mcpy_crc32) || (mcpy_adler32 != ip->mcpy_adler32)) {
-			fprintf(stderr, "ERR: Thread: %d CRC/ADLER does not match!\n"
+		if ((mcpy_crc32 != ip->mcpy_crc32) ||
+		    (mcpy_adler32 != ip->mcpy_adler32)) {
+			fprintf(stderr, "ERR: Thread: %d CRC/ADLER does not "
+				"match!\n"
 				"  from card CRC32: %08x ADLER: %08x\n"
-				"  original  CRC32: %08x ADLER: %08x at %d of %d loops\n",
-				pt->thread,
-				mcpy_crc32, mcpy_adler32, ip->mcpy_crc32, ip->mcpy_adler32,
-				count, ip->count);
+				"  original  CRC32: %08x ADLER: %08x "
+				"at %d of %d loops\n",
+				pt->thread, mcpy_crc32, mcpy_adler32,
+				ip->mcpy_crc32, ip->mcpy_adler32, count,
+				ip->count);
 			errors++;
 		}
 		/* Was all data processed? */
 		if ((ip->data_buf_size != (int)mcpy_inp_processed) ||
 		    (ip->data_buf_size != (int)mcpy_outp_returned)) {
-			fprintf(stderr, "ERR: Thread: %d IN/OUT sizes do not match!\n"
+			fprintf(stderr, "ERR: Thread: %d IN/OUT sizes do "
+				"not match!\n"
 				"  from card IN: %08x OUT: %08x\n"
-				"  original  IN: %08x OUT: %08x at %d of %d loops\n",
-				pt->thread,
+				"  original  IN: %08x OUT: %08x at %d of %d "
+				"loops\n", pt->thread,
 				mcpy_inp_processed, mcpy_outp_returned,
 				ip->data_buf_size, ip->data_buf_size,
 				count, ip->count);
@@ -437,16 +505,17 @@ static void *__memcpy_thread(void *data)
 			/* Check if data is correct  ... */
 			for (i = 0; i < ip->data_buf_size; i++) {
 				if (obuf[i] != pt->ibuf[i]) {
-					EVERBOSE("\nERR: Thread: %d @ offs %08x\n"
-						"  RETC: %03x %s ATTN: %x "
-						"PROGR: %x\n"
-						"  INP_PROCESSED: %08x "
-						"OUTP_RETURNED: %08x\n",
-						pt->thread, i, ddcb0->retc,
-						ddcb_retc_strerror(ddcb0->retc),
-						ddcb0->attn, ddcb0->progress,
-						mcpy_inp_processed,
-						mcpy_outp_returned);
+					EVERBOSE("\nERR: Thread: %d @ "
+						 "offs %08x\n"
+						 "  RETC: %03x %s ATTN: %x "
+						 "PROGR: %x\n"
+						 "  INP_PROCESSED: %08x "
+						 "OUTP_RETURNED: %08x\n",
+						 pt->thread, i, ddcb0->retc,
+						 ddcb_retc_strerror(ddcb0->retc),
+						 ddcb0->attn, ddcb0->progress,
+						 mcpy_inp_processed,
+						 mcpy_outp_returned);
 					errors++;
 					break;
 				}
@@ -458,9 +527,11 @@ static void *__memcpy_thread(void *data)
 				offs = i - 32;
 				if (offs < 0) offs = 0;
 				len  = MIN(64, ip->data_buf_size - offs);
-				EVERBOSE("memcopy src buffer (%p):\n", pt->ibuf);
+				EVERBOSE("memcopy src buffer (%p):\n",
+					 pt->ibuf);
 				__hexdump(&pt->ibuf[offs], len, offs);
-				EVERBOSE("memcopy dst buffer (%p):\n", obuf);
+				EVERBOSE("memcopy dst buffer (%p):\n",
+					 obuf);
 				__hexdump(&obuf[offs], len, offs);
 				errors++;
 			}
@@ -496,9 +567,11 @@ __memcpy_exit_2:
 	/* Free output buffer */
 	if (ip->use_sglist) {
 		if (ip->use_sglist > 1)
-			accel_unpin_memory(pt->accel, obuf4k, ip->data_buf_size + ip->pgoffs_o);
+			accel_unpin_memory(pt->accel, obuf4k,
+					   ip->data_buf_size + ip->pgoffs_o);
 		free(obuf4k);
-	} else accel_free(pt->accel, obuf4k, ip->data_buf_size + ip->pgoffs_o);
+	} else accel_free(pt->accel, obuf4k,
+			  ip->data_buf_size + ip->pgoffs_o);
 	obuf4k = NULL;
 __memcpy_exit_1:
 	pt->err = err;
@@ -577,12 +650,12 @@ static int __memcpy_alloc_ibuf(struct memcpy_in_parms *ip,
 
 int main(int argc, char *argv[])
 {
-	int	cmd;
-	char	*endptr = NULL;
-	pthread_t	tid;
-	int	thread;
-	char	*out_f;		/* Output File name used */
-	int	err_code;
+	int cmd;
+	char *endptr = NULL;
+	pthread_t tid;
+	int thread;
+	char *out_f;		/* Output File name used */
+	int err_code;
 	unsigned long long frequency, wtime_usec = 0, wtime_e = 0;
 
 	/* Summ for all threads */
@@ -595,8 +668,8 @@ int main(int argc, char *argv[])
 	unsigned long	kibs, mibs;
 	struct	memcpy_thread_data	*tdata;
 	struct	memcpy_thread_data	*pt;
-
 	struct	memcpy_in_parms ip;
+
 	ip.card_no = 0;
 	ip.card_type = DDCB_TYPE_GENWQE;
 	ip.mode = DDCB_MODE_RDWR | DDCB_MODE_ASYNC;
@@ -617,6 +690,7 @@ int main(int argc, char *argv[])
 	ip.mcpy_crc32 = 0;
 	ip.mcpy_adler32 = 0;
 	ip.have_threads = 0;
+	ip.err_inj = ERR_INJ_NONE;
 
 	while (1) {
 		int option_index = 0;
@@ -638,6 +712,8 @@ int main(int argc, char *argv[])
 			{ "pgoffs_o",		required_argument, NULL, 'o' },
 			{ "force-compare",	required_argument, NULL, 'F' },
 			{ "threads",		required_argument, NULL, 't' },
+			{ "err-inject",		required_argument, NULL, 'Y' },
+
 
 			/* misc/support */
 			{ "version",       no_argument,       NULL, 'V' },
@@ -648,7 +724,7 @@ int main(int argc, char *argv[])
 			{ 0,		   no_argument,       NULL, 0   },
 		};
 
-		cmd = getopt_long(argc, argv, "nqGDFi:o:p:s:c:C:A:X:vVhl:t:",
+		cmd = getopt_long(argc, argv, "nqGDFi:o:p:s:c:C:A:X:vVhl:t:Y:",
 				long_options, &option_index);
 		if (cmd == -1)	/* all params processed ? */
 			break;
@@ -745,6 +821,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'q':
 			ip.quiet = true;
+			break;
+		case 'Y':
+			ip.err_inj = strtol(optarg, (char **)NULL, 0);
 			break;
 		case 'v':
 			verbose_flag++;
@@ -920,15 +999,17 @@ int main(int argc, char *argv[])
 			if (total_usec < 100000) {
 				kibs = ((bytes_copied * 1000000) / 1024) /
 					total_usec;
-				VERBOSE0("%d KiB, in %lld/%lld usec, %ld KiB/sec,",
-					 kib, (long long)total_usec,
+				VERBOSE0("%d KiB, in %lld/%lld usec, "
+					 "%ld KiB/sec,", kib,
+					 (long long)total_usec,
 					 wtime_usec, kibs);
 			} else {
 				total_msec = total_usec / 1000;	/* now msec */
 				mibs = (bytes_copied * 1000) /
 					(1024 * 1024) / total_msec;
-				VERBOSE0("%d MiB, in %lld/%lld msec, %ld MiB/sec,",
-					 mib, (long long)total_msec,
+				VERBOSE0("%d MiB, in %lld/%lld msec, "
+					 "%ld MiB/sec,", mib,
+					 (long long)total_msec,
 					 wtime_usec/1000, mibs);
 			}
 		}
