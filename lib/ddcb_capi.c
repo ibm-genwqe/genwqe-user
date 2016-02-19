@@ -900,21 +900,20 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 	if (DDCB_IN != txq->status)
 		goto post_exit_stop;
 
-	/* it can happen that the timeout got set and the ddcb was
-	 * received in the meantime
-	 */
-	if (ddcb->retc_16)
-		compl_code = DDCB_OK;
-
 	elapsed_time = (int)(get_msec() - txq->q_in_time);
 
-	if ((DDCB_ERR_IRQTIMEOUT == compl_code) && (0 == ddcb->retc_16)) {
+	if (DDCB_ERR_IRQTIMEOUT == compl_code) {
+		if (ddcb->retc_16)
+			VERBOSE2("\t[%s] AFU[%d:%d] seq: 0x%x slot: %d compl_code: %d"
+				" retc: %4.4x after %d msec. wait 4 IRQ\n",
+				__func__, ctx->card_no, ctx->cid_id, txq->seqnum,
+				idx, compl_code, ddcb->retc_16, elapsed_time);
 		/* Select Timeout and no data received */
 		if (elapsed_time < (ctx->tout * 1000))
 			goto post_exit_cont;	/* Continue until timeout */
 
-		VERBOSE2("\t[%s] AFU[%d:%d] seq: 0x%x slot: %d elappsed "
-			"time %d msec timeout\n", __func__,
+		VERBOSE2("\t[%s] AFU[%d:%d] seq: 0x%x slot: %d timeout "
+			"after %d msec\n", __func__,
 			ctx->card_no, ctx->cid_id, txq->seqnum,
 			idx, elapsed_time);
 	}
@@ -949,13 +948,14 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 			" retc: %x after: %d msec\n", __func__,
 			ctx->card_no, ctx->cid_id, txq->seqnum, idx,
 			compl_code, ddcb->retc_16, elapsed_time);
+	else
+		VERBOSE1("\t[%s] AFU[%d:%d] seq: 0x%x slot: %d compl_code: %d"
+			" retc: %x after: %d msec\n", __func__,
+			ctx->card_no, ctx->cid_id, txq->seqnum, idx,
+			compl_code, ddcb->retc_16, elapsed_time);
 
 	ttx = txq->ttx;
 	ttx->compl_code = compl_code;
-	VERBOSE1("\t[%s] AFU[%d:%d] seq: 0x%x slot: %d "
-		 "compl_code: %d retc: %x after: %d msec\n", __func__,
-		ctx->card_no, ctx->cid_id, txq->seqnum, idx,
-		compl_code, ddcb->retc_16, elapsed_time);
 	rt_trace(0x0011, txq->seqnum, idx, ttx);
 	sem_post(&ctx->free_sem);
 	if (txq->thread_wait) {
@@ -1292,7 +1292,7 @@ static uint64_t _card_get_app_id(void *card_data)
 {
 	struct	ttxs	*ttx = (struct ttxs*)card_data;
 	struct  dev_ctx *ctx;
- 
+
 	if (ttx && (ttx->verify == ttx)) {
 		ctx = ttx->ctx;
 		if (ctx)
