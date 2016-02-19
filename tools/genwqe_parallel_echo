@@ -87,6 +87,7 @@ function cleanup {
     stop_jobs
     sleep 1
     echo "done"
+    stop_cxl_traces
     exit 0
 }
 
@@ -94,6 +95,13 @@ function start_cxl_traces {
     if [ ${accelerator} == "CAPI" -a ${tracing} -eq 1 ]; then
 	echo "Starting CXL tracing ...";
 	sudo sh -c 'echo 1 > /sys/kernel/debug/tracing/events/cxl/enable';
+    fi
+}
+
+function stop_cxl_traces {
+    if [ ${accelerator} == "CAPI" -a ${tracing} -eq 1 ]; then
+	echo "Stopping CXL tracing ...";
+	sudo sh -c 'echo 0 > /sys/kernel/debug/tracing/events/cxl/enable';
     fi
 }
 
@@ -174,7 +182,16 @@ echo "Parallel echo TEST for ${accelerator} card ${card} starting ${processes}"
 echo "********************************************************************"
 echo
 
+echo "********************************************************************"
+echo "Hardware Version"
+echo "********************************************************************"
+echo
+$tools_dir/genwqe_echo -A ${accelerator} -C ${card} --hardware-version
+
+echo "********************************************************************"
 echo "Remove old logfiles ..."
+echo "********************************************************************"
+echo
 rm -f echo_*.cmd echo_*.stdout.log echo_*.stderr.log
 
 start_cxl_traces
@@ -198,6 +215,7 @@ for i in `seq 1 ${iterations}` ; do
     if [ $? -ne 1 ]; then
 	echo "Found potential errors ... please check logfiles"
 	collect_cxl_traces
+	stop_cxl_traces
 	exit 1
     fi
 
@@ -206,6 +224,7 @@ for i in `seq 1 ${iterations}` ; do
     if [ $? -ne 0 ]; then
 	echo "Single echo took to long, please review results!"
 	collect_cxl_traces
+	stop_cxl_traces
 	exit 1
     fi
 
@@ -213,4 +232,5 @@ for i in `seq 1 ${iterations}` ; do
     rm -f echo_*.cmd echo_*.stdout.log echo_*.stderr.log
 done
 
+stop_cxl_traces
 exit 0
