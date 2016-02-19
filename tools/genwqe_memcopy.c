@@ -36,6 +36,13 @@
 #include "force_cpu.h"
 #include "memcopy_ddcb.h"
 
+/* Error injection bitmask */
+#define ERR_INJ_NONE   0x0
+#define ERR_INJ_INPUT  0x1
+#define ERR_INJ_OUTPUT 0x2
+#define ERR_INJ_SIZE   0x4
+#define ERR_INJ_DDCB   0x8
+
 static const char *version = GIT_VERSION;
 
 int verbose_flag = 0;
@@ -86,6 +93,7 @@ struct memcpy_in_parms {
 	int have_threads;
 	struct timespec stime;	/* Start time */
 	struct timespec etime;	/* End time */
+	unsigned int err_inj;	/* error injection while running DDCBs */
 };
 
 struct memcpy_thread_data {
@@ -135,7 +143,8 @@ static void usage(const char *prog)
 	       "  -i, --pgoffs_i <offs>    byte offset for input buffer\n"
 	       "  -o, --pgoffs_o <offs>    byte offset for output buffer\n"
 	       "  -F, --force-compare <ouput_data.bin>\n"
-	       "  -t, --threads <num>      Run <num> threads, default is 1\n"
+	       "  -t, --threads <num>      run <num> threads, default is 1\n"
+	       "  -Y, --inject-error <err> IN:0x1, OUT:0x2, SIZE:0x4, DDCB:0x8\n"
 	       "\n"
 	       "This utility sends memcopy DDCBs to the application\n"
 	       "chip unit. It can be used to check the cards health and/or\n"
@@ -264,7 +273,8 @@ static int accel_memcpy(accel_t card, struct ddcb_cmd *cmd_list, int preload,
 			uint32_t *crc32,
 			uint32_t *adler32,
 			uint32_t *inp_processed,
-			uint32_t *outp_returned)
+			uint32_t *outp_returned,
+			unsigned int err_inj)
 {
 	int rc, i;
 	struct ddcb_cmd *cmd = cmd_list;
@@ -296,9 +306,31 @@ static int accel_memcpy(accel_t card, struct ddcb_cmd *cmd_list, int preload,
 		/* Only relevant for the ZEDC variant. */
 		asiv->in_adler32    = __cpu_to_be32(1);
 		asiv->in_crc32      = __cpu_to_be32(0);
+
+		/* This will surely crash the application ... */
+		if (err_inj & ERR_INJ_INPUT) {
+			asiv->inp_buff ^= 0xffffffffffffffffull;
+			fprintf(stderr, "ERR_INJ_INPUT:  %016llx\n",
+				(long long)asiv->inp_buff);
+		}
+		if (err_inj & ERR_INJ_OUTPUT) {
+			asiv->outp_buff ^= 0xffffffffffffffffull;
+			fprintf(stderr, "ERR_INJ_OUTPUT: %016llx\n",
+				(long long)asiv->outp_buff);
+		}
+		if (err_inj & ERR_INJ_SIZE) {
+			asiv->inp_buff_len ^= 0xfffffffff;
+			asiv->outp_buff_len ^= 0xffffffff;
+			fprintf(stderr, "ERR_INJ_SIZE:   %08lx/%08lx\n",
+				(long)asiv->inp_buff_len,
+				(long)asiv->outp_buff_len);
+		}
+
 		if (i < (preload -1))
 			cmd->next_addr = (unsigned long)(cmd + 1);
-		else	cmd->next_addr = 0x0;
+		else
+			cmd->next_addr = 0x0;
+
 		cmd++;
 	}
 
@@ -401,7 +433,8 @@ static void *__memcpy_thread(void *data)
 				  ip->in_ats_type,
 				  &mcpy_crc32, &mcpy_adler32,
 				  &mcpy_inp_processed,
-				  &mcpy_outp_returned);
+				  &mcpy_outp_returned,
+				  ip->err_inj);
 		xerrno = errno;
 
 		clock_gettime(CLOCK_MONOTONIC_RAW, &etime);
@@ -617,12 +650,12 @@ static int __memcpy_alloc_ibuf(struct memcpy_in_parms *ip,
 
 int main(int argc, char *argv[])
 {
-	int	cmd;
-	char	*endptr = NULL;
-	pthread_t	tid;
-	int	thread;
-	char	*out_f;		/* Output File name used */
-	int	err_code;
+	int cmd;
+	char *endptr = NULL;
+	pthread_t tid;
+	int thread;
+	char *out_f;		/* Output File name used */
+	int err_code;
 	unsigned long long frequency, wtime_usec = 0, wtime_e = 0;
 
 	/* Summ for all threads */
@@ -635,8 +668,8 @@ int main(int argc, char *argv[])
 	unsigned long	kibs, mibs;
 	struct	memcpy_thread_data	*tdata;
 	struct	memcpy_thread_data	*pt;
-
 	struct	memcpy_in_parms ip;
+
 	ip.card_no = 0;
 	ip.card_type = DDCB_TYPE_GENWQE;
 	ip.mode = DDCB_MODE_RDWR | DDCB_MODE_ASYNC;
@@ -657,6 +690,7 @@ int main(int argc, char *argv[])
 	ip.mcpy_crc32 = 0;
 	ip.mcpy_adler32 = 0;
 	ip.have_threads = 0;
+	ip.err_inj = ERR_INJ_NONE;
 
 	while (1) {
 		int option_index = 0;
@@ -678,6 +712,8 @@ int main(int argc, char *argv[])
 			{ "pgoffs_o",		required_argument, NULL, 'o' },
 			{ "force-compare",	required_argument, NULL, 'F' },
 			{ "threads",		required_argument, NULL, 't' },
+			{ "err-inject",		required_argument, NULL, 'Y' },
+
 
 			/* misc/support */
 			{ "version",       no_argument,       NULL, 'V' },
@@ -688,7 +724,7 @@ int main(int argc, char *argv[])
 			{ 0,		   no_argument,       NULL, 0   },
 		};
 
-		cmd = getopt_long(argc, argv, "nqGDFi:o:p:s:c:C:A:X:vVhl:t:",
+		cmd = getopt_long(argc, argv, "nqGDFi:o:p:s:c:C:A:X:vVhl:t:Y:",
 				long_options, &option_index);
 		if (cmd == -1)	/* all params processed ? */
 			break;
@@ -785,6 +821,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'q':
 			ip.quiet = true;
+			break;
+		case 'Y':
+			ip.err_inj = strtol(optarg, (char **)NULL, 0);
 			break;
 		case 'v':
 			verbose_flag++;
