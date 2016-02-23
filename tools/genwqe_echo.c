@@ -17,9 +17,10 @@
 /**
  * @file	genwqe_echo.c
  * @brief	FPGA accelerator SW utility.
- * This utility sends ECHO-DDCBs to the Service Layer Unit (SLU) or
- * an chip application unit, waits for completion and checks if the
- * teststring is correctly returned
+ *
+ * This utility sends ECHO-DDCBs to the Service Layer Unit (SLU) or an
+ * chip application unit (or AFU), waits for completion and checks if
+ * the teststring is correctly returned.
  */
 
 #include <stdio.h>
@@ -68,8 +69,8 @@ static void usage(const char *prog)
 	       "  -D, --debug            create extended debug data on failure\n"
 #if defined (CONFIG_BUILD_4TEST)
 	       "  -u, --unitid=0:service layer|1:APP\n"
-	       "  -e, --exit-on-err      exit program when seeing an error\n"
 #endif
+	       "  -e, --exit-on-err      exit program when seeing an error\n"
 	       "  -f, --flood\n"
 	       "  -l, --preload=1..N     N <= 64\n"
 	       "  -i, --interval=INTERVAL_USEC\n"
@@ -261,8 +262,8 @@ int main(int argc, char *argv[])
 			{ "string",	required_argument, NULL, 's' },
 #if defined (CONFIG_BUILD_4TEST)
 			{ "unit",	required_argument, NULL, 'u' },
-			{ "exit-on-err", no_argument,      NULL, 'e' },
 #endif
+			{ "exit-on-err", required_argument, NULL, 'e' },
 			{ "flood",	no_argument,       NULL, 'f' },
 
 			/* misc/support */
@@ -277,10 +278,10 @@ int main(int argc, char *argv[])
 		};
 
 #if defined (CONFIG_BUILD_4TEST)
-		ch = getopt_long(argc, argv, "pDC:A:c:fhl:i:s:qvX:HVu:e",
+		ch = getopt_long(argc, argv, "pDC:A:c:fhl:i:s:qvX:HVu:e:",
 				long_options, &option_index);
 #else
-		ch = getopt_long(argc, argv, "pDC:A:c:fhl:i:s:qvX:HV",
+		ch = getopt_long(argc, argv, "pDC:A:c:fhl:i:s:qvX:HVe:",
 				long_options, &option_index);
 #endif
 		if (ch == -1)	/* all params processed ? */
@@ -332,10 +333,10 @@ int main(int argc, char *argv[])
 			    teststring[DDCB_ASV_LENGTH] = 0;
 			}
 			break;
-#if defined (CONFIG_BUILD_4TEST)
 		case 'e':
-			exit_on_err = 1;
+			exit_on_err = strtol(optarg, (char **)NULL, 0);
 			break;
+#if defined (CONFIG_BUILD_4TEST)
 		case 'u':		/* unit */
 			unit = strtol(optarg, (char **)NULL, 0);
 			break;
@@ -429,7 +430,7 @@ int main(int argc, char *argv[])
 		if (interval)
 			usleep(interval);
 
-		if ((exit_on_err) && (rc != DDCB_OK))
+		if (exit_on_err && (rc != DDCB_OK))
 			break;
 	}
 
