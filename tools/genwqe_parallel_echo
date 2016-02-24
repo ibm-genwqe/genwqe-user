@@ -37,6 +37,7 @@ tracing=0
 trace_file="genwqe_parallel_echo.log"
 PLATFORM=`uname -p`
 start_time=`date`
+do_build=0
 
 # Set default accelerator based on platform we are running on
 if [ ${PLATFORM} == "ppc64le" ]; then
@@ -56,6 +57,8 @@ function usage() {
     echo "     -l <N>           send <N> echos in one shot N <= 64"
     echo "     -P               run echo in experimental polling mode (CAPI only)"
     echo "     -T               start traces (CAPI only)"
+    echo "     -t <dir>         directory where the tools are located"
+    echo "     -b               build the code before running the test"
     echo
     echo "Example:"
     echo "  Repro the CAPI bitstream interrupt loss problem:"
@@ -117,7 +120,7 @@ trap cleanup SIGINT
 trap cleanup SIGKILL
 trap cleanup SIGTERM
 
-while getopts "TPA:C:p:i:k:l:h" opt; do
+while getopts "TPA:C:p:i:k:l:t:bh" opt; do
     case $opt in
 	A)
 	accelerator=$OPTARG;
@@ -147,6 +150,12 @@ while getopts "TPA:C:p:i:k:l:h" opt; do
         usage;
         exit 0;
         ;;
+	b)
+	do_build=1;
+	;;
+	t)
+	tools_dir=$OPTARG;
+	;;
         \?)
         echo "Invalid option: -$OPTARG" >&2
         ;;
@@ -175,8 +184,11 @@ function test_echo ()
     echo "ok"
 }
 
+# Check if we have to do a build
+if [ ${do_build} -eq 1 ]; then
 echo "Build code ..."
 make -s -j32 || exit 1
+fi
 
 echo "********************************************************************"
 echo "Parallel echo TEST for ${accelerator} card ${card} starting ${processes}"
