@@ -81,12 +81,12 @@ GenWQE adapter VPD tools
 %{_bindir}/genwqe_gzip
 %{_bindir}/genwqe_cksum
 %{_bindir}/genwqe_memcopy
-%{_bindir}/genwqe_mt_perf
 %{_bindir}/genwqe_peek
 %{_bindir}/genwqe_poke
-%{_bindir}/genwqe_test_gz
 %{_bindir}/genwqe_update
 %{_bindir}/zlib_mt_perf
+%{_bindir}/zlib_mt_perf.sh
+%{_bindir}/zlib_test_gz.sh
 
 %{_mandir}/man1/genwqe_echo.1.gz
 %{_mandir}/man1/genwqe_ffdc.1.gz
