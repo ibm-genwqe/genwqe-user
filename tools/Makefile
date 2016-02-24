@@ -17,8 +17,8 @@
 include ../config.mk
 
 DESTDIR ?= /usr
-libs = ../lib/libDDCB.a ../lib/libzHW.a ../lib/libcard.a $(libcxl_a) # static
-LDLIBS += $(libs) -lpthread -lrt                                     # dynamic
+libs = ../lib/libDDCB.a ../lib/libzHW.a ../lib/libcard.a
+LDLIBS += $(libs) -lpthread -lrt
 
 genwqe_peek_objs = force_cpu.o
 genwqe_poke_objs = force_cpu.o
@@ -39,10 +39,17 @@ projs = genwqe_update genwqe_gzip genwqe_gunzip zlib_mt_perf genwqe_memcopy \
 	genwqe_vpdconv genwqe_vpdupdate genwqe_csv2vpd \
 	genwqe_ffdc
 
-# Do this only on platforms where we have a libcxl available e.g. System p
-ifneq ($(CONFIG_LIBCXL_PATH),)
+ifdef WITH_LIBCXL
+# genwqe_maint is only used with CAPI support.
 projs += genwqe_maint genwqe_loadtree
-endif
+
+# If we are bundling, we need to link statically.  Otherwise, go dynamic.
+ifdef BUNDLE_LIBCXL
+LDLIBS += $(libcxl_a)
+else
+LDLIBS = -lcxl
+endif # !CONFIG_LIBCXL_PATH
+endif # WITH_LIBCXL
 
 all: $(projs)
 

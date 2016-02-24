@@ -38,17 +38,16 @@ endif
 PLATFORM ?= $(shell uname -i)
 
 distro = $(shell lsb_release -d | cut -f2)
-subdirs += lib tools
-ifeq ($(PLATFORM),ppc64le)
-subdirs += init
+
+ifdef BUNDLE_LIBCXL
+subdirs += "ext/libcxl"
 endif
-targets += $(subdirs)
+subdirs += lib tools init
 
 UDEV_RULES_D ?= /etc/udev/rules.d
 MODPROBE_D ?= /etc/modprobe.d
 
-
-all: $(targets)
+all: $(subdirs)
 
 tools: lib
 

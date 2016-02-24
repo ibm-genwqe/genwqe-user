@@ -43,8 +43,8 @@ objs1 = $(src1:.c=.o)
 
 ###libDDCB
 src2 += libddcb.c ddcb_card.c
-
-ifneq ($(CONFIG_LIBCXL_PATH),)
+# ddcb_capi is only used with LIBCXL support.
+ifdef WITH_LIBCXL
 src2 += ddcb_capi.c
 endif
 
@@ -55,32 +55,6 @@ objs2 = $(src2:.c=.o)
 projs += $(projA) $(proj0) $(proj1) $(proj2)
 
 all: $(projs)
-
-$(libcxl_a): ..check_libcxl
-
-ddcb_capi.o: ..check_libcxl
-
-.PHONY: ..check_libcxl
-..check_libcxl:
-ifneq ($(CONFIG_LIBCXL_PATH),)
-	@printf "\t[INFO]\tUsing $(libcxl_a).\n"
-	@if [ ! -f $(CONFIG_LIBCXL_PATH)/include/misc/cxl.h ]; then	\
-		mkdir -p $(CONFIG_LIBCXL_PATH)/include/misc/;		\
-		cp ../ext/include/misc/cxl.h 				\
-			$(CONFIG_LIBCXL_PATH)/include/misc/cxl.h;	\
-	fi
-	$(MAKE) -C $(CONFIG_LIBCXL_PATH)
-	@if [ ! -f $(libcxl_a) ]; then 					\
-	  printf  "\t[ERROR]\t$(libcxl_a) not found!\n"; 		\
-	  echo;								\
-	  echo "  Please clone libcxl git before continuing. E.g.:";	\
-	  echo "    git clone https://github.com/ibm-capi/libcxl";	\
-	  echo;                                                         \
-	  exit 1; \
-	fi
-else
-	# @printf "\t[INFO]\tNot using libcxl.a.\n"
-endif
 
 ### libzHW
 __$(libname0).o: $(objs0)
@@ -190,8 +164,5 @@ uninstall:
 
 clean distclean:
 	$(RM) *.o *.d $(projs) *.so
-ifneq ($(CONFIG_LIBCXL_PATH),)
-	$(MAKE) -C $(CONFIG_LIBCXL_PATH) $@
-endif
 
 -include $(objs:.o=.d) $(objs0:.o=.d) $(objs1:.o=.d) $(objs2:.o=.d)

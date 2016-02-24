@@ -49,9 +49,17 @@ GenWQE adapter VPD tools
 %prep
 %setup -q -n genwqe-user-%{version}
 
+%ifarch ppc64le
+%define libcxl "BUNDLE_LIBCXL=1"
+%endif
+
 %build
+%ifarch ppc64le
+%{__make} -C ext/libcxl CFLAGS="-I../include"
+%endif
+
 %{__make} %{?_smp_mflags} tools lib VERSION=%{version} \
-	CONFIG_ZLIB_PATH=%{_libdir}/libz.so.1
+	CONFIG_ZLIB_PATH=%{_libdir}/libz.so.1 %{?libcxl}
 
 %install
 %{__make} %{?_smp_mflags} install DESTDIR=%{buildroot}/%{_prefix} VERSION=%{version}
