@@ -85,9 +85,9 @@ GenWQE adapter VPD tools
 %doc LICENSE
 %defattr(0755,root,root)
 %{_bindir}/genwqe_*
-%{_bindir}/zlib_mt_perf
-%{_bindir}/zlib_mt_perf.sh
-%{_bindir}/zlib_test_gz.sh
+%{_bindir}/genwqe_zlib_mt_perf
+/usr/lib/genwqe/zlib_mt_perf
+/usr/lib/genwqe/zlib_test_gz
 %{_bindir}/genwqe/gunzip
 %{_bindir}/genwqe/gzip
 
