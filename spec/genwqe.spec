@@ -34,7 +34,7 @@ Group: Development/Tools
 URL: https://github.com/ibm-genwqe/genwqe-user/
 Requires: zlib >= 1.2.7
 BuildRequires: zlib-devel >= 1.2.7
-Source0: https://github.com/ibm-genwqe/genwqe-user/archive/genwqe-%{version}.tar.gz
+Source0: https://github.com/ibm-genwqe/genwqe-user/archive/genwqe-user-%{version}.tar.gz
 
 %description
 Provide a suite of utilities to manage and configure the IBM GenWQE card.
@@ -52,7 +52,7 @@ Group: System Environment/Base
 GenWQE adapter VPD tools
 
 %prep
-%setup -q -n genwqe-%{version}
+%setup -q -n genwqe-user-%{version}
 
 %build
 %{__make} %{?_smp_mflags} tools lib VERSION=%{version} \

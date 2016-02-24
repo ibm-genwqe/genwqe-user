@@ -20,6 +20,8 @@
 #   V=2 means full output
 V ?= 2
 
+include config.mk
+
 ifeq ($(V),0)
 	Q		:= @
 	MAKEFLAGS	+= --silent
@@ -98,14 +100,11 @@ rpmbuild_setup:
 #
 rpmbuild:
 	@$(MAKE) -s distclean
-	@rm -rf /tmp/genwqe-$(RPMVERSION)
-	@mkdir -p /tmp/genwqe-$(RPMVERSION)
-	@cp -ar * /tmp/genwqe-$(RPMVERSION)/
-	(cd /tmp && tar cfz genwqe-$(RPMVERSION).tar.gz genwqe-$(RPMVERSION))
-	rpmbuild -ta -v --define 'srcVersion $(RPMVERSION)' \
-		--define 'srcRelease 1'			\
-		--define 'Version $(RPMVERSION)'	\
-		/tmp/genwqe-$(RPMVERSION).tar.gz
+	@rm -rf /tmp/genwqe-user-$(VERSION)
+	@mkdir -p /tmp/genwqe-user-$(VERSION)
+	@cp -ar * /tmp/genwqe-user-$(VERSION)/
+	(cd /tmp && tar cfz genwqe-user-$(VERSION).tar.gz genwqe-user-$(VERSION))
+	rpmbuild -ta -v /tmp/genwqe-user-$(VERSION).tar.gz
 
 # Install/Uninstall
 install uninstall:
