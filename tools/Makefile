@@ -138,4 +138,4 @@ uninstall: uninstall_gzip_tools uninstall_manpages
 clean distclean:
 	$(RM) $(objs) $(projs) $(objs:.o=.d) $(manpages)
 
--include $(objs:.o=.d)
+#-include $(objs:.o=.d)
