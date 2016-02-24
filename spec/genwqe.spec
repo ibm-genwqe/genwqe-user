@@ -12,11 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
-# FIXME How can we automatically set the version? Version changes from time
-#       to time, would be good if we could autoadjust this to avoid us editing
-#       the spec file on any version increase. Let me try %Version to fix that.
-#
 # zlib-devel 1.2.8 is better, but 1.2.7 should work too
 #
 # The following switch tries to take care that the distros libz.so is been taken:
@@ -27,7 +22,7 @@
 
 Summary: GenWQE userspace tools
 Name:    genwqe-tools
-Version: %Version
+Version: 4.0.15
 Release: 1%{?dist}
 License: Apache license
 Group: Development/Tools
