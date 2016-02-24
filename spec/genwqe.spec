@@ -64,7 +64,8 @@ GenWQE adapter VPD tools
 
 
 %install
-%{__make} %{?_smp_mflags} install DESTDIR=%{buildroot}/%{_prefix} VERSION=%{version}
+%{__make} %{?_smp_mflags} install DESTDIR=%{buildroot}/%{_prefix} \
+        VERSION=%{version} SYSTEMD_UNIT_DIR=%{buildroot}/%{_unitdir}/
 
 #
 # FIXME Instead of trying to fixup things in the spec fike, let us consider
@@ -89,6 +90,11 @@ GenWQE adapter VPD tools
 %{_bindir}/zlib_test_gz.sh
 %{_bindir}/genwqe/gunzip
 %{_bindir}/genwqe/gzip
+
+%ifarch ppc64le
+%{_bindir}/genwqe_maint
+%{_unitdir}/genwqe_maint.service
+%endif
 
 %{_mandir}/man1/genwqe_*.gz
 %{_mandir}/man1/zlib_mt_perf.1.gz
