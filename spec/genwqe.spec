@@ -28,7 +28,7 @@ License: Apache license
 Group: Development/Tools
 URL: https://github.com/ibm-genwqe/genwqe-user/
 Requires: zlib >= 1.2.7
-BuildRequires: zlib-devel >= 1.2.7
+BuildRequires: zlib-devel >= 1.2.7 help2man
 Source0: https://github.com/ibm-genwqe/genwqe-user/archive/v%{version}.tar.gz
 
 %description
