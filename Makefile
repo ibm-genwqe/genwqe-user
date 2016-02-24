@@ -34,13 +34,16 @@ ifeq ($(V),1)
 endif
 
 distro = $(shell lsb_release -d | cut -f2)
+
+ifdef BUNDLE_LIBCXL
+subdirs += "ext/libcxl"
+endif
 subdirs += lib tools init
-targets += $(subdirs)
 
 UDEV_RULES_D ?= /etc/udev/rules.d
 MODPROBE_D ?= /etc/modprobe.d
 
-all: $(targets)
+all: $(subdirs)
 
 tools: lib
 

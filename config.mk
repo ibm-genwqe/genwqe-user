@@ -91,26 +91,46 @@ endif
 # version, which connects to the pslse server, which talks to the
 # hardware simulator.
 #
-# Enabling BUILD_SIMCODE=1 enables simulation version which builds and
-# links against the pslse version of libcxl.
+# libcxl is enabled by default on architectures that support
+# libcxl (ppc64le).
 #
+# If you need to disable it, you can run Make with DISABLE_LIBCXL=1.
+#
+# If you want to use the bundled version of libcxl (*not recommended*),
+# run make with BUNDLE_LIBCXL=1.  If your bundle is in some place other
+# than ../ext/libcxl, you can use CONFIG_LIBCXL_PATH to fix it.
+#
+# If you want to use the simulation (pslse) version of libcxl, run with
+# BUILD_SIMCODE=1. If your bundle is in some place other than
+# ../../pslse/libcxl, you can use CONFIG_LIBCXL_PATH to fix it.
+#
+#
+# libcxl cannot be enabled on platforms that don't have CAPI support.
 
-ifeq ($(PLATFORM),ppc64le)              # Enable libcxl by default
-CONFIG_LIBCXL_PATH ?= ../ext/libcxl
+ifndef DISABLE_LIBCXL
+ifeq ($(PLATFORM), ppc64le)
+WITH_LIBCXL=1
 endif
 
-BUILD_SIMCODE ?= 0
-
-ifeq ($(BUILD_SIMCODE),1)               # Use simulation version of libcxl
-CONFIG_LIBCXL_PATH = ../../pslse/libcxl
+ifdef BUILD_SIMCODE
+WITH_LIBCXL=1
+CONFIG_LIBCXL_PATH ?= ../../pslse/libcxl
 CFLAGS += -DCONFIG_BUILD_SIMCODE
 endif
 
-ifneq ($(CONFIG_LIBCXL_PATH),)          # Use libcxl
+ifdef BUNDLE_LIBCXL
+
+WITH_LIBCXL=1
+CONFIG_LIBCXL_PATH ?= ../ext/libcxl
+endif
+
+# Finally, set any paths needed.
+ifdef CONFIG_LIBCXL_PATH
 CFLAGS += -I$(CONFIG_LIBCXL_PATH) -I$(CONFIG_LIBCXL_PATH)/include
 LDFLAGS += -L$(CONFIG_LIBCXL_PATH)
 libcxl_a = $(CONFIG_LIBCXL_PATH)/libcxl.a
-endif
+endif # !CONFIG_LIBCXL_PATH
+endif # !DISABLE_LIBCXL
 
 # z_ prefixed version of libz, intended to be linked statically with
 # our libz version to provide the software zlib functionality.
