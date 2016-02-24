@@ -27,7 +27,7 @@
 
 Summary: GenWQE userspace tools
 Name:    genwqe-tools
-Version: %Version
+Version: 4.0.13
 Release: 1%{?dist}
 License: Apache license
 Group: Development/Tools
