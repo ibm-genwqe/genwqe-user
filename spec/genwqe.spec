@@ -62,7 +62,8 @@ GenWQE adapter VPD tools
 	CONFIG_ZLIB_PATH=%{_libdir}/libz.so.1 %{?libcxl}
 
 %install
-%{__make} %{?_smp_mflags} install DESTDIR=%{buildroot}/%{_prefix} VERSION=%{version}
+%{__make} %{?_smp_mflags} install DESTDIR=%{buildroot}/%{_prefix} \
+        VERSION=%{version} SYSTEMD_UNIT_DIR=%{buildroot}/%{_unitdir}/
 
 #
 # FIXME Instead of trying to fixup things in the spec fike, let us consider
@@ -103,20 +104,16 @@ GenWQE adapter VPD tools
 %{_mandir}/man1/genwqe_peek.1.gz
 %{_mandir}/man1/genwqe_poke.1.gz
 %{_mandir}/man1/genwqe_update.1.gz
-%{_mandir}/man1/zlib_mt_perf.1.gz
 
-# Not yet working with help2man
-#%{_mandir}/man1/genwqe_mt_perf.1.gz
-#%{_mandir}/man1/genwqe_test_gz.1.gz
+%{_mandir}/man1/zlib_mt_perf.1.gz
 
 %ifarch ppc64le
 %{_bindir}/genwqe_maint
-%{_prefix}/lib/systemd/system/genwqe_maint.service
+%{_unitdir}/genwqe_maint.service
 %{_bindir}/genwqe_loadtree
 %{_mandir}/man1/genwqe_maint.1.gz
 %{_mandir}/man1/genwqe_loadtree.1.gz
 %endif
-
 
 %files -n genwqe-zlib
 %doc LICENSE

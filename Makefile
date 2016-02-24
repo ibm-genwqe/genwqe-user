@@ -42,7 +42,11 @@ distro = $(shell lsb_release -d | cut -f2)
 ifdef BUNDLE_LIBCXL
 subdirs += "ext/libcxl"
 endif
-subdirs += lib tools init
+
+subdirs += lib tools
+ifdef WITH_LIBCXL
+subdirs += init
+endif
 
 UDEV_RULES_D ?= /etc/udev/rules.d
 MODPROBE_D ?= /etc/modprobe.d
