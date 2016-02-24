@@ -80,8 +80,8 @@ GenWQE adapter VPD tools
 %defattr(0755,root,root)
 %{_bindir}/genwqe_*
 %{_bindir}/zlib_mt_perf
-%{_bindir}/genwqe_mt_perf
-%{_bindir}/genwqe_test_gz
+%{_bindir}/zlib_mt_perf.sh
+%{_bindir}/zlib_test_gz.sh
 %{_bindir}/genwqe/gunzip
 %{_bindir}/genwqe/gzip
 

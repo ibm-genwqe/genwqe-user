@@ -94,14 +94,14 @@ install_gzip_tools: all
 	mkdir -p $(DESTDIR)/bin/genwqe
 	cp -uv genwqe_gzip $(DESTDIR)/bin/genwqe/gzip
 	cp -uv genwqe_gzip $(DESTDIR)/bin/genwqe/gunzip
-	cp -uv zlib_mt_perf genwqe_mt_perf genwqe_test_gz $(DESTDIR)/bin
+	cp -uv zlib_mt_perf zlib_mt_perf.sh zlib_test_gz.sh $(DESTDIR)/bin
 
 uninstall_gzip_tools:
 	$(RM) $(DESTDIR)/bin/genwqe/gzip	\
 	      $(DESTDIR)/bin/genwqe/gunzip	\
 	      $(DESTDIR)/bin/zlib_mt_perf	\
-	      $(DESTDIR)/bin/genwqe_mt_perf	\
-	      $(DESTDIR)/bin/genwqe_test_gz
+	      $(DESTDIR)/bin/zlib_mt_perf.sh	\
+	      $(DESTDIR)/bin/zlib_test_gz.sh
 
 install_manpages: $(manpages)
 	@mkdir -p $(DESTDIR)/man/man1
