@@ -1,5 +1,5 @@
 #
-# Copyright 2015, International Business Machines
+# Copyright 2016, International Business Machines
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,8 @@ all:
 clean:
 
 install:
-	install -D -m 644  genwqe_maint.service $(SYSTEMD_UNIT_DIR)/genwqe_maint.service
+	install -D -m 644 genwqe_maint.service \
+		$(SYSTEMD_UNIT_DIR)/genwqe_maint.service
 
 uninstall:
 	-rm $(SYSTEMD_UNIT_DIR)/genwqe_maint.service

@@ -36,12 +36,12 @@ zlib_mt_perf_libs = ../lib/libzADC.a -ldl	# statically link our libz
 
 projs = genwqe_update genwqe_gzip genwqe_gunzip zlib_mt_perf genwqe_memcopy \
 	genwqe_echo genwqe_peek genwqe_poke genwqe_cksum \
-	genwqe_vpdconv genwqe_vpdupdate genwqe_csv2vpd genwqe_loadtree \
+	genwqe_vpdconv genwqe_vpdupdate genwqe_csv2vpd \
 	genwqe_ffdc
 
 # Do this only on platforms where we have a libcxl available e.g. System p
 ifneq ($(CONFIG_LIBCXL_PATH),)
-projs += genwqe_maint
+projs += genwqe_maint genwqe_loadtree
 endif
 
 all: $(projs)
@@ -53,7 +53,7 @@ $(projs): $(libs)
 
 objs = force_cpu.o genwqe_vpd_common.o $(projs:=.o)
 
-manpages = $(projs:=.1)
+manpages = $(projs:=.1.gz)
 
 manpages: all $(manpages)
 
@@ -74,6 +74,9 @@ genwqe_gunzip.o: genwqe_gzip.c
 
 %.1: %
 	$(HELP2MAN) -N --output=$@ --name "IBM Hardware Accelerator Tool." ./$<
+
+%.1.gz: %.1
+	gzip --best -c $< > $@
 
 #
 # Tools for card maintenance
