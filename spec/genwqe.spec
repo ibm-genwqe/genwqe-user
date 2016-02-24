@@ -73,6 +73,7 @@ GenWQE adapter VPD tools
 %files -n genwqe-tools
 %doc LICENSE
 %defattr(0755,root,root)
+
 %{_bindir}/genwqe/gunzip
 %{_bindir}/genwqe/gzip
 %{_bindir}/genwqe_echo
@@ -84,9 +85,9 @@ GenWQE adapter VPD tools
 %{_bindir}/genwqe_peek
 %{_bindir}/genwqe_poke
 %{_bindir}/genwqe_update
-%{_bindir}/zlib_mt_perf
-%{_bindir}/zlib_mt_perf.sh
-%{_bindir}/zlib_test_gz.sh
+%{_bindir}/genwqe_zlib_mt_perf
+/usr/lib/genwqe/zlib_mt_perf
+/usr/lib/genwqe/zlib_test_gz
 
 %{_mandir}/man1/genwqe_echo.1.gz
 %{_mandir}/man1/genwqe_ffdc.1.gz
