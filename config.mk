@@ -60,7 +60,7 @@ HAS_GIT = $(shell git describe > /dev/null 2>&1 && echo y || echo n)
 
 ifeq (${HAS_GIT},y)
 VERSION ?= $(shell git describe --abbrev=4 --dirty --always --tags)
-RPMVERSION ?= $(shell git describe --abbrev=0 --tags)
+RPMVERSION ?= $(shell git describe --abbrev=0 --tags | cut -c 2-7)
 else
 VERSION=4.0.15
 RPMVERSION=$(VERSION)

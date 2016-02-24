@@ -22,6 +22,8 @@ include config.mk
 #   V=2 means full output
 V ?= 2
 
+include config.mk
+
 ifeq ($(V),0)
 Q		:= @
 MAKEFLAGS	+= --silent
@@ -106,14 +108,11 @@ rpmbuild_setup:
 #
 rpmbuild:
 	@$(MAKE) -s distclean
-	@rm -rf /tmp/genwqe-$(RPMVERSION)
-	@mkdir -p /tmp/genwqe-$(RPMVERSION)
-	@cp -ar * /tmp/genwqe-$(RPMVERSION)/
-	(cd /tmp && tar cfz genwqe-$(RPMVERSION).tar.gz genwqe-$(RPMVERSION))
-	rpmbuild -ta -v --define 'srcVersion $(RPMVERSION)' \
-		--define 'srcRelease 1'			\
-		--define 'Version $(RPMVERSION)'	\
-		/tmp/genwqe-$(RPMVERSION).tar.gz
+	@rm -rf /tmp/genwqe-user-$(RPMVERSION)
+	@mkdir -p /tmp/genwqe-user-$(RPMVERSION)
+	@cp -ar * /tmp/genwqe-user-$(RPMVERSION)/
+	(cd /tmp && tar cfz v$(RPMVERSION).tar.gz genwqe-user-$(RPMVERSION))
+	rpmbuild -ta -v /tmp/v$(RPMVERSION).tar.gz
 
 # Install/Uninstall
 install uninstall:
@@ -159,7 +158,7 @@ clean:
 			$(MAKE) -C $$dir $@ || exit 1;	\
 		fi					\
 	done
-	@$(RM) genwqe-$(RPMVERSION).tgz	libz.o libz_prefixed.o zlib-1.2.8.cfg
+	@$(RM) genwqe-$(RPMVERSION).tar.gz libz.o libz_prefixed.o zlib-1.2.8.cfg
 	@if [ -d zlib-1.2.8 ]; then 			\
 		$(MAKE) -s -C zlib-1.2.8 distclean;	\
 	fi
