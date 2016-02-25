@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 
-SYSTEMD_UNIT_DIR?=$(DESTDIR)/usr/lib/systemd/system
+SYSTEMD_UNIT_DIR?=$(DESTDIR)/lib/systemd/system
 
 all:
 clean:

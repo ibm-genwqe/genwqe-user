@@ -110,9 +110,10 @@ GenWQE adapter VPD tools
 
 %ifarch ppc64le
 %{_bindir}/genwqe_maint
+%{_prefix}/lib/systemd/system/genwqe_maint.service
 %{_bindir}/genwqe_loadtree
-%{_mandir}/genwqe_maint.1.gz
-%{_mandir}/genwqe_loadtree.1.gz
+%{_mandir}/man1/genwqe_maint.1.gz
+%{_mandir}/man1/genwqe_loadtree.1.gz
 %endif
 
 
