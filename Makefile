@@ -31,7 +31,11 @@ MAKEFLAGS	+= --silent
 MAKE		+= -s
 endif
 
-HAS_GIT = $(shell git --help > /dev/null 2>&1 && echo y || echo n)
+#
+# If we can use git to get a version, we use that. If not, we have
+# no repository and set a static version number.
+#
+HAS_GIT = $(shell git describe > /dev/null 2>&1 && echo y || echo n)
 
 ifeq (${HAS_GIT},y)
 VERSION ?= $(shell git describe --abbrev=4 --dirty --always --tags)
