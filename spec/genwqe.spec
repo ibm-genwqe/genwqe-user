@@ -78,15 +78,44 @@ GenWQE adapter VPD tools
 %files -n genwqe-tools
 %doc LICENSE
 %defattr(0755,root,root)
-%{_bindir}/genwqe_*
-%{_bindir}/zlib_mt_perf
-%{_bindir}/genwqe_mt_perf
-%{_bindir}/genwqe_test_gz
 %{_bindir}/genwqe/gunzip
 %{_bindir}/genwqe/gzip
+%{_bindir}/genwqe_echo
+%{_bindir}/genwqe_ffdc
+%{_bindir}/genwqe_gunzip
+%{_bindir}/genwqe_gzip
+%{_bindir}/genwqe_cksum
+%{_bindir}/genwqe_memcopy
+%{_bindir}/genwqe_mt_perf
+%{_bindir}/genwqe_peek
+%{_bindir}/genwqe_poke
+%{_bindir}/genwqe_test_gz
+%{_bindir}/genwqe_update
+%{_bindir}/zlib_mt_perf
 
-%{_mandir}/man1/genwqe_*.gz
+%{_mandir}/man1/genwqe_echo.1.gz
+%{_mandir}/man1/genwqe_ffdc.1.gz
+%{_mandir}/man1/genwqe_gunzip.1.gz
+%{_mandir}/man1/genwqe_gzip.1.gz
+%{_mandir}/man1/genwqe_cksum.1.gz
+%{_mandir}/man1/genwqe_memcopy.1.gz
+%{_mandir}/man1/genwqe_peek.1.gz
+%{_mandir}/man1/genwqe_poke.1.gz
+%{_mandir}/man1/genwqe_update.1.gz
 %{_mandir}/man1/zlib_mt_perf.1.gz
+
+# Not yet working with help2man
+#%{_mandir}/man1/genwqe_mt_perf.1.gz
+#%{_mandir}/man1/genwqe_test_gz.1.gz
+
+%ifarch ppc64le
+%{_bindir}/genwqe_maint
+%{_prefix}/lib/systemd/system/genwqe_maint.service
+%{_bindir}/genwqe_loadtree
+%{_mandir}/man1/genwqe_maint.1.gz
+%{_mandir}/man1/genwqe_loadtree.1.gz
+%endif
+
 
 %files -n genwqe-zlib
 %doc LICENSE
@@ -100,6 +129,7 @@ GenWQE adapter VPD tools
 %{_bindir}/genwqe_csv2vpd
 %{_bindir}/genwqe_vpdconv
 %{_bindir}/genwqe_vpdupdate
+
 %{_mandir}/man1/genwqe_csv2vpd.1.gz
 %{_mandir}/man1/genwqe_vpdconv.1.gz
 %{_mandir}/man1/genwqe_vpdupdate.1.gz

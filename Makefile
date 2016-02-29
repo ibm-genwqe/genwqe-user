@@ -21,22 +21,42 @@
 V ?= 2
 
 ifeq ($(V),0)
-	Q		:= @
-	MAKEFLAGS	+= --silent
-	MAKE		+= -s
+Q		:= @
+MAKEFLAGS	+= --silent
+MAKE		+= -s
 endif
 
 ifeq ($(V),1)
-	MAKEFLAGS	+= --silent
-	MAKE		+= -s
+MAKEFLAGS	+= --silent
+MAKE		+= -s
 endif
 
+#
+# If we can use git to get a version, we use that. If not, we have
+# no repository and set a static version number.
+#
+HAS_GIT = $(shell git describe > /dev/null 2>&1 && echo y || echo n)
+
+ifeq (${HAS_GIT},y)
+VERSION ?= $(shell git describe --abbrev=4 --dirty --always --tags)
+RPMVERSION ?= $(shell git describe --abbrev=0 --tags)
+else
+VERSION=4.0.11
+RPMVERSION=$(VERSION)
+endif
+
+PLATFORM ?= $(shell uname -i)
+
 distro = $(shell lsb_release -d | cut -f2)
-subdirs += lib tools init
+subdirs += lib tools
+ifeq ($(PLATFORM),ppc64le)
+subdirs += init
+endif
 targets += $(subdirs)
 
 UDEV_RULES_D ?= /etc/udev/rules.d
 MODPROBE_D ?= /etc/modprobe.d
+
 
 all: $(targets)
 
