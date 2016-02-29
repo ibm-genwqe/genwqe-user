@@ -27,14 +27,14 @@
 
 Summary: GenWQE userspace tools
 Name:    genwqe-tools
-Version: %Version
+Version: 4.0.13
 Release: 1%{?dist}
 License: Apache license
 Group: Development/Tools
 URL: https://github.com/ibm-genwqe/genwqe-user/
 Requires: zlib >= 1.2.7
-BuildRequires: zlib-devel >= 1.2.7
-Source0: https://github.com/ibm-genwqe/genwqe-user/archive/genwqe-%{version}.tar.gz
+BuildRequires: zlib-devel >= 1.2.7 help2man
+Source0: https://github.com/ibm-genwqe/genwqe-user/archive/genwqe-user-%{version}.tar.gz
 
 %description
 Provide a suite of utilities to manage and configure the IBM GenWQE card.
@@ -52,14 +52,23 @@ Group: System Environment/Base
 GenWQE adapter VPD tools
 
 %prep
-%setup -q -n genwqe-%{version}
+%setup -q -n genwqe-user-%{version}
+
+%ifarch ppc64le
+%define libcxl "BUNDLE_LIBCXL=1"
+%endif
 
 %build
+%ifarch ppc64le
+%{__make} -C ext/libcxl
+%endif
+
 %{__make} %{?_smp_mflags} tools lib VERSION=%{version} \
-	CONFIG_ZLIB_PATH=%{_libdir}/libz.so
+        CONFIG_ZLIB_PATH=%{_libdir}/libz.so %{?libcxl}
 
 %install
-%{__make} %{?_smp_mflags} install DESTDIR=%{buildroot}/%{_prefix} VERSION=%{version}
+%{__make} %{?_smp_mflags} install DESTDIR=%{buildroot}/%{_prefix} \
+        VERSION=%{version} SYSTEMD_UNIT_DIR=%{buildroot}/%{_unitdir}/
 
 #
 # FIXME Instead of trying to fixup things in the spec fike, let us consider
@@ -79,11 +88,16 @@ GenWQE adapter VPD tools
 %doc LICENSE
 %defattr(0755,root,root)
 %{_bindir}/genwqe_*
-%{_bindir}/zlib_mt_perf
-%{_bindir}/genwqe_mt_perf
-%{_bindir}/genwqe_test_gz
+%{_bindir}/genwqe_zlib_mt_perf
+/usr/lib/genwqe/zlib_mt_perf
+/usr/lib/genwqe/zlib_test_gz
 %{_bindir}/genwqe/gunzip
 %{_bindir}/genwqe/gzip
+
+%ifarch ppc64le
+%{_bindir}/genwqe_maint
+%{_unitdir}/genwqe_maint.service
+%endif
 
 %{_mandir}/man1/genwqe_*.gz
 %{_mandir}/man1/zlib_mt_perf.1.gz

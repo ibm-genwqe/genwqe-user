@@ -20,6 +20,8 @@
 #   V=2 means full output
 V ?= 2
 
+include config.mk
+
 ifeq ($(V),0)
 	Q		:= @
 	MAKEFLAGS	+= --silent
@@ -32,13 +34,20 @@ ifeq ($(V),1)
 endif
 
 distro = $(shell lsb_release -d | cut -f2)
-subdirs += lib tools init
-targets += $(subdirs)
+
+ifdef BUNDLE_LIBCXL
+subdirs += "ext/libcxl"
+endif
+
+subdirs += lib tools
+ifdef WITH_LIBCXL
+subdirs += init
+endif
 
 UDEV_RULES_D ?= /etc/udev/rules.d
 MODPROBE_D ?= /etc/modprobe.d
 
-all: $(targets)
+all: $(subdirs)
 
 tools: lib
 
@@ -98,14 +107,11 @@ rpmbuild_setup:
 #
 rpmbuild:
 	@$(MAKE) -s distclean
-	@rm -rf /tmp/genwqe-$(RPMVERSION)
-	@mkdir -p /tmp/genwqe-$(RPMVERSION)
-	@cp -ar * /tmp/genwqe-$(RPMVERSION)/
-	(cd /tmp && tar cfz genwqe-$(RPMVERSION).tar.gz genwqe-$(RPMVERSION))
-	rpmbuild -ta -v --define 'srcVersion $(RPMVERSION)' \
-		--define 'srcRelease 1'			\
-		--define 'Version $(RPMVERSION)'	\
-		/tmp/genwqe-$(RPMVERSION).tar.gz
+	@rm -rf /tmp/genwqe-user-$(VERSION)
+	@mkdir -p /tmp/genwqe-user-$(VERSION)
+	@cp -ar * /tmp/genwqe-user-$(VERSION)/
+	(cd /tmp && tar cfz genwqe-user-$(VERSION).tar.gz genwqe-user-$(VERSION))
+	rpmbuild -ta -v /tmp/genwqe-user-$(VERSION).tar.gz
 
 # Install/Uninstall
 install uninstall:
