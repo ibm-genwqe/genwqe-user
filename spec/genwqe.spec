@@ -81,9 +81,6 @@ GenWQE adapter VPD tools
 %files -n genwqe-tools
 %doc LICENSE
 %defattr(0755,root,root)
-
-%{_bindir}/genwqe/gunzip
-%{_bindir}/genwqe/gzip
 %{_bindir}/genwqe_echo
 %{_bindir}/genwqe_ffdc
 %{_bindir}/genwqe_gunzip
