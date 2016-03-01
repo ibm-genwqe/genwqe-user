@@ -28,6 +28,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <getopt.h>
+#include <endian.h>
 #include <sys/stat.h>
 
 #include <libddcb.h>
@@ -73,6 +74,11 @@ struct mdev_ctx {
 	char *errinfo;
 
 	uint64_t fir[MMIO_FIR_REGS_NUM];
+};
+
+struct cgzip_afu_fir {
+	__be32 fir_val;
+	__be32 fir_addr;
 };
 
 /*	Expect min this Release or higher */
@@ -302,6 +308,28 @@ static int afu_check_stime(struct mdev_ctx *mctx)
 	return mctx->dt;
 }
 
+static void afu_dump_mfirs(struct mdev_ctx *mctx)
+{
+	unsigned int i;
+	struct cgzip_afu_fir *fir;
+
+	if (verbose > 3) {
+		ddcb_hexdump(fd_out, mctx->errinfo, mctx->errinfo_size);
+		return;
+	}
+
+	for (i = 0, fir = (struct cgzip_afu_fir *)mctx->errinfo;
+	     i < MMIO_FIR_REGS_NUM; i++) {
+
+		VERBOSE0("  AFU[%d] FIR: %d: 0x%08x addr: 0x%08x "
+			 "mmio: 0x%016llx\n",
+			 mctx->card, i,
+			 be32toh(fir[i].fir_val),
+			 be32toh(fir[i].fir_addr),
+			 (long long)mctx->fir[i]);
+	}
+}
+
 /*
  * Print FIRs only if they have changed. Always collect them.
  */
@@ -341,13 +369,8 @@ static int afu_check_mfirs(struct mdev_ctx *mctx)
 				VERBOSE0("  cxl_err_info_read returned %d!\n",
 					 rc);
 			}
-			ddcb_hexdump(fd_out, mctx->errinfo,
-				     mctx->errinfo_size);
+			afu_dump_mfirs(mctx);
 		}
-
-		for (i = 0; i < MMIO_FIR_REGS_NUM; i++)
-			VERBOSE0("  AFU[%d] FIR: %d: 0x%016llx\n",
-				 mctx->card, i, (long long)mctx->fir[i]);
 
 		if (dead) {
 			t = time(NULL);
@@ -436,7 +459,17 @@ static void help(char *prog)
 	       "\t	1 = Check Master Firs\n"
 	       "\t	2 = Report Context Details\n"
 	       "\t-f, --log-file <file> Log File name when running in -d "
-	       "(daemon)\n", prog);
+	       "(daemon)\n"
+	       "\n"
+	       "Figure out how many card resets are allowed within an hour:\n"
+	       "    sudo cat /sys/kernel/debug/powerpc/eeh_max_freezes\n"
+	       "\n"
+	       "Set this to a higher value with:\n"
+	       "    sudo sh -c 'echo 10000 > /sys/kernel/debug/powerpc/eeh_max_freezes'\n"
+	       "\n"
+	       "Manually resetting a card:\n"
+	       "    sudo sh -c 'echo 1 > /sys/class/cxl/card0/reset'\n"
+	       "\n", prog);
 }
 
 /**
