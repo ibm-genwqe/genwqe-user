@@ -18,7 +18,7 @@ include ../config.mk
 
 DESTDIR ?= /usr
 libs = ../lib/libDDCB.a ../lib/libzHW.a ../lib/libcard.a
-LDLIBS += $(libs) -lpthread -lrt
+LDLIBS += $(libs) -lpthread -lrt -ljson-c
 
 genwqe_peek_objs = force_cpu.o
 genwqe_poke_objs = force_cpu.o
@@ -42,6 +42,7 @@ projs = genwqe_update genwqe_gzip genwqe_gunzip zlib_mt_perf genwqe_memcopy \
 ifdef WITH_LIBCXL
 # genwqe_maint is only used with CAPI support.
 projs += genwqe_maint genwqe_loadtree
+projs += agzipd
 CAPI_INSTALL=capi_install
 
 # If we are bundling, we need to link statically.  Otherwise, go dynamic.
