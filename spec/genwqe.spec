@@ -64,7 +64,6 @@ GenWQE adapter VPD tools
 %install
 %{__make} %{?_smp_mflags} install DESTDIR=%{buildroot}/%{_prefix} \
         VERSION=%{version} SYSTEMD_UNIT_DIR=%{buildroot}/%{_unitdir}/
-
 #
 # FIXME Instead of trying to fixup things in the spec fike, let us consider
 #       changing the associated install rule, such that the spec file
@@ -74,10 +73,6 @@ GenWQE adapter VPD tools
 # Move genwqe_vpd.csv to expected location.
 %{__mkdir} -p %{buildroot}/%{_sysconfdir}/
 %{__install} -m 0644 tools/genwqe_vpd.csv %{buildroot}/etc/
-
-# Move man pages to expected location.
-%{__mkdir} -p %{buildroot}/%{_mandir}/man1
-%{__mv} %{buildroot}/usr/man/man1/* %{buildroot}/%{_mandir}/man1
 
 %files -n genwqe-tools
 %doc LICENSE

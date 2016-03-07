@@ -116,8 +116,8 @@ uninstall_gzip_tools:
 	      $(DESTDIR)/lib/genwqe/zlib_test_gz
 
 install_manpages: $(manpages)
-	@mkdir -p $(DESTDIR)/man/man1
-	cp -uv $(manpages) $(DESTDIR)/man/man1
+	@mkdir -p $(DESTDIR)/share/man/man1
+	cp -uv $(manpages) $(DESTDIR)/share/man/man1
 
 install_release_manpages: $(manpages)
 	@mkdir -p $(DESTDIR)/man/man1
