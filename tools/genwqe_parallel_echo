@@ -33,6 +33,7 @@ killtimeout=2
 preload=1
 runpids=""
 polling=""
+count=""
 tracing=0
 trace_file="genwqe_parallel_echo.log"
 PLATFORM=`uname -p`
@@ -51,6 +52,7 @@ function usage() {
     echo "  genwqe_parallel_echo"
     echo "     -A <accelerator> GENWQE|CAPI"
     echo "     -C <card>        card to be used for the test"
+    echo "     -c <count>       send <count> echos and than stop"
     echo "     -i <iterations>  repeat  multiple times for more testing"
     echo "     -p <processes>   how many processed in parallel"
     echo "     -k <seconds>     kill timeout"
@@ -120,13 +122,16 @@ trap cleanup SIGINT
 trap cleanup SIGKILL
 trap cleanup SIGTERM
 
-while getopts "TPA:C:p:i:k:l:t:bh" opt; do
+while getopts "TPA:C:c:p:i:k:l:t:bh" opt; do
     case $opt in
 	A)
 	accelerator=$OPTARG;
 	;;
 	C)
 	card=$OPTARG;
+	;;
+	c)
+	count="-c $OPTARG";
 	;;
         i)
         iterations=$OPTARG;
@@ -168,20 +173,24 @@ function test_echo ()
     echo "Starting genwqe_echo in the background ... "
     for s in `seq 1 $processes` ; do
 	start_job $tools_dir/genwqe_echo -A ${accelerator} -C ${card} \
-	    -l ${preload} -f ${polling} > echo_$s.stdout.log 2> echo_$s.stderr.log
+	    -l ${preload} ${count} -f ${polling} \
+	    > echo_$s.stdout.log 2> echo_$s.stderr.log
     done
     echo "ok"
 
-    echo "Waiting ${killtimeout} seconds ..."
-    for s in `seq 0 ${killtimeout}` ; do
-	sleep 1;
-	echo -n "."
-    done
-    echo " ok"
-	
-    echo "Sending SIGKILL to all ... "
-    stop_jobs
-    echo "ok"
+    if [ ${killtimeout} -ne -1 ]; then
+	echo "Waiting ${killtimeout} seconds ..."
+	for s in `seq 0 ${killtimeout}` ; do
+	    sleep 1;
+	    echo -n "."
+	done
+	echo " ok"
+	echo "Sending SIGKILL to all ... "
+	stop_jobs
+	echo "ok"
+    else
+	echo "Skipp killing processes but wait until they terminate ..."
+    fi
 }
 
 # Check if we have to do a build
