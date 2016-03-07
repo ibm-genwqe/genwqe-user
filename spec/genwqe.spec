@@ -29,6 +29,7 @@ Group: Development/Tools
 URL: https://github.com/ibm-genwqe/genwqe-user/
 Requires: zlib >= 1.2.7
 BuildRequires: zlib-devel >= 1.2.7 help2man
+BuildRoot: %{_tmppath}/%{name}-root
 Source0: https://github.com/ibm-genwqe/genwqe-user/archive/v%{version}.tar.gz
 
 %description
@@ -75,8 +76,8 @@ GenWQE adapter VPD tools
 %{__install} -m 0644 tools/genwqe_vpd.csv %{buildroot}/etc/
 
 %files -n genwqe-tools
+%defattr(-,root,root)
 %doc LICENSE
-%defattr(0755,root,root)
 %{_bindir}/genwqe_echo
 %{_bindir}/genwqe_ffdc
 %{_bindir}/genwqe_gunzip
@@ -87,8 +88,6 @@ GenWQE adapter VPD tools
 %{_bindir}/genwqe_poke
 %{_bindir}/genwqe_update
 %{_bindir}/genwqe_zlib_mt_perf
-/usr/lib/genwqe/zlib_mt_perf
-/usr/lib/genwqe/zlib_test_gz
 
 %{_mandir}/man1/genwqe_echo.1.gz
 %{_mandir}/man1/genwqe_ffdc.1.gz
@@ -111,12 +110,17 @@ GenWQE adapter VPD tools
 %endif
 
 %files -n genwqe-zlib
+%defattr(-,root,root)
 %doc LICENSE
-%defattr(0755,root,root)
+%{_prefix}/include/genwqe
+%{_prefix}/lib/genwqe
 %{_prefix}/lib/genwqe/*
 %{_prefix}/include/genwqe/*
+%{_prefix}/lib/genwqe/zlib_mt_perf
+%{_prefix}/lib/genwqe/zlib_test_gz
 
 %files -n genwqe-vpd
+%defattr(0755,root,root)
 %doc LICENSE
 %{_sysconfdir}/genwqe_vpd.csv
 %{_bindir}/genwqe_csv2vpd
