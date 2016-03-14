@@ -529,8 +529,10 @@ load_syms:
 
 void zedc_sw_done(void)
 {
-	sw_trace("Closing software zlib\n");
-	dlclose(handle);
+	if (handle != NULL) {
+		sw_trace("Closing software zlib\n");
+		dlclose(handle);
+	}
 }
 
 #else
