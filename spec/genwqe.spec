@@ -56,7 +56,7 @@ GenWQE adapter VPD tools
 
 %build
 %{__make} %{?_smp_mflags} tools lib VERSION=%{version} \
-	CONFIG_ZLIB_PATH=%{_libdir}/libz.so
+	CONFIG_ZLIB_PATH=%{_libdir}/libz.so.1
 
 %install
 %{__make} %{?_smp_mflags} install DESTDIR=%{buildroot}/%{_prefix} VERSION=%{version}

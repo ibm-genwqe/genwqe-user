@@ -449,9 +449,9 @@ void zedc_sw_init(void)
 		goto load_syms;
 
 	/* try loading system zlib.so */
-	sw_trace("Try loading system software zlib \"libz.so\"\n");
+	sw_trace("Try loading system software zlib \"libz.so.1\"\n");
 	dlerror();
-	handle = dlopen("libz.so", RTLD_LAZY);
+	handle = dlopen("libz.so.1", RTLD_LAZY);
 	if (handle == NULL) {
 		pr_err("  %s\n", dlerror());
 		return;
@@ -529,8 +529,10 @@ load_syms:
 
 void zedc_sw_done(void)
 {
-	sw_trace("Closing software zlib\n");
-	dlclose(handle);
+	if (handle != NULL) {
+		sw_trace("Closing software zlib\n");
+		dlclose(handle);
+	}
 }
 
 #else
