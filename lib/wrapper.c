@@ -77,8 +77,8 @@
 /* Good values are something like 8KiB or 16KiB */
 #define CONFIG_INFLATE_THRESHOLD (16 * 1024)  /* 0: disabled */
 
-int zlib_trace = 0x0;
-
+int zlib_trace = 0x0;		/* no trace by default */
+FILE *zlib_log = NULL;		/* default is stderr, unless overwritten */
 int zlib_accelerator = DDCB_TYPE_GENWQE;
 int zlib_card = -1;		/* Using redundant now as default */
 
@@ -235,7 +235,15 @@ static void _init(void)
 {
 	int rc;
 	const char *trace, *inflate_impl, *deflate_impl, *method;
+	const char *zlib_logfile = NULL;
 	char *inflate_threshold;
+
+	zlib_logfile = getenv("ZLIB_LOGFILE");
+	if (zlib_logfile != NULL) {
+		zlib_log = fopen(zlib_logfile, "a+");
+		if (zlib_log == NULL)
+			zlib_log = stderr;
+	} else zlib_log = stderr;
 
 	trace = getenv("ZLIB_TRACE");
 	if (trace != NULL)
@@ -761,8 +769,8 @@ int deflate(z_streamp strm, int flush)
 	}
 
 	pr_trace("[%p] deflate:   flush=%d %s next_in=%p avail_in=%d "
-		 "next_out=%p avail_out=%d total_out=%ld crc/adler=%08lx impl=%d\n",
-		 strm, flush, flush_to_str(flush), strm->next_in,
+		 "next_out=%p avail_out=%d total_out=%ld crc/adler=%08lx "
+		 "impl=%d\n", strm, flush, flush_to_str(flush), strm->next_in,
 		 strm->avail_in, strm->next_out, strm->avail_out,
 		 strm->total_out, strm->adler, w->impl);
 
@@ -776,7 +784,8 @@ int deflate(z_streamp strm, int flush)
 		rc = z_deflate(strm, flush);
 		break;
 	default:
-		pr_trace("[%p] deflate: impl (%d) is not valid for me\n", strm, w->impl);
+		pr_trace("[%p] deflate: impl (%d) is not valid for me\n",
+			 strm, w->impl);
 		break;
 	}
 	strm->state = (void *)w;
@@ -1518,5 +1527,9 @@ static void _done(void)
 
 	zedc_hw_done();
 	zedc_sw_done();
+
+	if (zlib_log != stderr)
+		fclose(zlib_log);
+
 	return;
 }
