@@ -1127,11 +1127,11 @@ static inline int __check_stream_end(z_streamp strm)
 
 	hw_trace("Accumulated input data:\n");
 	if (zlib_hw_trace_enabled())
-		ddcb_hexdump(stderr, e.d, e.avail_in);
+		ddcb_hexdump(zlib_log, e.d, e.avail_in);
 
 	/* Now let us have a look what we have here */
 	while (1) {
-		/* fprintf(stderr, "STATE: %s\n", state_str[e.state]); */
+		/* fprintf(zlib_log, "STATE: %s\n", state_str[e.state]); */
 		switch (e.state) {
 		case READ_HDR:
 			rc = get_bits(&e, 3, &d);
@@ -1298,13 +1298,13 @@ int h_inflate(z_streamp strm, int flush)
 			rc = Z_OK;
 #ifdef CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END /* EXPERIMENTAL for MongoDB PoC */
 			/*
-			 * fprintf(stderr, "SCRATCH\n");
-			 * ddcb_hexdump(stderr, h->wsp->tree,
+			 * fprintf(zlib_log, "SCRATCH\n");
+			 * ddcb_hexdump(zlib_log, h->wsp->tree,
 			 *	     __in_hdr_scratch_len(h));
-			 * fprintf(stderr, "NEXT_IN\n");
-			 * ddcb_hexdump(stderr, strm->next_in,
+			 * fprintf(zlib_log, "NEXT_IN\n");
+			 * ddcb_hexdump(zlib_log, strm->next_in,
 			 *	     MIN(strm->avail_in, (unsigned int)0x20));
-			 * fprintf(stderr,
+			 * fprintf(zlib_log,
 			 *	"  in_hdr_scratch_len = %d\n"
 			 *	"  proc_bits = %d\n",
 			 *	__in_hdr_scratch_len(h), h->proc_bits);

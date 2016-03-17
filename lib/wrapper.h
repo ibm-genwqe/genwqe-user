@@ -28,6 +28,7 @@
  */
 
 #include <stdint.h>
+#include <stdio.h>
 #include <pthread.h>
 #include <zaddons.h>
 
@@ -39,6 +40,8 @@
 #  define __unused __attribute__((unused))
 #endif
 
+extern FILE *zlib_log;
+
 #define zlib_trace_enabled()       (zlib_trace & 0x1)
 #define zlib_hw_trace_enabled()    (zlib_trace & 0x2)
 #define zlib_sw_trace_enabled()    (zlib_trace & 0x4)
@@ -46,37 +49,37 @@
 
 /* Use in case of an error */
 #define pr_err(fmt, ...) do {						\
-		fprintf(stderr, "%s:%u: Error: " fmt,			\
+		fprintf(zlib_log, "%s:%u: Error: " fmt,		\
 			__FILE__, __LINE__, ## __VA_ARGS__);		\
 	} while (0)
 
 /* Use in case of an warning */
 #define pr_warn(fmt, ...) do {						\
-		fprintf(stderr, "%s:%u: Warning: " fmt,			\
+		fprintf(zlib_log, "%s:%u: Warning: " fmt,		\
 			__FILE__, __LINE__, ## __VA_ARGS__);		\
 	} while (0)
 
 /* Informational printouts */
 #define pr_info(fmt, ...) do {						\
-		fprintf(stderr, "Info: " fmt, ## __VA_ARGS__);		\
+		fprintf(zlib_log, "Info: " fmt, ## __VA_ARGS__);	\
 	} while (0)
 
 /* Trace zlib wrapper code */
 #define pr_trace(fmt, ...) do {						\
 		if (zlib_trace_enabled())				\
-			fprintf(stderr, "### " fmt, ## __VA_ARGS__);	\
+			fprintf(zlib_log, "### " fmt, ## __VA_ARGS__); \
 	} while (0)
 
 /* Trace zlib hardware implementation */
 #define hw_trace(fmt, ...) do {						\
 		if (zlib_hw_trace_enabled())				\
-			fprintf(stderr, "hhh " fmt, ## __VA_ARGS__);	\
+			fprintf(zlib_log, "hhh " fmt, ## __VA_ARGS__); \
 	} while (0)
 
 /* Trace zlib software implementation */
 #define sw_trace(fmt, ...) do {						\
 		if (zlib_sw_trace_enabled())				\
-			fprintf(stderr, "sss " fmt, ## __VA_ARGS__);	\
+			fprintf(zlib_log, "sss " fmt, ## __VA_ARGS__); \
 	} while (0)
 
 #define Z_UNSUPPORTED (-7)
