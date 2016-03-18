@@ -35,6 +35,9 @@ endif
 # If we can use git to get a version, we use that. If not, we have
 # no repository and set a static version number.
 #
+# NOTE Keep the VERSION for the non git case in sync with the git
+#      tag used to build this code!
+#
 HAS_GIT = $(shell git describe > /dev/null 2>&1 && echo y || echo n)
 
 ifeq (${HAS_GIT},y)
