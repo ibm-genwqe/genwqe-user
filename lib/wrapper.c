@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, International Business Machines
+ * Copyright 2015, 2016, International Business Machines
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -74,6 +74,8 @@
 #endif
 /* default memLevel */
 
+#define ZLIB_MAXDICTLEN		 (32 * 1024)
+
 /* Good values are something like 8KiB or 16KiB */
 #define CONFIG_INFLATE_THRESHOLD (16 * 1024)  /* 0: disabled */
 
@@ -123,6 +125,9 @@ struct _internal_state {
 	int stream_size;
 	gz_headerp gzhead;
 	uint64_t magic1;
+
+	Bytef *dictionary;	/* backlevel support for sw zlib < 1.2.8 */
+	uInt dictLength;
 };
 
 static int has_wrapper_state(z_streamp strm)
@@ -980,7 +985,7 @@ int inflateInit2_(z_streamp strm, int  windowBits,
 
 	w = calloc(1, sizeof(*w));
 	if (w == NULL)
-		return Z_ERRNO;
+		return Z_MEM_ERROR;
 
 	w->magic0 = MAGIC0;
 	w->magic1 = MAGIC1;
@@ -989,11 +994,31 @@ int inflateInit2_(z_streamp strm, int  windowBits,
 	w->stream_size = stream_size;
 	w->priv_data = NULL;
 	w->impl = zlib_inflate_impl; /* try default first */
+	w->dictLength = 0;
+
+	if (z_hasGetDictionary()) {
+		w->dictionary = calloc(1, ZLIB_MAXDICTLEN);
+		if (w->dictionary == NULL) {
+			rc = Z_MEM_ERROR;
+			goto free_w;
+		}
+	}
 
 	rc = __inflateInit2_(strm, w);
 	if (rc == Z_OK)
 		strm->state = (void *)w;
-	else	free(w);
+	else
+		goto free_dict;
+
+	return rc;
+
+ free_dict:
+	if (w->dictionary) {
+		free(w->dictionary);
+		w->dictionary = NULL;
+	}
+ free_w:
+	free(w);
 	return rc;
 }
 
@@ -1030,9 +1055,10 @@ int inflateReset(z_streamp strm)
 		pthread_mutex_unlock(&stats_mutex);
 	}
 
-	w->gzhead = NULL;
-	strm->state = w->priv_data;
+	w->gzhead = NULL;	/* clear gz header */
+	w->dictLength = 0;	/* clear cached dictionary */
 
+	strm->state = w->priv_data;
 	rc = (w->impl) ? h_inflateReset(strm) :
 			 z_inflateReset(strm);
 
@@ -1073,6 +1099,8 @@ int inflateReset2(z_streamp strm, int windowBits)
 		pthread_mutex_unlock(&stats_mutex);
 	}
 
+	w->dictLength = 0;	/* clear cached dictionary */
+
 	strm->state = w->priv_data;
 	rc = (w->impl) ? h_inflateReset2(strm, windowBits) :
 			 z_inflateReset2(strm, windowBits);
@@ -1105,8 +1133,19 @@ int inflateSetDictionary(z_streamp strm,
 	}
 
 	strm->state = w->priv_data;
-	rc = w->impl ? h_inflateSetDictionary(strm, dictionary, dictLength) :
-		       z_inflateSetDictionary(strm, dictionary, dictLength);
+	if (w->impl)
+		rc = h_inflateSetDictionary(strm, dictionary, dictLength);
+	else {
+		rc = z_inflateSetDictionary(strm, dictionary, dictLength);
+
+		/* Update a private copy for the case we have not
+		   inflateGetDict */
+		if (!z_hasGetDictionary()) {
+			memcpy(w->dictionary, dictionary,
+			       MIN((uInt)ZLIB_MAXDICTLEN, dictLength));
+			w->dictLength = dictLength;
+		}
+	}
 	strm->state = (void *)w;
 
 	pr_trace("[%p] inflateSetDictionary: dictionary=%p dictLength=%d "
@@ -1117,11 +1156,18 @@ int inflateSetDictionary(z_streamp strm,
 	return rc;
 }
 
+/**
+ * zlib older than 1.2.8 has no inflateGetDictionary. To get the
+ * software/hardware switching working without this function we create
+ * a copy of the dictionary. I a user has set it via
+ * inflateSetDictionary, we have still a copy in this code which we
+ * can use.
+ */
 extern int inflateGetDictionary(z_streamp strm, Bytef *dictionary,
 				uInt *dictLength);
 int inflateGetDictionary(z_streamp strm, Bytef *dictionary, uInt *dictLength)
 {
-	int rc;
+	int rc = Z_OK;
 	struct _internal_state *w;
 
 	if (strm == NULL)
@@ -1138,8 +1184,18 @@ int inflateGetDictionary(z_streamp strm, Bytef *dictionary, uInt *dictLength)
 	}
 
 	strm->state = w->priv_data;
-	rc = w->impl ? h_inflateGetDictionary(strm, dictionary, dictLength) :
-		       z_inflateGetDictionary(strm, dictionary, dictLength);
+	if (w->impl)
+		rc = h_inflateGetDictionary(strm, dictionary, dictLength);
+	else {
+		if (z_hasGetDictionary())
+			rc = z_inflateGetDictionary(strm, dictionary,
+						    dictLength);
+		else {
+			memcpy(dictionary, w->dictionary, w->dictLength);
+			if (dictLength)
+				*dictLength = w->dictLength;
+		}
+	}
 	strm->state = (void *)w;
 
 	pr_trace("[%p] inflateGetDictionary: dictionary=%p dictLength=%p "
@@ -1263,6 +1319,11 @@ int inflateEnd(z_streamp strm)
 	}
 
 	rc = __inflateEnd(strm, w);
+
+	if (w->dictionary) {
+		free(w->dictionary);
+		w->dictionary = NULL;
+	}
 	free(w);
 
 	pr_trace("[%p] inflateEnd w=%p rc=%d\n", strm, w, rc);
@@ -1274,7 +1335,7 @@ int inflate(z_streamp strm, int flush)
 	int rc = Z_OK;
 	struct _internal_state *w;
 	unsigned int avail_in_slot, avail_out_slot;
-	uint8_t dictionary[32 * 1024];
+	uint8_t dictionary[ZLIB_MAXDICTLEN];
 	unsigned int dictLength = 0;
 
 	if (strm == NULL)

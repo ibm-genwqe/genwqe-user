@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 International Business Machines
+ * Copyright 2015, 2016, International Business Machines
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,9 +20,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
-
 #include <zlib.h>
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -38,7 +36,7 @@ typedef void * __attribute__ ((__may_alias__)) pvoid_t;
 #define register_sym(name)						\
 	do {								\
 		dlerror();    /* Clear any existing error */		\
-		sw_trace("loading [%s]\n", #name);			\
+		/* sw_trace("loading [%s]\n", #name); */		\
 		*(pvoid_t *)(&p_##name) = dlsym(handle, #name);		\
 		if ((error = dlerror()) != NULL) {			\
 			sw_trace("%s\n", error);			\
@@ -173,6 +171,11 @@ int z_inflateGetDictionary(z_streamp strm, const Bytef *dictionary,
 {
 	check_sym(p_inflateGetDictionary, Z_STREAM_ERROR);
 	return (* p_inflateGetDictionary)(strm, dictionary, dictLength);
+}
+
+bool z_hasGetDictionary(void)
+{
+	return (p_inflateGetDictionary != NULL);
 }
 
 static int (* p_inflateGetHeader)(z_streamp strm, gz_headerp head);

@@ -28,12 +28,19 @@
  */
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <pthread.h>
 #include <zaddons.h>
 
 #ifndef ARRAY_SIZE
 #  define ARRAY_SIZE(a)	 (sizeof((a)) / sizeof((a)[0]))
+#endif
+
+#ifndef MIN
+#  define MIN(a,b)	({ __typeof__ (a) _a = (a); \
+			   __typeof__ (b) _b = (b); \
+			_a < _b ? _a : _b; })
 #endif
 
 #ifndef __unused
@@ -146,8 +153,12 @@ int h_inflateReset2(z_streamp strm, int windowBits);
 
 int h_inflateSetDictionary(z_streamp strm, const Bytef *dictionary,
 			   uInt dictLength);
+
+/* inflateGetDictionary is only available for 1.2.8 or later */
+bool z_hasGetDictionary(void);
 int h_inflateGetDictionary(z_streamp strm, Bytef *dictionary,
 			   uInt *dictLength);
+
 int h_inflateGetHeader(z_streamp strm, gz_headerp head);
 int h_deflateCopy(z_streamp dest, z_streamp source);
 
