@@ -206,6 +206,7 @@ int z_inflateBackEnd(z_streamp strm);
 
 uLong z_adler32(uLong adler, const Bytef *buf, uInt len);
 uLong z_adler32_combine(uLong adler1, uLong adler2, z_off_t len2);
+
 uLong z_crc32(uLong crc, const Bytef *buf, uInt len);
 uLong z_crc32_combine(uLong crc1, uLong crc2, z_off_t len2);
 
