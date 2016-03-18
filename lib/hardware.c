@@ -38,12 +38,6 @@
 				   fix for that before we can enable
 				   this. */
 
-#ifndef MIN
-#  define MIN(a,b)	({ __typeof__ (a) _a = (a); \
-			   __typeof__ (b) _b = (b); \
-			_a < _b ? _a : _b; })
-#endif
-
 /*
  * BUF_SIZE of 0 is used to avoid buffering. Env-variables can
  * overwrite those defaults.
