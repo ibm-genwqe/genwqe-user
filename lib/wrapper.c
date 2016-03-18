@@ -996,7 +996,7 @@ int inflateInit2_(z_streamp strm, int  windowBits,
 	w->impl = zlib_inflate_impl; /* try default first */
 	w->dictLength = 0;
 
-	if (z_hasGetDictionary()) {
+	if (!z_hasGetDictionary()) {
 		w->dictionary = calloc(1, ZLIB_MAXDICTLEN);
 		if (w->dictionary == NULL) {
 			rc = Z_MEM_ERROR;
