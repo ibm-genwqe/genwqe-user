@@ -164,12 +164,17 @@ int z_inflateSetDictionary(z_streamp strm, const Bytef *dictionary,
 	return (* p_inflateSetDictionary)(strm, dictionary, dictLength);
 }
 
+/**
+ * No warning in this case since we try to emulate this in the
+ * functions above.
+ */
 static int (* p_inflateGetDictionary)(z_streamp strm, const Bytef *dictionary,
 				      uInt *dictLength);
 int z_inflateGetDictionary(z_streamp strm, const Bytef *dictionary,
 			   uInt *dictLength)
 {
-	check_sym(p_inflateGetDictionary, Z_STREAM_ERROR);
+	if (p_inflateGetDictionary == NULL)
+		return Z_STREAM_ERROR;
 	return (* p_inflateGetDictionary)(strm, dictionary, dictLength);
 }
 
