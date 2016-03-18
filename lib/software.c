@@ -29,6 +29,11 @@
 #include <dlfcn.h>
 #include <wrapper.h>
 
+/* older zlibs might not have this */
+#ifndef z_off64_t
+#  define z_off64_t off64_t
+#endif
+
 #if defined(CONFIG_DLOPEN_MECHANISM)
 
 typedef void * __attribute__ ((__may_alias__)) pvoid_t;
@@ -372,6 +377,13 @@ z_off_t gzseek(gzFile file, z_off_t offset, int whence)
 	return (* p_gzseek)(file, offset, whence);
 }
 
+static int (* p_gzrewind)(gzFile file);
+int gzrewind(gzFile file)
+{
+	check_sym(p_gzrewind, -1);
+	return (* p_gzrewind)(file);
+}
+
 static char * (* p_gzgets)(gzFile file, char *buf, int len);
 char * gzgets(gzFile file, char *buf, int len)
 {
@@ -434,6 +446,66 @@ int uncompress(Bytef *dest, uLongf *destLen, const Bytef *source,
 	check_sym(p_uncompress, Z_STREAM_ERROR);
 	return (* p_uncompress)(dest, destLen, source, sourceLen);
 }
+
+#if ZLIB_VERNUM >= 0x1280
+static uLong (* p_adler32_combine64)(uLong adler1, uLong adler2,
+				     z_off64_t len2);
+uLong adler32_combine64(uLong adler1, uLong adler2, z_off64_t len2)
+{
+	check_sym(p_adler32_combine64, Z_STREAM_ERROR);
+	return (* p_adler32_combine64)(adler1, adler2, len2);
+}
+
+static uLong (* p_crc32_combine64)(uLong crc1, uLong crc2, z_off64_t len2);
+uLong crc32_combine64(uLong crc1, uLong crc2, z_off64_t len2)
+{
+	check_sym(p_crc32_combine64, Z_STREAM_ERROR);
+	return (* p_crc32_combine64)(crc1, crc2, len2);
+}
+
+static gzFile (* p_gzopen64)(const char *path, const char *mode);
+gzFile gzopen64(const char *path, const char *mode)
+{
+	check_sym(p_gzopen64, NULL);
+	return (* p_gzopen64)(path, mode);
+}
+
+static z_off64_t (* p_gztell64)(gzFile file);
+z_off64_t gztell64(gzFile file)
+{
+	check_sym(p_gztell64, -1ll);
+	return (* p_gztell64)(file);
+}
+
+static z_off_t (* p_gzseek64)(gzFile file, z_off64_t offset, int whence);
+z_off_t gzseek64(gzFile file, z_off64_t offset, int whence)
+{
+	check_sym(p_gzseek64, -1ll);
+	return (* p_gzseek64)(file, offset, whence);
+}
+
+static z_off_t (* p_gzoffset)(gzFile file);
+z_off_t gzoffset(gzFile file)
+{
+	check_sym(p_gzoffset, -1ll);
+	return (* p_gzoffset)(file);
+}
+
+static z_off64_t (* p_gzoffset64)(gzFile file);
+z_off_t gzoffset64(gzFile file)
+{
+	check_sym(p_gzoffset64, -1ll);
+	return (* p_gzoffset64)(file);
+}
+
+static const z_crc_t *(* p_get_crc_table)(void);
+const z_crc_t *get_crc_table()
+{
+	check_sym(p_get_crc_table, NULL);
+	return (* p_get_crc_table)();
+}
+
+#endif
 
 void zedc_sw_init(void)
 {
@@ -514,6 +586,7 @@ load_syms:
 	register_sym(gztell);
 	register_sym(gzerror);
 	register_sym(gzseek);
+	register_sym(gzrewind);
 	register_sym(gzputs);
 	register_sym(gzputc);
 	register_sym(gzgetc);
@@ -530,6 +603,18 @@ load_syms:
 	register_sym(adler32_combine);
 	register_sym(crc32);
 	register_sym(crc32_combine);
+
+
+#if ZLIB_VERNUM >= 0x1280
+	register_sym(gzopen64);
+	register_sym(gzseek64);
+	register_sym(gztell64);
+	register_sym(gzoffset);
+	register_sym(gzoffset64);
+	register_sym(adler32_combine64);
+	register_sym(crc32_combine64);
+	register_sym(get_crc_table);
+#endif
 
 	sw_trace("Software zlib %s/header %s loaded\n", z_zlibVersion(),
 		 ZLIB_VERSION);
