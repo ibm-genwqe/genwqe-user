@@ -41,9 +41,11 @@ ifeq (${HAS_GIT},y)
 VERSION ?= $(shell git describe --abbrev=4 --dirty --always --tags)
 RPMVERSION ?= $(shell git describe --abbrev=0 --tags)
 else
-VERSION=4.0.11
+VERSION=4.0.14
 RPMVERSION=$(VERSION)
 endif
+
+export VERSION RPMVERSION
 
 PLATFORM ?= $(shell uname -i)
 
