@@ -42,7 +42,7 @@ projs = genwqe_update genwqe_gzip genwqe_gunzip zlib_mt_perf genwqe_memcopy \
 ifdef WITH_LIBCXL
 # genwqe_maint is only used with CAPI support.
 projs += genwqe_maint genwqe_loadtree
-projs += agzipd
+projs += agzipd ag_uptime
 CAPI_INSTALL=capi_install
 
 # If we are bundling, we need to link statically.  Otherwise, go dynamic.
