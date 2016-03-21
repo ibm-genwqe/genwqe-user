@@ -158,7 +158,7 @@ struct dev_ctx {
 	struct		dev_ctx		*verify;	/* Verify field */
 };
 
-#define NUM_CARDS 2 /* max number of CAPI cards in system */
+#define NUM_CARDS 4 /* max number of CAPI cards in system */
 
 static ddcb_t my_ddcbs[NUM_CARDS][NUM_DDCBS] __attribute__((aligned(64*1024)));
 static struct dev_ctx my_ctx[NUM_CARDS];
