@@ -22,7 +22,7 @@
 
 Summary: GenWQE userspace tools
 Name:    genwqe-tools
-Version: 4.0.15
+Version: 4.0.16
 Release: 1%{?dist}
 License: Apache-2.0
 Group: Development/Tools
@@ -158,6 +158,11 @@ ln -sf %{_bindir}/genwqe_gzip   %{buildroot}/%{_libdir}/genwqe/gzip
 %{_libdir}/genwqe/*.a
 
 %changelog
+* Wed Apr 06 2016 Gabriel Krisman Bertazi <krisman@linux.vnet.ibm.com> - 4.0.16
+- dlopen uses SONAME when opening libz.
+- Support CAPI version.
+- Bulid fixes.
+- Include genwqe_maint daemon (CAPI version).
 * Mon Apr 04 2016 Frank Haverkamp <haverkam@de.ibm.com>
 - Renamed some scripts again
 * Thu Feb 04 2016 Frank Haverkamp <haverkam@de.ibm.com>
