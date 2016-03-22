@@ -426,6 +426,8 @@ zedc_handle_t zedc_open(int dev_no, int dev_type, int mode, int *err_code)
 {
 	char *env;
 	zedc_handle_t zedc;
+	uint64_t app_id = DDCB_APPL_ID_GZIP;
+	uint64_t app_id_mask = DDCB_APPL_ID_MASK;
 
 	zedc = malloc(sizeof(*zedc));
 	if (!zedc) {
@@ -436,8 +438,14 @@ zedc_handle_t zedc_open(int dev_no, int dev_type, int mode, int *err_code)
 	zedc->mode = mode;
 
 	/* Check Appl id GZIP Version 2 */
+	if (dev_no == ACCEL_REDUNDANT) {
+		app_id = DDCB_APPL_ID_GZIP2;
+		app_id_mask = DDCB_APPL_ID_MASK_VER;
+	}
+
+	/* Check Appl id GZIP Version 2 */
 	zedc->card = accel_open(dev_no, dev_type, mode, &zedc->card_rc,
-			DDCB_APPL_ID_GZIP, DDCB_APPL_ID_MASK);
+				app_id, app_id_mask);
 	if (zedc->card == NULL) {
 		*err_code = ZEDC_ERR_CARD;
 		goto free_zedc;

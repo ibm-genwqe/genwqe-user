@@ -54,10 +54,12 @@ extern "C" {
 #define DDCB_MODE_ASYNC			0x0008 /* ... */
 #define DDCB_MODE_NONBLOCK		0x0010 /* non blocking, -EBUSY */
 #define DDCB_MODE_POLLING		0x0020 /* polling */
-#define DDCB_MODE_MASTER		0x08000000 /* Open Master Context, Slave is default, CAPI ony */
+#define DDCB_MODE_MASTER		0x08000000
+	/* Open Master Context, Slave is default, CAPI ony */
 
 #define DDCB_APPL_ID_IGNORE		0x0000000000000000 /* Ignore applid */
 #define DDCB_APPL_ID_MASK		0x00000000ffffffff /* Valid bits */
+#define DDCB_APPL_ID_MASK_VER		0x000000ffffffffff /* Valid bits */
 
 #define DDCB_OK				0
 #define DDCB_ERRNO			-401 /* libc call went wrong */

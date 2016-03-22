@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, International Business Machines
+ * Copyright 2015, 2016, International Business Machines
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -106,6 +106,7 @@ struct ttxs {
 	int     card_next;	/* Next card to try in redundant mode */
 	unsigned int mode;
 	uint64_t app_id;	/* a copy of MMIO_APP_VERSION_REG */
+	uint64_t app_id_mask;	/* used when opening the handle */
 	struct	ttxs	*verify;
 };
 
@@ -157,7 +158,7 @@ struct dev_ctx {
 	struct		dev_ctx		*verify;	/* Verify field */
 };
 
-#define NUM_CARDS 2 /* max number of CAPI cards in system */
+#define NUM_CARDS 4 /* max number of CAPI cards in system */
 
 static ddcb_t my_ddcbs[NUM_CARDS][NUM_DDCBS] __attribute__((aligned(64*1024)));
 static struct dev_ctx my_ctx[NUM_CARDS];
@@ -725,6 +726,8 @@ static void *card_open(int card_no, unsigned int mode, int *card_rc,
 	/* Inc use count and initialize AFU on first open */
 	sem_init(&ttx->wait_sem, 0, 0);
 	ttx->card_no = card_no;	/* Save only right now */
+	ttx->app_id = appl_id;
+	ttx->app_id_mask = appl_id_mask;
 	ttx->card_next = rand() % NUM_CARDS;  /* start always random */
 	ttx->mode = mode;
 	ttx->verify = ttx;
@@ -1288,17 +1291,22 @@ static int card_write_reg32(void *card_data, uint32_t offs, uint32_t data)
 	return DDCB_ERR_INVAL;
 }
 
+/**
+ * The CAPI card implementation is always matching the zEDCv2
+ * compressor implementation. It is complicated to return the right
+ * version in case of multicard mode, since the DDCB execution is
+ * altering through the cards. The right solution here is to enhance
+ * the appl_id_mask, such that the version bits are considered and
+ * only cards with the same id are being used.
+ */
 static uint64_t _card_get_app_id(void *card_data)
 {
-	struct	ttxs	*ttx = (struct ttxs*)card_data;
-	struct  dev_ctx *ctx;
+	struct ttxs *ttx = (struct ttxs *)card_data;
 
-	if (ttx && (ttx->verify == ttx)) {
-		ctx = ttx->ctx;
-		if (ctx)
-			return ctx->app_id;
-	}
-	return 0;
+	if (ttx == NULL)
+		return DDCB_ERR_INVAL;
+
+	return ttx->app_id;
 }
 
 /**
