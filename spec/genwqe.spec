@@ -24,7 +24,7 @@ Summary: GenWQE userspace tools
 Name:    genwqe-tools
 Version: 4.0.15
 Release: 1%{?dist}
-License: Apache license
+License: Apache-2.0
 Group: Development/Tools
 URL: https://github.com/ibm-genwqe/genwqe-user/
 Requires: zlib >= 1.2.7
@@ -45,7 +45,16 @@ GenWQE hardware accelerated libz and test-utilities.
 Summary: GenWQE adapter VPD tools
 Group: System Environment/Base
 %description -n genwqe-vpd
-GenWQE adapter VPD tools
+The genwqe-vpd package contains GenWQE adapter VPD tools.
+
+%package        devel
+Summary:        Development files for %{name}
+Group:          Development/Libraries
+Requires:       %{name} = %{version}
+
+%description devel
+The %{name}-devel package contains libraries and header files for
+developing applications that use %{name}.
 
 %prep
 %setup -q -n genwqe-user-%{version}
@@ -60,7 +69,7 @@ GenWQE adapter VPD tools
 %endif
 
 %{__make} %{?_smp_mflags} tools lib VERSION=%{version} \
-	CONFIG_ZLIB_PATH=%{_libdir}/libz.so.1 %{?libcxl}
+       CONFIG_ZLIB_PATH=%{_libdir}/libz.so.1 %{?libcxl}
 
 %install
 %{__make} %{?_smp_mflags} install DESTDIR=%{buildroot}/%{_prefix} \
@@ -75,9 +84,11 @@ GenWQE adapter VPD tools
 %{__mkdir} -p %{buildroot}/%{_sysconfdir}/
 %{__install} -m 0644 tools/genwqe_vpd.csv %{buildroot}/etc/
 
+strip %{buildroot}%{_bindir}/genwqe_gzip
+strip %{buildroot}%{_bindir}/genwqe_gunzip
+
 %files -n genwqe-tools
-%defattr(-,root,root)
-%doc LICENSE
+%defattr(0755,root,root)
 %{_bindir}/genwqe_echo
 %{_bindir}/genwqe_ffdc
 %{_bindir}/genwqe_gunzip
@@ -89,6 +100,8 @@ GenWQE adapter VPD tools
 %{_bindir}/genwqe_update
 %{_bindir}/genwqe_zlib_mt_perf
 
+%defattr(-,root,root)
+%doc LICENSE
 %{_mandir}/man1/genwqe_echo.1.gz
 %{_mandir}/man1/genwqe_ffdc.1.gz
 %{_mandir}/man1/genwqe_gunzip.1.gz
@@ -112,24 +125,29 @@ GenWQE adapter VPD tools
 %files -n genwqe-zlib
 %defattr(-,root,root)
 %doc LICENSE
-%{_prefix}/include/genwqe
-%{_prefix}/lib/genwqe
-%{_prefix}/lib/genwqe/*
-%{_prefix}/include/genwqe/*
-%{_prefix}/lib/genwqe/zlib_mt_perf
-%{_prefix}/lib/genwqe/zlib_test_gz
+%defattr(0755,root,root)
+%dir %{_libdir}/genwqe
+%{_libdir}/genwqe/*.so*
+%{_libdir}/genwqe/zlib_mt_perf
+%{_libdir}/genwqe/zlib_test_gz
 
 %files -n genwqe-vpd
-%defattr(0755,root,root)
-%doc LICENSE
-%{_sysconfdir}/genwqe_vpd.csv
+%defattr(-,root,root,-)
 %{_bindir}/genwqe_csv2vpd
 %{_bindir}/genwqe_vpdconv
 %{_bindir}/genwqe_vpdupdate
-
+%defattr(-,root,root)
+%doc LICENSE
+%{_sysconfdir}/genwqe_vpd.csv
 %{_mandir}/man1/genwqe_csv2vpd.1.gz
 %{_mandir}/man1/genwqe_vpdconv.1.gz
 %{_mandir}/man1/genwqe_vpdupdate.1.gz
+
+%files devel
+%defattr(-,root,root,-)
+%dir %{_includedir}/genwqe
+%{_includedir}/genwqe/*
+%{_libdir}/genwqe/*.a
 
 %changelog
 * Thu Feb 04 2016 Frank Haverkamp <haverkam@de.ibm.com>
