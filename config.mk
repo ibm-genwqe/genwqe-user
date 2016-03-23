@@ -162,3 +162,7 @@ CONFIG_LIBZ_PATH=../zlib-1.2.8
 CFLAGS += -I$(CONFIG_LIBZ_PATH)
 libz_a=libz_prefixed.o
 endif
+
+DESTDIR ?= /usr
+LIB_INSTALL_PATH ?= $(DESTDIR)/lib/genwqe
+INCLUDE_INSTALL_PATH ?= $(DESTDIR)/include/genwqe

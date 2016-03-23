@@ -105,15 +105,15 @@ install_gzip_tools: all
 	install -D -m 644 genwqe_gzip -T $(DESTDIR)/bin/genwqe_gzip
 	install -D -m 644 genwqe_gunzip -T $(DESTDIR)/bin/genwqe_gunzip
 	install -D -m 744 zlib_mt_perf $(DESTDIR)/bin/genwqe_zlib_mt_perf
-	install -D -m 644 zlib_mt_perf.sh -T $(DESTDIR)/lib/genwqe/zlib_mt_perf
-	install -D -m 644 zlib_test_gz.sh -T $(DESTDIR)/lib/genwqe/zlib_test_gz
+	install -D -m 644 zlib_mt_perf.sh -T $(LIB_INSTALL_PATH)/zlib_mt_perf
+	install -D -m 644 zlib_test_gz.sh -T $(LIB_INSTALL_PATH)/zlib_test_gz
 
 uninstall_gzip_tools:
 	$(RM) $(DESTDIR)/bin/genwqe_gzip	\
 	      $(DESTDIR)/bin/genwqe_gunzip	\
 	      $(DESTDIR)/bin/genwqe_zlib_mt_perf	\
-	      $(DESTDIR)/lib/genwqe/zlib_mt_perf \
-	      $(DESTDIR)/lib/genwqe/zlib_test_gz
+	      $(LIB_INSTALL_PATH)/zlib_mt_perf \
+	      $(LIB_INSTALL_PATH/zlib_test_gz
 
 install_manpages: $(manpages)
 	@mkdir -p $(DESTDIR)/share/man/man1

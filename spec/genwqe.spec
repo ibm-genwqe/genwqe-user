@@ -73,8 +73,10 @@ developing applications that use %{name}.
 
 %install
 %{__make} %{?_smp_mflags} install DESTDIR=%{buildroot}/%{_prefix} \
-        VERSION=%{version} SYSTEMD_UNIT_DIR=%{buildroot}/%{_unitdir}/
-#
+        VERSION=%{version} SYSTEMD_UNIT_DIR=%{buildroot}/%{_unitdir} \
+	LIB_INSTALL_PATH=%{buildroot}/%{_libdir}/genwqe \
+	INCLUDE_INSTALL_PATH=%{buildroot}/%{_includedir}/genwqe
+
 # FIXME Instead of trying to fixup things in the spec fike, let us consider
 #       changing the associated install rule, such that the spec file
 #       can get smaller and simpler.
