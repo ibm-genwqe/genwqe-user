@@ -71,9 +71,7 @@ PLATFORM ?= $(shell uname -i)
 CFLAGS ?= -W -Wall -Werror -Wwrite-strings -Wextra -Os -g \
 	-Wmissing-prototypes # -Wstrict-prototypes -Warray-bounds
 CFLAGS += -DGIT_VERSION=\"$(VERSION)\" \
-	-I. -I/opt/genwqe/include -I../include -I../include/linux/uapi
-
-LDFLAGS += -L/opt/genwqe/lib # -Wl,--no-undefined
+	-I. -I../include -I../include/linux/uapi
 
 # Force 32-bit build
 #   This is needed to generate the code for special environments. We have
@@ -153,7 +151,6 @@ endif # !DISABLE_LIBCXL
 # spec file during RPM build.
 #
 CONFIG_DLOPEN_MECHANISM ?= 1
-CONFIG_ZLIB_PATH ?= /opt/genwqe/lib/libz.so.1
 
 ifeq ($(CONFIG_DLOPEN_MECHANISM),1)
 CFLAGS += -DCONFIG_DLOPEN_MECHANISM -DCONFIG_ZLIB_PATH=\"$(CONFIG_ZLIB_PATH)\"

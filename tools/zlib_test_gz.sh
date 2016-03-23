@@ -30,7 +30,7 @@ export ZLIB_ACCELERATOR=GENWQE
 export ZLIB_CARD=-1
 
 # Directories used
-INSTALL_DIR="/opt/genwqe"                    # Tool RPM install directory
+INSTALL_DIR="/"			             # Tool RPM install directory
 TOOLS_DIR="${INSTALL_DIR}/bin/genwqe"        # gzip, gunzip install directory
 TMP_DIR="/tmp"                               # Temporary directory to use
 DATA_DIR="${TMP_DIR}/$$_testdata"            # directory for testdata
