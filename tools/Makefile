@@ -78,7 +78,6 @@ genwqe_gunzip.o: genwqe_gzip.c
 
 %.o: %.c $(libs)
 	$(CC) -c $(CPPFLAGS) $(CFLAGS) $< -o $@
-	$(CC) -MM $(CPPFLAGS) $(CFLAGS) $< > $*.d
 
 %.1: %
 	$(HELP2MAN) -N --output=$@ --name "IBM Hardware Accelerator Tool." ./$<
@@ -154,6 +153,5 @@ uninstall: uninstall_gzip_tools uninstall_manpages
 	done
 
 clean distclean:
-	$(RM) $(objs) $(projs) $(objs:.o=.d) $(manpages)
+	$(RM) $(objs) $(projs) $(manpages)
 
--include $(objs:.o=.d)
