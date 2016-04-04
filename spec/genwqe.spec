@@ -12,11 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
-# FIXME How can we automatically set the version? Version changes from time
-#       to time, would be good if we could autoadjust this to avoid us editing
-#       the spec file on any version increase. Let me try %Version to fix that.
-#
 # zlib-devel 1.2.8 is better, but 1.2.7 should work too
 #
 # The following switch tries to take care that the distros libz.so is been taken:
@@ -27,14 +22,15 @@
 
 Summary: GenWQE userspace tools
 Name:    genwqe-tools
-Version: %Version
+Version: 4.0.15
 Release: 1%{?dist}
-License: Apache license
+License: Apache-2.0
 Group: Development/Tools
 URL: https://github.com/ibm-genwqe/genwqe-user/
 Requires: zlib >= 1.2.7
-BuildRequires: zlib-devel >= 1.2.7
-Source0: https://github.com/ibm-genwqe/genwqe-user/archive/genwqe-%{version}.tar.gz
+BuildRequires: zlib-devel >= 1.2.7 help2man
+BuildRoot: %{_tmppath}/%{name}-root
+Source0: https://github.com/ibm-genwqe/genwqe-user/archive/v%{version}.tar.gz
 
 %description
 Provide a suite of utilities to manage and configure the IBM GenWQE card.
@@ -49,19 +45,38 @@ GenWQE hardware accelerated libz and test-utilities.
 Summary: GenWQE adapter VPD tools
 Group: System Environment/Base
 %description -n genwqe-vpd
-GenWQE adapter VPD tools
+The genwqe-vpd package contains GenWQE adapter VPD tools.
+
+%package        devel
+Summary:        Development files for %{name}
+Group:          Development/Libraries
+Requires:       %{name} = %{version}
+
+%description devel
+The %{name}-devel package contains libraries and header files for
+developing applications that use %{name}.
 
 %prep
-%setup -q -n genwqe-%{version}
+%setup -q -n genwqe-user-%{version}
+
+%ifarch ppc64le
+%define libcxl "BUNDLE_LIBCXL=1"
+%endif
 
 %build
+%ifarch ppc64le
+%{__make} -C ext/libcxl CFLAGS="-I../include"
+%endif
+
 %{__make} %{?_smp_mflags} tools lib VERSION=%{version} \
-	CONFIG_ZLIB_PATH=%{_libdir}/libz.so.1
+       CONFIG_ZLIB_PATH=%{_libdir}/libz.so.1 %{?libcxl}
 
 %install
-%{__make} %{?_smp_mflags} install DESTDIR=%{buildroot}/%{_prefix} VERSION=%{version}
+%{__make} %{?_smp_mflags} install DESTDIR=%{buildroot}/%{_prefix} \
+        VERSION=%{version} SYSTEMD_UNIT_DIR=%{buildroot}/%{_unitdir} \
+	LIB_INSTALL_PATH=%{buildroot}/%{_libdir}/genwqe \
+	INCLUDE_INSTALL_PATH=%{buildroot}/%{_includedir}/genwqe
 
-#
 # FIXME Instead of trying to fixup things in the spec fike, let us consider
 #       changing the associated install rule, such that the spec file
 #       can get smaller and simpler.
@@ -71,28 +86,24 @@ GenWQE adapter VPD tools
 %{__mkdir} -p %{buildroot}/%{_sysconfdir}/
 %{__install} -m 0644 tools/genwqe_vpd.csv %{buildroot}/etc/
 
-# Move man pages to expected location.
-%{__mkdir} -p %{buildroot}/%{_mandir}/man1
-%{__mv} %{buildroot}/usr/man/man1/* %{buildroot}/%{_mandir}/man1
+strip %{buildroot}%{_bindir}/genwqe_gzip
+strip %{buildroot}%{_bindir}/genwqe_gunzip
 
 %files -n genwqe-tools
-%doc LICENSE
 %defattr(0755,root,root)
-%{_bindir}/genwqe/gunzip
-%{_bindir}/genwqe/gzip
 %{_bindir}/genwqe_echo
 %{_bindir}/genwqe_ffdc
 %{_bindir}/genwqe_gunzip
 %{_bindir}/genwqe_gzip
 %{_bindir}/genwqe_cksum
 %{_bindir}/genwqe_memcopy
-%{_bindir}/genwqe_mt_perf
 %{_bindir}/genwqe_peek
 %{_bindir}/genwqe_poke
-%{_bindir}/genwqe_test_gz
 %{_bindir}/genwqe_update
-%{_bindir}/zlib_mt_perf
+%{_bindir}/genwqe_zlib_mt_perf
 
+%defattr(-,root,root)
+%doc LICENSE
 %{_mandir}/man1/genwqe_echo.1.gz
 %{_mandir}/man1/genwqe_ffdc.1.gz
 %{_mandir}/man1/genwqe_gunzip.1.gz
@@ -102,37 +113,43 @@ GenWQE adapter VPD tools
 %{_mandir}/man1/genwqe_peek.1.gz
 %{_mandir}/man1/genwqe_poke.1.gz
 %{_mandir}/man1/genwqe_update.1.gz
-%{_mandir}/man1/zlib_mt_perf.1.gz
 
-# Not yet working with help2man
-#%{_mandir}/man1/genwqe_mt_perf.1.gz
-#%{_mandir}/man1/genwqe_test_gz.1.gz
+%{_mandir}/man1/zlib_mt_perf.1.gz
 
 %ifarch ppc64le
 %{_bindir}/genwqe_maint
-%{_prefix}/lib/systemd/system/genwqe_maint.service
+%{_unitdir}/genwqe_maint.service
 %{_bindir}/genwqe_loadtree
 %{_mandir}/man1/genwqe_maint.1.gz
 %{_mandir}/man1/genwqe_loadtree.1.gz
 %endif
 
-
 %files -n genwqe-zlib
+%defattr(-,root,root)
 %doc LICENSE
 %defattr(0755,root,root)
-%{_prefix}/lib/genwqe/*
-%{_prefix}/include/genwqe/*
+%dir %{_libdir}/genwqe
+%{_libdir}/genwqe/*.so*
+%{_libdir}/genwqe/zlib_mt_perf
+%{_libdir}/genwqe/zlib_test_gz
 
 %files -n genwqe-vpd
-%doc LICENSE
-%{_sysconfdir}/genwqe_vpd.csv
+%defattr(-,root,root,-)
 %{_bindir}/genwqe_csv2vpd
 %{_bindir}/genwqe_vpdconv
 %{_bindir}/genwqe_vpdupdate
-
+%defattr(-,root,root)
+%doc LICENSE
+%{_sysconfdir}/genwqe_vpd.csv
 %{_mandir}/man1/genwqe_csv2vpd.1.gz
 %{_mandir}/man1/genwqe_vpdconv.1.gz
 %{_mandir}/man1/genwqe_vpdupdate.1.gz
+
+%files devel
+%defattr(-,root,root,-)
+%dir %{_includedir}/genwqe
+%{_includedir}/genwqe/*
+%{_libdir}/genwqe/*.a
 
 %changelog
 * Thu Feb 04 2016 Frank Haverkamp <haverkam@de.ibm.com>

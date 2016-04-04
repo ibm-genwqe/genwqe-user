@@ -521,7 +521,7 @@ void zedc_sw_init(void)
 			goto load_syms;
 	}
 
-	/* try loading private zlib.so in /opt/genwqe/lib */
+	/* try loading private zlib.so in CONFIG_ZLIB_PATH */
 	sw_trace("Try loading software zlib \"%s\"\n", CONFIG_ZLIB_PATH);
 	dlerror();
 	handle = dlopen(CONFIG_ZLIB_PATH, RTLD_LAZY);

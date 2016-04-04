@@ -14,11 +14,15 @@
 # limitations under the License.
 #
 
+include config.mk
+
 # Verbose level:
 #   V=0 means completely silent
 #   V=1 means brief output
 #   V=2 means full output
 V ?= 2
+
+include config.mk
 
 ifeq ($(V),0)
 Q		:= @
@@ -31,39 +35,23 @@ MAKEFLAGS	+= --silent
 MAKE		+= -s
 endif
 
-#
-# If we can use git to get a version, we use that. If not, we have
-# no repository and set a static version number.
-#
-# NOTE Keep the VERSION for the non git case in sync with the git
-#      tag used to build this code!
-#
-HAS_GIT = $(shell git describe > /dev/null 2>&1 && echo y || echo n)
-
-ifeq (${HAS_GIT},y)
-VERSION ?= $(shell git describe --abbrev=4 --dirty --always --tags)
-RPMVERSION ?= $(shell git describe --abbrev=0 --tags)
-else
-VERSION=4.0.14
-RPMVERSION=$(VERSION)
-endif
-
-export VERSION RPMVERSION
-
 PLATFORM ?= $(shell uname -i)
 
 distro = $(shell lsb_release -d | cut -f2)
+
+ifdef BUNDLE_LIBCXL
+subdirs += "ext/libcxl"
+endif
+
 subdirs += lib tools
-ifeq ($(PLATFORM),ppc64le)
+ifdef WITH_LIBCXL
 subdirs += init
 endif
-targets += $(subdirs)
 
 UDEV_RULES_D ?= /etc/udev/rules.d
 MODPROBE_D ?= /etc/modprobe.d
 
-
-all: $(targets)
+all: $(subdirs)
 
 tools: lib
 
@@ -123,14 +111,11 @@ rpmbuild_setup:
 #
 rpmbuild:
 	@$(MAKE) -s distclean
-	@rm -rf /tmp/genwqe-$(RPMVERSION)
-	@mkdir -p /tmp/genwqe-$(RPMVERSION)
-	@cp -ar * /tmp/genwqe-$(RPMVERSION)/
-	(cd /tmp && tar cfz genwqe-$(RPMVERSION).tar.gz genwqe-$(RPMVERSION))
-	rpmbuild -ta -v --define 'srcVersion $(RPMVERSION)' \
-		--define 'srcRelease 1'			\
-		--define 'Version $(RPMVERSION)'	\
-		/tmp/genwqe-$(RPMVERSION).tar.gz
+	@rm -rf /tmp/genwqe-user-$(RPMVERSION)
+	@mkdir -p /tmp/genwqe-user-$(RPMVERSION)
+	@cp -ar * /tmp/genwqe-user-$(RPMVERSION)/
+	(cd /tmp && tar cfz v$(RPMVERSION).tar.gz genwqe-user-$(RPMVERSION))
+	rpmbuild -ta -v /tmp/v$(RPMVERSION).tar.gz
 
 # Install/Uninstall
 install uninstall:
@@ -176,7 +161,7 @@ clean:
 			$(MAKE) -C $$dir $@ || exit 1;	\
 		fi					\
 	done
-	@$(RM) genwqe-$(RPMVERSION).tgz	libz.o libz_prefixed.o zlib-1.2.8.cfg
+	@$(RM) genwqe-$(RPMVERSION).tar.gz libz.o libz_prefixed.o zlib-1.2.8.cfg
 	@if [ -d zlib-1.2.8 ]; then 			\
 		$(MAKE) -s -C zlib-1.2.8 distclean;	\
 	fi

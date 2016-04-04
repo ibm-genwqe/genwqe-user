@@ -49,14 +49,29 @@ else
 CLEAN		= echo -n
 endif
 
+#
+# If we can use git to get a version, we use that. If not, we have
+# no repository and set a static version number.
+#
+# NOTE Keep the VERSION for the non git case in sync with the git
+#      tag used to build this code!
+#
+HAS_GIT = $(shell git describe > /dev/null 2>&1 && echo y || echo n)
+
+ifeq (${HAS_GIT},y)
+VERSION ?= $(shell git describe --abbrev=4 --dirty --always --tags)
+RPMVERSION ?= $(shell git describe --abbrev=0 --tags | cut -c 2-7)
+else
+VERSION=4.0.15
+RPMVERSION=$(VERSION)
+endif
+
 PLATFORM ?= $(shell uname -i)
 
-CFLAGS = -W -Wall -Werror -Wwrite-strings -Wextra -Os -g \
-	-DGIT_VERSION=\"$(VERSION)\" \
-	-I. -I/opt/genwqe/include -I../include -I../include/linux/uapi \
+CFLAGS ?= -W -Wall -Werror -Wwrite-strings -Wextra -Os -g \
 	-Wmissing-prototypes # -Wstrict-prototypes -Warray-bounds
-
-LDFLAGS += -L/opt/genwqe/lib # -Wl,--no-undefined
+CFLAGS += -DGIT_VERSION=\"$(VERSION)\" \
+	-I. -I../include -I../include/linux/uapi
 
 # Force 32-bit build
 #   This is needed to generate the code for special environments. We have
@@ -88,26 +103,47 @@ endif
 # version, which connects to the pslse server, which talks to the
 # hardware simulator.
 #
-# Enabling BUILD_SIMCODE=1 enables simulation version which builds and
-# links against the pslse version of libcxl.
+# libcxl is enabled by default on architectures that support
+# libcxl (ppc64le).
 #
+# If you need to disable it, you can run Make with DISABLE_LIBCXL=1.
+#
+# If you want to use the bundled version of libcxl (*not recommended*),
+# run make with BUNDLE_LIBCXL=1.  If your bundle is in some place other
+# than ../ext/libcxl, you can use CONFIG_LIBCXL_PATH to fix it.
+#
+# If you want to use the simulation (pslse) version of libcxl, run with
+# BUILD_SIMCODE=1. If your bundle is in some place other than
+# ../../pslse/libcxl, you can use CONFIG_LIBCXL_PATH to fix it.
+#
+#
+# libcxl cannot be enabled on platforms that don't have CAPI support.
 
-ifeq ($(PLATFORM),ppc64le)              # Enable libcxl by default
-CONFIG_LIBCXL_PATH ?= ../ext/libcxl
+ifndef DISABLE_LIBCXL
+ifeq ($(PLATFORM), ppc64le)
+WITH_LIBCXL=1
 endif
 
-BUILD_SIMCODE ?= 0
-
-ifeq ($(BUILD_SIMCODE),1)               # Use simulation version of libcxl
-CONFIG_LIBCXL_PATH = ../../pslse/libcxl
+ifdef BUILD_SIMCODE
+WITH_LIBCXL=1
+CONFIG_LIBCXL_PATH ?= ../../pslse/libcxl
 CFLAGS += -DCONFIG_BUILD_SIMCODE
 endif
 
-ifneq ($(CONFIG_LIBCXL_PATH),)          # Use libcxl
+ifdef BUNDLE_LIBCXL
+
+WITH_LIBCXL=1
+CONFIG_LIBCXL_PATH ?= ../ext/libcxl
+CFLAGS += -I../ext/libcxl -I../ext/include
+endif
+
+# Finally, set any paths needed.
+ifdef CONFIG_LIBCXL_PATH
 CFLAGS += -I$(CONFIG_LIBCXL_PATH) -I$(CONFIG_LIBCXL_PATH)/include
 LDFLAGS += -L$(CONFIG_LIBCXL_PATH)
 libcxl_a = $(CONFIG_LIBCXL_PATH)/libcxl.a
-endif
+endif # !CONFIG_LIBCXL_PATH
+endif # !DISABLE_LIBCXL
 
 # z_ prefixed version of libz, intended to be linked statically with
 # our libz version to provide the software zlib functionality.
@@ -115,7 +151,6 @@ endif
 # spec file during RPM build.
 #
 CONFIG_DLOPEN_MECHANISM ?= 1
-CONFIG_ZLIB_PATH ?= /opt/genwqe/lib/libz.so.1
 
 ifeq ($(CONFIG_DLOPEN_MECHANISM),1)
 CFLAGS += -DCONFIG_DLOPEN_MECHANISM -DCONFIG_ZLIB_PATH=\"$(CONFIG_ZLIB_PATH)\"
@@ -124,3 +159,7 @@ CONFIG_LIBZ_PATH=../zlib-1.2.8
 CFLAGS += -I$(CONFIG_LIBZ_PATH)
 libz_a=libz_prefixed.o
 endif
+
+DESTDIR ?= /usr
+LIB_INSTALL_PATH ?= $(DESTDIR)/lib/genwqe
+INCLUDE_INSTALL_PATH ?= $(DESTDIR)/include/genwqe

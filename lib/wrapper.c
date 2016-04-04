@@ -58,10 +58,6 @@
 #  define CONFIG_DEFLATE_IMPL	 (ZLIB_HW_IMPL | ZLIB_FLAG_OMIT_LAST_DICT)
 #endif
 
-#ifndef CONFIG_ZLIB_PATH
-#  define CONFIG_ZLIB_PATH "/opt/genwqe/lib/libz.so"
-#endif
-
 #ifndef DEF_WBITS
 #  define DEF_WBITS MAX_WBITS
 #endif
