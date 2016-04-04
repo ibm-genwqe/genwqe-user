@@ -44,8 +44,8 @@
 extern "C" {
 #endif
 
-#define DDCB_APPL_ID_GZIP	0x00000000475a4950 /* The GZIP	APPL id */
-#define DDCB_APPL_ID_GZIP2	0x00000002475a4950 /* The GZIP 2 APPL id */
+#define DDCB_APPL_ID_GZIP	0x00000000475a4950ull /* The GZIP APPL id */
+#define DDCB_APPL_ID_GZIP2	0x00000002475a4950ull /* The GZIP2 APPL id */
 
 /* Different zlib versions used different codes for flush! */
 #define ZEDC_NO_FLUSH		0

@@ -319,8 +319,8 @@ static int accel_memcpy(accel_t card, struct ddcb_cmd *cmd_list, int preload,
 				(long long)asiv->outp_buff);
 		}
 		if (err_inj & ERR_INJ_SIZE) {
-			asiv->inp_buff_len ^= 0xfffffffff;
-			asiv->outp_buff_len ^= 0xffffffff;
+			asiv->inp_buff_len ^= 0xfffffffffull;
+			asiv->outp_buff_len ^= 0xffffffffull;
 			fprintf(stderr, "ERR_INJ_SIZE:   %08lx/%08lx\n",
 				(long)asiv->inp_buff_len,
 				(long)asiv->outp_buff_len);
