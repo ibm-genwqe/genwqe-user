@@ -89,18 +89,32 @@ developing applications that use %{name}.
 strip %{buildroot}%{_bindir}/genwqe_gzip
 strip %{buildroot}%{_bindir}/genwqe_gunzip
 
+# Create symlinks to enable usage of tar with adjusted path:
+#   PATH=/usr/bin/genwqe:$PATH tar xfvz ...
+# In this case the hardware accelerated gzip/gunzip variant is being used
+# and hardware acceleration can be exploited. Aliasing did not work out.
+#
+%{__mkdir} -p %{buildroot}/%{_bindir}/genwqe
+ln -sf %{_bindir}/genwqe_gunzip %{buildroot}%{_bindir}/genwqe/gunzip
+ln -sf %{_bindir}/genwqe_gzip   %{buildroot}%{_bindir}/genwqe/gzip
+
 %files -n genwqe-tools
 %defattr(0755,root,root)
 %{_bindir}/genwqe_echo
 %{_bindir}/genwqe_ffdc
-%{_bindir}/genwqe_gunzip
-%{_bindir}/genwqe_gzip
 %{_bindir}/genwqe_cksum
 %{_bindir}/genwqe_memcopy
 %{_bindir}/genwqe_peek
 %{_bindir}/genwqe_poke
 %{_bindir}/genwqe_update
-%{_bindir}/genwqe_zlib_mt_perf
+
+%{_bindir}/genwqe_gunzip
+%{_bindir}/genwqe_gzip
+%{_bindir}/genwqe_test_gz
+%{_bindir}/genwqe_mt_perf
+%{_bindir}/zlib_mt_perf
+%{_bindir}/genwqe/gunzip
+%{_bindir}/genwqe/gzip
 
 %defattr(-,root,root)
 %doc LICENSE
@@ -113,13 +127,12 @@ strip %{buildroot}%{_bindir}/genwqe_gunzip
 %{_mandir}/man1/genwqe_peek.1.gz
 %{_mandir}/man1/genwqe_poke.1.gz
 %{_mandir}/man1/genwqe_update.1.gz
-
 %{_mandir}/man1/zlib_mt_perf.1.gz
 
 %ifarch ppc64le
 %{_bindir}/genwqe_maint
-%{_unitdir}/genwqe_maint.service
 %{_bindir}/genwqe_loadtree
+%{_unitdir}/genwqe_maint.service
 %{_mandir}/man1/genwqe_maint.1.gz
 %{_mandir}/man1/genwqe_loadtree.1.gz
 %endif
@@ -130,8 +143,6 @@ strip %{buildroot}%{_bindir}/genwqe_gunzip
 %defattr(0755,root,root)
 %dir %{_libdir}/genwqe
 %{_libdir}/genwqe/*.so*
-%{_libdir}/genwqe/zlib_mt_perf
-%{_libdir}/genwqe/zlib_test_gz
 
 %files -n genwqe-vpd
 %defattr(-,root,root,-)
@@ -152,6 +163,8 @@ strip %{buildroot}%{_bindir}/genwqe_gunzip
 %{_libdir}/genwqe/*.a
 
 %changelog
+* Mon Apr 04 2016 Frank Haverkamp <haverkam@de.ibm.com>
+- Renamed some scripts again
 * Thu Feb 04 2016 Frank Haverkamp <haverkam@de.ibm.com>
 - Fix s390 and Intel build. Remove debug stuff from zlib rpm.
 * Fri Dec 11 2015 Frank Haverkamp <haverkam@de.ibm.com>

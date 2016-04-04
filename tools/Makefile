@@ -35,9 +35,8 @@ genwqe_gunzip_libs = ../lib/libzADC.a -ldl	# statically link our libz
 zlib_mt_perf_libs = ../lib/libzADC.a -ldl	# statically link our libz
 
 projs = genwqe_update genwqe_gzip genwqe_gunzip zlib_mt_perf genwqe_memcopy \
-	genwqe_echo genwqe_peek genwqe_poke genwqe_cksum \
-	genwqe_vpdconv genwqe_vpdupdate genwqe_csv2vpd \
-	genwqe_ffdc
+	genwqe_echo genwqe_peek genwqe_poke genwqe_cksum genwqe_vpdconv \
+	genwqe_vpdupdate genwqe_csv2vpd genwqe_ffdc
 
 ifdef WITH_LIBCXL
 # genwqe_maint is only used with CAPI support.
@@ -90,7 +89,8 @@ genwqe_gunzip.o: genwqe_gzip.c
 #
 install_release_tools: all
 	@mkdir -p $(DESTDIR)/bin
-	cp -uv genwqe_peek genwqe_poke genwqe_memcopy genwqe_echo genwqe_update \
+	cp -uv genwqe_peek genwqe_poke genwqe_memcopy genwqe_echo \
+		genwqe_update \
 		$(DESTDIR)/bin
 
 #
@@ -101,18 +101,18 @@ install_release_tools: all
 #   hardware accelerated version of gzip/gunzip.
 #
 install_gzip_tools: all
-	install -D -m 644 genwqe_gzip -T $(DESTDIR)/bin/genwqe_gzip
-	install -D -m 644 genwqe_gunzip -T $(DESTDIR)/bin/genwqe_gunzip
-	install -D -m 744 zlib_mt_perf $(DESTDIR)/bin/genwqe_zlib_mt_perf
-	install -D -m 644 zlib_mt_perf.sh -T $(LIB_INSTALL_PATH)/zlib_mt_perf
-	install -D -m 644 zlib_test_gz.sh -T $(LIB_INSTALL_PATH)/zlib_test_gz
+	install -D -m 644 genwqe_gzip    -T $(DESTDIR)/bin/genwqe_gzip
+	install -D -m 644 genwqe_gunzip  -T $(DESTDIR)/bin/genwqe_gunzip
+	install -D -m 644 zlib_mt_perf   -T $(DESTDIR)/bin/zlib_mt_perf
+	install -D -m 644 genwqe_mt_perf -T $(DESTDIR)/bin/genwqe_mt_perf
+	install -D -m 644 genwqe_test_gz -T $(DESTDIR)/bin/genwqe_test_gz
 
 uninstall_gzip_tools:
-	$(RM) $(DESTDIR)/bin/genwqe_gzip	\
-	      $(DESTDIR)/bin/genwqe_gunzip	\
-	      $(DESTDIR)/bin/genwqe_zlib_mt_perf	\
-	      $(LIB_INSTALL_PATH)/zlib_mt_perf \
-	      $(LIB_INSTALL_PATH/zlib_test_gz
+	$(RM) $(DESTDIR)/bin/genwqe_gzip \
+	      $(DESTDIR)/bin/genwqe_gunzip \
+	      $(DESTDIR)/bin/zlib_mt_perf \
+	      $(DESTDIR)/bin/genwqe_mt_perf \
+	      $(DESTDIR)/bin/genwqe_test_gz
 
 install_manpages: $(manpages)
 	@mkdir -p $(DESTDIR)/share/man/man1
@@ -136,15 +136,15 @@ capi_install: genwqe_maint
 install: install_gzip_tools install_manpages $(CAPI_INSTALL)
 	@mkdir -p $(DESTDIR)/bin
 	install -D genwqe_update -T $(DESTDIR)/bin/genwqe_update
-	install -D -m 744 genwqe_memcopy -T $(DESTDIR)/bin/genwqe_memcopy
-	install -D -m 744 genwqe_echo -T $(DESTDIR)/bin/genwqe_echo
-	install -D -m 744 genwqe_peek -T $(DESTDIR)/bin/genwqe_peek
-	install -D -m 744 genwqe_poke -T $(DESTDIR)/bin/genwqe_poke
-	install -D -m 744 genwqe_cksum -T $(DESTDIR)/bin/genwqe_cksum
-	install -D -m 744 genwqe_vpdconv -T $(DESTDIR)/bin/genwqe_vpdconv
+	install -D -m 744 genwqe_memcopy   -T $(DESTDIR)/bin/genwqe_memcopy
+	install -D -m 744 genwqe_echo      -T $(DESTDIR)/bin/genwqe_echo
+	install -D -m 744 genwqe_peek      -T $(DESTDIR)/bin/genwqe_peek
+	install -D -m 744 genwqe_poke      -T $(DESTDIR)/bin/genwqe_poke
+	install -D -m 744 genwqe_cksum     -T $(DESTDIR)/bin/genwqe_cksum
+	install -D -m 744 genwqe_vpdconv   -T $(DESTDIR)/bin/genwqe_vpdconv
 	install -D -m 744 genwqe_vpdupdate -T $(DESTDIR)/bin/genwqe_vpdupdate
-	install -D -m 744 genwqe_csv2vpd -T $(DESTDIR)/bin/genwqe_csv2vpd
-	install -D -m 744 genwqe_ffdc -T $(DESTDIR)/bin/genwqe_ffdc
+	install -D -m 744 genwqe_csv2vpd   -T $(DESTDIR)/bin/genwqe_csv2vpd
+	install -D -m 744 genwqe_ffdc      -T $(DESTDIR)/bin/genwqe_ffdc
 
 uninstall: uninstall_gzip_tools uninstall_manpages
 	@for f in $(projs) ; do					\
