@@ -49,6 +49,7 @@ LDLIBS += $(libcxl_a)
 else
 LDLIBS = -lcxl
 endif # !CONFIG_LIBCXL_PATH
+
 endif # WITH_LIBCXL
 
 all: $(projs)

@@ -59,7 +59,7 @@ endif
 HAS_GIT = $(shell git describe > /dev/null 2>&1 && echo y || echo n)
 
 ifeq (${HAS_GIT},y)
-VERSION ?= $(shell git describe --abbrev=4 --dirty --always --tags)
+VERSION ?= $(shell git describe --abbrev=4 --always --tags)
 RPMVERSION ?= $(shell git describe --abbrev=0 --tags | cut -c 2-7)
 else
 VERSION=4.0.15
@@ -109,7 +109,7 @@ endif
 # If you need to disable it, you can run Make with DISABLE_LIBCXL=1.
 #
 # If you want to use the bundled version of libcxl (*not recommended*),
-# run make with BUNDLE_LIBCXL=1.  If your bundle is in some place other
+# run make with BUNDLE_LIBCXL=1. If your bundle is in some place other
 # than ../ext/libcxl, you can use CONFIG_LIBCXL_PATH to fix it.
 #
 # If you want to use the simulation (pslse) version of libcxl, run with
@@ -120,29 +120,33 @@ endif
 # libcxl cannot be enabled on platforms that don't have CAPI support.
 
 ifndef DISABLE_LIBCXL
+
 ifeq ($(PLATFORM), ppc64le)
 WITH_LIBCXL=1
+BUNDLE_LIBCXL ?= 1
 endif
 
 ifdef BUILD_SIMCODE
 WITH_LIBCXL=1
+BUNDLE_LIBCXL ?= 1
 CONFIG_LIBCXL_PATH ?= ../../pslse/libcxl
-CFLAGS += -DCONFIG_BUILD_SIMCODE
+CFLAGS += -DCONFIG_BUILD_SIMCODE -I../ext/include
 endif
 
-ifdef BUNDLE_LIBCXL
-
+# Can be overwritten by makfile option
+ifeq ($(BUNDLE_LIBCXL),1)
 WITH_LIBCXL=1
 CONFIG_LIBCXL_PATH ?= ../ext/libcxl
-CFLAGS += -I../ext/libcxl -I../ext/include
+CFLAGS += -I../ext/include -I../include
 endif
 
-# Finally, set any paths needed.
+# Finally, set any path needed.
 ifdef CONFIG_LIBCXL_PATH
 CFLAGS += -I$(CONFIG_LIBCXL_PATH) -I$(CONFIG_LIBCXL_PATH)/include
 LDFLAGS += -L$(CONFIG_LIBCXL_PATH)
 libcxl_a = $(CONFIG_LIBCXL_PATH)/libcxl.a
 endif # !CONFIG_LIBCXL_PATH
+
 endif # !DISABLE_LIBCXL
 
 # z_ prefixed version of libz, intended to be linked statically with
@@ -151,7 +155,6 @@ endif # !DISABLE_LIBCXL
 # spec file during RPM build.
 #
 CONFIG_DLOPEN_MECHANISM ?= 1
-
 ifeq ($(CONFIG_DLOPEN_MECHANISM),1)
 CFLAGS += -DCONFIG_DLOPEN_MECHANISM -DCONFIG_ZLIB_PATH=\"$(CONFIG_ZLIB_PATH)\"
 else

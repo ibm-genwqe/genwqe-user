@@ -39,11 +39,8 @@ PLATFORM ?= $(shell uname -i)
 
 distro = $(shell lsb_release -d | cut -f2)
 
-ifdef BUNDLE_LIBCXL
-subdirs += "ext/libcxl"
-endif
-
 subdirs += lib tools
+
 ifdef WITH_LIBCXL
 subdirs += init
 endif
@@ -53,6 +50,7 @@ MODPROBE_D ?= /etc/modprobe.d
 
 all: $(subdirs)
 
+# Rules for the recursive build
 tools: lib
 
 # z_ prefixed version of libz, intended to be linked statically with
@@ -95,8 +93,8 @@ endif
 # Only build if the subdirectory is really existent
 .PHONY: $(subdirs) install
 $(subdirs):
-	@if [ -d $@ ]; then					\
-		$(MAKE) -C $@ C=0 || exit 1; \
+	@if [ -d $@ ]; then				\
+		$(MAKE) -C $@ C=0 || exit 1;		\
 	fi
 
 rpmbuild_setup:
@@ -119,10 +117,10 @@ rpmbuild:
 
 # Install/Uninstall
 install uninstall:
-	@for dir in $(subdirs); do 					  \
-		if [ -d $$dir ]; then					  \
-			$(MAKE) -C $$dir $@ || exit 1; \
-		fi							  \
+	@for dir in $(subdirs); do 			\
+		if [ -d $$dir ]; then			\
+			$(MAKE) -C $$dir $@ || exit 1;	\
+		fi					\
 	done
 
 install_udev_rules:
