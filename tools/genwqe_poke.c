@@ -18,19 +18,31 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <endian.h>
+#include <asm/byteorder.h>
+#include <sys/mman.h>
 
 #include "genwqe_tools.h"
 #include "force_cpu.h"
 #include <libddcb.h>
 
 int verbose_flag = 0;
-
+static int quiet = 0;
 static const char *version = GIT_VERSION;
 
 /**
- * @brief	prints valid command line options
+ * @brief Prints valid command line options
  *
- * @param prog	current program's name
+ * @param prog	current program name
+ *
+ * Example for CAPI specific MMIO timeout circumvention:
+ *
+ *   Read out old value:
+ *     sudo ./tools/genwqe_peek -ACAPI -C1 --psl-bar=2 --width=64 0x150
+ *
+ *   Set some bits under mask only bits 36..38:
+ *     sudo ./tools/genwqe_poke -ACAPI -C1 --psl-bar=2 --width=64 --mask \
+ *                              0xe000000 0x150 0x4000000
  */
 static void usage(const char *prog)
 {
@@ -45,6 +57,8 @@ static void usage(const char *prog)
 	       "  -i, --interval <intv>     interval in usec, 0: default.\n"
 	       "  -c, --count <mum>         number of pokes, 1: default\n"
 	       "  -r, --read-back           read back and verify.\n"
+	       "  -p, --psl-bar <bar>       access PSL bar (CAPI only)\n"
+	       "  -m, --mask <mask>         x = (x & ~mask) | (val & mask)\n"
 	       "  <addr> <val>\n"
 	       "\n"
 	       "Example:\n"
@@ -52,23 +66,93 @@ static void usage(const char *prog)
 	       "\n"
 	       "Testcase to trigger error recovery code on genwqe card:\n"
 	       "   Fatal GFIR:\n"
-	       "     ./tools/genwqe_poke -C0 0x00000008 0x001\n"
+	       "     genwqe_poke -C0 0x00000008 0x001\n"
 	       "   Info GFIR by writing to VF:\n"
-	       "     ./tools/genwqe_poke -C2 0x00020020 0x800\n"
+	       "     genwqe_poke -C2 0x00020020 0x800\n"
 	       "\n"
 	       "   Registers for Capi card (-A CAPI)\n"
-	       "      FIR Reg:      0x1000 ... 0x1028, 6 Regs\n"
-	       "      Err. Inj Reg: 0x1800 and 0x1808\n"
-	       "      Agr. Regs:    0x2000 and 0x2078\n"
-	       "      Gzip Regs:    0x2100 and 0x2178\n"
+	       "     FIR Reg:      0x1000 ... 0x1028, 6 Regs\n"
+	       "     Err. Inj Reg: 0x1800 and 0x1808\n"
+	       "     Agr. Regs:    0x2000 and 0x2078\n"
+	       "     Gzip Regs:    0x2100 and 0x2178\n"
+	       "\n"
+	       "   Only CAPI (debugging):\n"
+	       "     genwqe_poke -ACAPI -C0 --psl-bar=2 --width=64 --mask <mask> <offs> <data>\n"
 	       "\n",
 	       prog);
 }
 
 /**
- * @brief	tool to write to zEDC register
- *		must be called as root !
+ * Writing PSL BARs only works in CAPI mode. It directly opens the
+ * PCIe device and bypasses therefore the CXL driver. Handle this with
+ * care, since it can cause unexpected effects if wrong data is
+ * written or accessed.
  *
+ * We actually need this to setup a circumvention for MMIOs which can
+ * timeout. This is required since the Linux driver could not be
+ * changed as quickly as desired.
+ */
+static int capi_write_psl_bar(unsigned int card_no, unsigned int res_no,
+			      int width, off_t offset, uint64_t val,
+			      uint64_t mask)
+{
+	int fd, rc = 0;
+	struct stat sb;
+	void *memblk, *addr;
+	uint64_t val64;
+	char res[128];
+
+	sprintf(res, "/sys/class/cxl/card%u/device/resource%u",
+		card_no, res_no);
+
+	fd = open(res, O_RDWR);
+	if (fd < 0) {
+		fprintf(stderr, "err: Can not open %s %s\n",
+			res, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	fstat(fd, &sb);
+	memblk = mmap(NULL, sb.st_size, PROT_WRITE|PROT_READ,
+		      MAP_SHARED, fd, 0);
+	if (memblk == MAP_FAILED) {
+		fprintf(stderr, "err: Can not mmap %s\n", res);
+		exit(EXIT_FAILURE);
+	}
+
+	addr = memblk + (offset & (sb.st_size - 1));
+
+	switch (width) {
+	case 32: /* Write word */
+		if (mask == 0)
+			*((uint32_t *)addr) = __cpu_to_be32(val);
+		else {
+			val64 = __be32_to_cpu(*((uint32_t *)addr));  /* old */
+			val64 = (val64 & ~mask) | (val & mask);      /* new */
+			*((uint32_t *)addr) = __cpu_to_be32(val64);
+		}
+		break;
+	case 64: /* Write double */
+		if (mask == 0)
+			*((uint64_t *)addr) = __cpu_to_be64(val);
+		else {
+			val64 = __be64_to_cpu(*((uint32_t *)addr));  /* old */
+			val64 = (val64 & ~mask) | (val & mask);      /* new */
+			*((uint64_t *)addr) = __cpu_to_be64(val64);
+		}
+		break;
+	default:
+		fprintf(stderr, "err: Illegal width %d\n", width);
+		rc = -1;
+	}
+
+	munmap(memblk,sb.st_size);
+	close(fd);
+	return rc;
+}
+
+/**
+ * @brief Tool to write to zEDC registers. Must be called as root!
  */
 int main(int argc, char *argv[])
 {
@@ -82,10 +166,11 @@ int main(int argc, char *argv[])
 	int rd_back = 0;
 	uint32_t offs;
 	uint64_t val, rbval;
-	int quiet = 0;
+	uint64_t mask = 0x0ull;  /* default is using no mask */
 	unsigned long i, count = 1;
 	unsigned long interval = 0;
 	int mode = DDCB_MODE_WR; /* Default mode for CAPI and GENWQE Card's */
+	int psl_bar = -1;	/* -1 disabled */
 	int xerrno;
 
 	while (1) {
@@ -103,16 +188,20 @@ int main(int argc, char *argv[])
 			{ "count",	required_argument, NULL, 'c' },
 			{ "rd-back",	no_argument,       NULL, 'r' },
 
+			/* CAPI specific tweakings */
+			{ "psl-bar",	required_argument, NULL, 'p' },
+			{ "mask",	required_argument, NULL, 'm' },
+
 			/* misc/support */
 			{ "version",	no_argument,	   NULL, 'V' },
 			{ "quiet",	no_argument,	   NULL, 'q' },
 			{ "verbose",	no_argument,	   NULL, 'v' },
 			{ "help",	no_argument,	   NULL, 'h' },
+
 			{ 0,		no_argument,	   NULL, 0   },
 		};
 
-		ch = getopt_long(argc, argv,
-				 "C:A:X:w:i:c:Vqrvh",
+		ch = getopt_long(argc, argv, "m:p:C:A:X:w:i:c:Vqrvh",
 				 long_options, &option_index);
 		if (ch == -1)	/* all params processed ? */
 			break;
@@ -138,6 +227,12 @@ int main(int argc, char *argv[])
 			break;
 		case 'w':
 			width = strtoul(optarg, NULL, 0);
+			break;
+		case 'p':		/* psl-bar */
+			psl_bar = strtol(optarg, (char **)NULL, 0);
+			break;
+		case 'm':
+			mask = strtoll(optarg, (char **)NULL, 0);
 			break;
 		case 'i':		/* interval */
 			interval = strtol(optarg, (char **)NULL, 0);
@@ -178,6 +273,12 @@ int main(int argc, char *argv[])
 	val  = strtoull(argv[optind++], NULL, 0);
 	rbval = ~val;
 	switch_cpu(cpu, verbose_flag);
+
+	if ((DDCB_TYPE_CAPI == card_type) && (psl_bar != -1)) {
+		capi_write_psl_bar(card_no, psl_bar, width, offs, val, mask);
+		goto print_result;
+	}
+
 	ddcb_debug(verbose_flag);
 
 	/* CAPI need's master flag for Poke */
@@ -185,7 +286,8 @@ int main(int argc, char *argv[])
 		mode |= DDCB_MODE_MASTER;
 
 	if ((card_no < 0) || (card_no > 4)) {
-		printf("(%d) is a invalid Card number !\n", card_no);
+		fprintf(stderr, "err: (%d) is a invalid card number!\n",
+			card_no);
 		usage(argv[0]);
 		exit(EXIT_FAILURE);
 	}
@@ -202,22 +304,17 @@ int main(int argc, char *argv[])
 	for (i = 0; i < count; i++) {
 		switch (width) {
 		case 32:
-			rc = accel_write_reg32(card, offs,
-						     (uint32_t)val);
+			rc = accel_write_reg32(card, offs, (uint32_t)val);
 			xerrno = errno;
 			if (rd_back)
-				rbval = accel_read_reg32(card,
-							       offs,
-							       &rbrc);
+				rbval = accel_read_reg32(card, offs, &rbrc);
 			break;
 		default:
 		case 64:
 			rc = accel_write_reg64(card, offs, val);
 			xerrno = errno;
 			if (rd_back)
-				rbval = accel_read_reg64(card,
-							       offs,
-							       &rbrc);
+				rbval = accel_read_reg64(card, offs, &rbrc);
 			break;
 		}
 
@@ -246,9 +343,11 @@ int main(int argc, char *argv[])
 			usleep(interval);
 	}
 
+	accel_close(card);
+
+ print_result:
 	if (!quiet)
 		printf("[%08x] %016llx\n", offs, (long long)val);
 
-	accel_close(card);
 	exit(EXIT_SUCCESS);
 }

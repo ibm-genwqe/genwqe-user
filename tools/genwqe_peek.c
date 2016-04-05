@@ -18,6 +18,9 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <endian.h>
+#include <asm/byteorder.h>
+#include <sys/mman.h>
 
 #include "genwqe_tools.h"
 #include "force_cpu.h"
@@ -46,24 +49,90 @@ static void usage(const char *prog)
 	       "  -c, --count <num>         number of peeks do be done, 1: default.\n"
 	       "  -e, --must-be <value>     compare and exit if not equal.\n"
 	       "  -n, --must-not-be <value> compare and exit if equal.\n"
-	       "  -a, --and-mask <valud>    mask read value before compare.\n"
+	       "  -a, --and-mask <value>    mask read value before compare.\n"
+	       "  -p, --psl-bar <bar>       access PSL bar (CAPI only)\n"
 	       "  <addr>\n"
 	       "\n"
 	       "Example:\n"
 	       "  genwqe_peek 0x0000\n"
 	       "  [00000000] 000000021032a178\n\n"
 	       "  for CAPI card (-A CAPI)\n"
-	       "      Reg 0x0000 CAPI Card Version Reg 1 (RO)\n"
-	       "      Reg 0x0008 CAPI Card Version Reg 2 (RO)\n"
-	       "      Reg 0x0080 CAPI Card Free Run Timer in 4 nsec (RO)\n"
-	       "      Reg 0x0180 Queue Work Time in 4 nsec (RO)\n"
-	       "      Reg 0x1000 ... 0x1028  6 Fir Regsiters (RW)\n",
+	       "    Reg 0x0000 CAPI Card Version Reg 1 (RO)\n"
+	       "    Reg 0x0008 CAPI Card Version Reg 2 (RO)\n"
+	       "    Reg 0x0080 CAPI Card Free Run Timer in 4 nsec (RO)\n"
+	       "    Reg 0x0180 Queue Work Time in 4 nsec (RO)\n"
+	       "    Reg 0x1000 ... 0x1028  6 Fir Regsiters (RW)\n"
+	       "\n"
+	       "   Only CAPI (debugging):\n"
+	       "     genwqe_peek -ACAPI -C0 --psl-bar=2 --width=64 0x150\n"
+	       "\n",
 	       prog);
 }
 
 /**
- * @brief
+ * Writing PSL BARs only works in CAPI mode. It directly opens the
+ * PCIe device and bypasses therefore the CXL driver. Handle this with
+ * care, since it can cause unexpected effects if wrong data is
+ * written or accessed.
  *
+ * We actually need this to setup a circumvention for MMIOs which can
+ * timeout. This is required since the Linux driver could not be
+ * changed as quickly as desired.
+ *
+ * MSB                                                                         LSB
+ *             11.1111.1111.2222.2222.2233_3333.3333.4444.4444.4455.5555.5555.6666
+ * 0123.4567.8901.2345.6789.0123.4567.8901_2345.6789.0123.4567.8901.2345.6789.0123
+ */
+static int capi_read_psl_bar(unsigned int card_no, unsigned int res_no,
+			     int width, off_t offset, uint64_t *val)
+{
+	int fd, rc = 0;
+	struct stat sb;
+	void *memblk, *addr;
+	char res[128];
+
+	sprintf(res, "/sys/class/cxl/card%u/device/resource%u",
+		card_no, res_no);
+
+	fd = open(res, O_RDWR);
+	if (fd < 0) {
+		fprintf(stderr, "err: Can not open %s %s\n",
+			res, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	fstat(fd, &sb);
+	memblk = mmap(NULL, sb.st_size, PROT_WRITE|PROT_READ,
+		      MAP_SHARED, fd, 0);
+	if (memblk == MAP_FAILED) {
+		fprintf(stderr, "err: Can not mmap %s\n", res);
+		exit(EXIT_FAILURE);
+	}
+
+	addr = memblk + (offset & (sb.st_size - 1));
+
+	switch (width) {
+	case 32: /* Write word */
+		if (val)
+			*val = __be32_to_cpu(*((uint32_t *)addr));
+		break;
+	case 64: /* Write double */
+		if (val)
+			*val = __be64_to_cpu(*((uint64_t *)addr));
+		break;
+	default:
+		fprintf(stderr, "err: Illegal width %d\n", width);
+		rc = -1;
+	}
+
+	munmap(memblk,sb.st_size);
+	close(fd);
+	return rc;
+}
+
+
+/**
+ * Read accelerator specific registers. Must be called as root!
  */
 int main(int argc, char *argv[])
 {
@@ -84,6 +153,7 @@ int main(int argc, char *argv[])
 	unsigned long i, count = 1;
 	unsigned long interval = 0;
 	int mode = DDCB_MODE_WR;
+	int psl_bar = -1;	/* -1 disabled */
 
 	while (1) {
 		int option_index = 0;
@@ -102,6 +172,9 @@ int main(int argc, char *argv[])
 			{ "must-not-be", required_argument, NULL, 'n' },
 			{ "and-mask",    required_argument, NULL, 'a' },
 
+			/* CAPI specific tweakings */
+			{ "psl-bar",	required_argument,  NULL, 'p' },
+
 			/* misc/support */
 			{ "version",	 no_argument,	    NULL, 'V' },
 			{ "quiet",	 no_argument,	    NULL, 'q' },
@@ -111,7 +184,7 @@ int main(int argc, char *argv[])
 		};
 
 		ch = getopt_long(argc, argv,
-				 "C:A:X:w:i:c:e:n:a:Vqvh",
+				 "p:C:A:X:w:i:c:e:n:a:Vqvh",
 				 long_options, &option_index);
 		if (ch == -1)	/* all params processed ? */
 			break;
@@ -137,6 +210,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'w':
 			width = strtoul(optarg, NULL, 0);
+			break;
+		case 'p':		/* psl-bar */
+			psl_bar = strtol(optarg, (char **)NULL, 0);
 			break;
 		case 'i':		/* interval */
 			interval = strtol(optarg, (char **)NULL, 0);
@@ -188,6 +264,12 @@ int main(int argc, char *argv[])
 	}
 
 	switch_cpu(cpu, verbose_flag);
+
+	if ((DDCB_TYPE_CAPI == card_type) && (psl_bar != -1)) {
+		capi_read_psl_bar(card_no, psl_bar, width, offs, &val);
+		goto print_result;
+	}
+
 	ddcb_debug(verbose_flag);
 
 	/* CAPI need's master flag for Poke */
@@ -246,9 +328,11 @@ int main(int argc, char *argv[])
 			usleep(interval);
 	}
 
+	accel_close(card);
+
+ print_result:
 	if (!quiet)
 		printf("[%08x] %016llx\n", offs, (long long)val);
 
-	accel_close(card);
 	exit(EXIT_SUCCESS);
 }
