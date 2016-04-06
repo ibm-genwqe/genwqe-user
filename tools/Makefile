@@ -131,21 +131,21 @@ uninstall_manpages:
 	done
 
 capi_install: genwqe_maint
-	install -D -m 744 genwqe_maint -T $(DESTDIR)/bin/genwqe_maint
-	install -D -m 744 genwqe_loadtree -T $(DESTDIR)/bin/genwqe_loadtree
+	install -D -m 755 genwqe_maint -T $(DESTDIR)/bin/genwqe_maint
+	install -D -m 755 genwqe_loadtree -T $(DESTDIR)/bin/genwqe_loadtree
 
 install: install_gzip_tools install_manpages $(CAPI_INSTALL)
 	@mkdir -p $(DESTDIR)/bin
 	install -D genwqe_update -T $(DESTDIR)/bin/genwqe_update
-	install -D -m 744 genwqe_memcopy   -T $(DESTDIR)/bin/genwqe_memcopy
-	install -D -m 744 genwqe_echo      -T $(DESTDIR)/bin/genwqe_echo
-	install -D -m 744 genwqe_peek      -T $(DESTDIR)/bin/genwqe_peek
-	install -D -m 744 genwqe_poke      -T $(DESTDIR)/bin/genwqe_poke
-	install -D -m 744 genwqe_cksum     -T $(DESTDIR)/bin/genwqe_cksum
-	install -D -m 744 genwqe_vpdconv   -T $(DESTDIR)/bin/genwqe_vpdconv
-	install -D -m 744 genwqe_vpdupdate -T $(DESTDIR)/bin/genwqe_vpdupdate
-	install -D -m 744 genwqe_csv2vpd   -T $(DESTDIR)/bin/genwqe_csv2vpd
-	install -D -m 744 genwqe_ffdc      -T $(DESTDIR)/bin/genwqe_ffdc
+	install -D -m 755 genwqe_memcopy   -T $(DESTDIR)/bin/genwqe_memcopy
+	install -D -m 755 genwqe_echo      -T $(DESTDIR)/bin/genwqe_echo
+	install -D -m 755 genwqe_peek      -T $(DESTDIR)/bin/genwqe_peek
+	install -D -m 755 genwqe_poke      -T $(DESTDIR)/bin/genwqe_poke
+	install -D -m 755 genwqe_cksum     -T $(DESTDIR)/bin/genwqe_cksum
+	install -D -m 755 genwqe_vpdconv   -T $(DESTDIR)/bin/genwqe_vpdconv
+	install -D -m 755 genwqe_vpdupdate -T $(DESTDIR)/bin/genwqe_vpdupdate
+	install -D -m 755 genwqe_csv2vpd   -T $(DESTDIR)/bin/genwqe_csv2vpd
+	install -D -m 755 genwqe_ffdc      -T $(DESTDIR)/bin/genwqe_ffdc
 
 uninstall: uninstall_gzip_tools uninstall_manpages
 	@for f in $(projs) ; do					\
