@@ -102,11 +102,11 @@ install_release_tools: all
 #   hardware accelerated version of gzip/gunzip.
 #
 install_gzip_tools: all
-	install -D -m 644 genwqe_gzip    -T $(DESTDIR)/bin/genwqe_gzip
-	install -D -m 644 genwqe_gunzip  -T $(DESTDIR)/bin/genwqe_gunzip
-	install -D -m 644 zlib_mt_perf   -T $(DESTDIR)/bin/zlib_mt_perf
-	install -D -m 644 genwqe_mt_perf -T $(DESTDIR)/bin/genwqe_mt_perf
-	install -D -m 644 genwqe_test_gz -T $(DESTDIR)/bin/genwqe_test_gz
+	install -D -m 755 genwqe_gzip    -T $(DESTDIR)/bin/genwqe_gzip
+	install -D -m 755 genwqe_gunzip  -T $(DESTDIR)/bin/genwqe_gunzip
+	install -D -m 755 zlib_mt_perf   -T $(DESTDIR)/bin/zlib_mt_perf
+	install -D -m 755 genwqe_mt_perf -T $(DESTDIR)/bin/genwqe_mt_perf
+	install -D -m 755 genwqe_test_gz -T $(DESTDIR)/bin/genwqe_test_gz
 
 uninstall_gzip_tools:
 	$(RM) $(DESTDIR)/bin/genwqe_gzip \

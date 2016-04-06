@@ -50,12 +50,11 @@
  * libz.so, we assume that users of it like to use hardware as
  * default.
  */
-#if 0
-#  define CONFIG_INFLATE_IMPL	 ZLIB_SW_IMPL
-#  define CONFIG_DEFLATE_IMPL	 ZLIB_SW_IMPL
-#else
-#  define CONFIG_INFLATE_IMPL	 (ZLIB_HW_IMPL | ZLIB_FLAG_OMIT_LAST_DICT)
-#  define CONFIG_DEFLATE_IMPL	 (ZLIB_HW_IMPL | ZLIB_FLAG_OMIT_LAST_DICT)
+#define CONFIG_INFLATE_IMPL	 (ZLIB_HW_IMPL | ZLIB_FLAG_OMIT_LAST_DICT)
+#define CONFIG_DEFLATE_IMPL	 (ZLIB_HW_IMPL | ZLIB_FLAG_OMIT_LAST_DICT)
+
+#ifndef CONFIG_ZLIB_PATH
+#  define CONFIG_ZLIB_PATH "/opt/genwqe/lib/libz.so.1"
 #endif
 
 #ifndef DEF_WBITS
