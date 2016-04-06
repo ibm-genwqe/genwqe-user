@@ -89,14 +89,8 @@ developing applications that use %{name}.
 strip %{buildroot}%{_bindir}/genwqe_gzip
 strip %{buildroot}%{_bindir}/genwqe_gunzip
 
-# Create symlinks to enable usage of tar with adjusted path:
-#   PATH=/usr/bin/genwqe:$PATH tar xfvz ...
-# In this case the hardware accelerated gzip/gunzip variant is being used
-# and hardware acceleration can be exploited. Aliasing did not work out.
-#
-%{__mkdir} -p %{buildroot}/%{_bindir}/genwqe
-ln -sf %{_bindir}/genwqe_gunzip %{buildroot}%{_bindir}/genwqe/gunzip
-ln -sf %{_bindir}/genwqe_gzip   %{buildroot}%{_bindir}/genwqe/gzip
+ln -sf %{_bindir}/genwqe_gunzip %{buildroot}/%{_libdir}/genwqe/gunzip
+ln -sf %{_bindir}/genwqe_gzip   %{buildroot}/%{_libdir}/genwqe/gzip
 
 %files -n genwqe-tools
 %defattr(0755,root,root)
@@ -113,8 +107,9 @@ ln -sf %{_bindir}/genwqe_gzip   %{buildroot}%{_bindir}/genwqe/gzip
 %{_bindir}/genwqe_test_gz
 %{_bindir}/genwqe_mt_perf
 %{_bindir}/zlib_mt_perf
-%{_bindir}/genwqe/gunzip
-%{_bindir}/genwqe/gzip
+
+%{_libdir}/genwqe/gunzip
+%{_libdir}/genwqe/gzip
 
 %defattr(-,root,root)
 %doc LICENSE
