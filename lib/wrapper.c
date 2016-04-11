@@ -54,7 +54,7 @@
 #define CONFIG_DEFLATE_IMPL	 (ZLIB_HW_IMPL | ZLIB_FLAG_OMIT_LAST_DICT)
 
 #ifndef CONFIG_ZLIB_PATH
-#  define CONFIG_ZLIB_PATH "/opt/genwqe/lib/libz.so.1"
+#  define CONFIG_ZLIB_PATH "/usr/lib64/libz.so.1"
 #endif
 
 #ifndef DEF_WBITS
