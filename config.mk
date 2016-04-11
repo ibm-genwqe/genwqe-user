@@ -166,5 +166,5 @@ libz_a=libz_prefixed.o
 endif
 
 DESTDIR ?= /usr
-LIB_INSTALL_PATH ?= $(DESTDIR)/lib/genwqe
+LIB_INSTALL_PATH ?= $(DESTDIR)/lib64/genwqe
 INCLUDE_INSTALL_PATH ?= $(DESTDIR)/include/genwqe
