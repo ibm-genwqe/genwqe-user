@@ -155,7 +155,7 @@ endif # !DISABLE_LIBCXL
 # spec file during RPM build.
 #
 CONFIG_DLOPEN_MECHANISM ?= 1
-CONFIG_ZLIB_PATH ?= /opt/genwqe/lib/libz.so.1
+CONFIG_ZLIB_PATH ?= /usr/lib64/libz.so.1
 
 ifeq ($(CONFIG_DLOPEN_MECHANISM),1)
 CFLAGS += -DCONFIG_DLOPEN_MECHANISM -DCONFIG_ZLIB_PATH=\"$(CONFIG_ZLIB_PATH)\"
