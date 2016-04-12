@@ -507,31 +507,55 @@ const z_crc_t *get_crc_table()
 
 #endif
 
+/**
+ * NOTE: We had different variants trying to find the right libz.so.1
+ * in our system. Unfortunately this can differ for the various
+ * distributions:
+ *
+ * RHEL7.2:
+ *   $ ldconfig -p | grep libz.so.1 | cut -d' ' -f4 | head -n1
+ *   /lib64/libz.so.1
+ *
+ * Ubuntu 15.10:
+ *   $ ldconfig -p | grep libz.so.1 | cut -d' ' -f4 | head -n1
+ *   /lib/powerpc64le-linux-gnu/libz.so.1
+ *
+ * Intel with RHEL6.7:
+ *   $ ldconfig -p | grep libz.so.1 | cut -d' ' -f4 | head -n1
+ *   /lib64/libz.so.1
+ *
+ * We are setting this via config.mk option and allow the
+ * distributions to overwrite this via rpm spec file.
+ *
+ * NOTE: We tried loading "libz.so.1" without full path, but that
+ * turned out to be dangerous. We tried to load our own lib, which was
+ * leading to endless recursive calls and segfaults as results.
+ */
 void zedc_sw_init(void)
 {
 	char *error;
 	const char *zlib_path = getenv("ZLIB_PATH");
 
-	/* user has setup environment variable to find libz.so */
+	/* User has setup environment variable to find libz.so.1 */
 	if (zlib_path != NULL) {
-		sw_trace("Try loading software zlib \"%s\"\n", zlib_path);
+		sw_trace("Loading software zlib \"%s\"\n", zlib_path);
 		dlerror();
 		handle = dlopen(zlib_path, RTLD_LAZY);
 		if (handle != NULL)
 			goto load_syms;
 	}
 
-	/* try loading private zlib.so in CONFIG_ZLIB_PATH */
-	sw_trace("Try loading software zlib \"%s\"\n", CONFIG_ZLIB_PATH);
+	/* We saw dlopen returning non NULL value in case of passing ""! */
+	if (strcmp(CONFIG_ZLIB_PATH, "") == 0) {
+		pr_err("  Empty CONFIG_ZLIB_PATH \"%s\"\n",
+		       CONFIG_ZLIB_PATH);
+		return;
+	}
+
+	/* Loading private zlib.so.1 using CONFIG_ZLIB_PATH */
+	sw_trace("Loading software zlib \"%s\"\n", CONFIG_ZLIB_PATH);
 	dlerror();
 	handle = dlopen(CONFIG_ZLIB_PATH, RTLD_LAZY);
-	if (handle != NULL)
-		goto load_syms;
-
-	/* try loading system zlib.so */
-	sw_trace("Try loading system software zlib \"libz.so.1\"\n");
-	dlerror();
-	handle = dlopen("libz.so.1", RTLD_LAZY);
 	if (handle == NULL) {
 		pr_err("  %s\n", dlerror());
 		return;
@@ -540,12 +564,11 @@ void zedc_sw_init(void)
 load_syms:
 	register_sym(zlibVersion);
 
-	sw_trace("Using dlopened libz.so\n");
-	sw_trace("  ZLIB_VERSION %s (header version)\n", ZLIB_VERSION);
-	sw_trace("  zlibVersion  %s (libz.so version)\n", z_zlibVersion());
+	sw_trace("  ZLIB_VERSION=%s (header) zlibVersion()=%s (code)\n",
+		 ZLIB_VERSION, z_zlibVersion());
 
 	if (strcmp(ZLIB_VERSION, z_zlibVersion()) != 0) {
-		pr_err("libz.so %s and zlib.h %s do not match!\n",
+		pr_err("libz.so.1=%s and zlib.h=%s do not match!\n",
 		       z_zlibVersion(), ZLIB_VERSION);
 		return;
 	}
@@ -615,9 +638,6 @@ load_syms:
 	register_sym(crc32_combine64);
 	register_sym(get_crc_table);
 #endif
-
-	sw_trace("Software zlib %s/header %s loaded\n", z_zlibVersion(),
-		 ZLIB_VERSION);
 }
 
 void zedc_sw_done(void)
