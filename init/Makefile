@@ -24,4 +24,4 @@ install:
 		$(SYSTEMD_UNIT_DIR)/genwqe_maint.service
 
 uninstall:
-	-rm $(SYSTEMD_UNIT_DIR)/genwqe_maint.service
+	$(RM) $(SYSTEMD_UNIT_DIR)/genwqe_maint.service
