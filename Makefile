@@ -114,6 +114,8 @@ rpmbuild:
 	@cp -ar * /tmp/genwqe-user-$(RPMVERSION)/
 	(cd /tmp && tar cfz v$(RPMVERSION).tar.gz genwqe-user-$(RPMVERSION))
 	rpmbuild -ta -v /tmp/v$(RPMVERSION).tar.gz
+	@rm -rf /tmp/genwqe-user-$(RPMVERSION)
+	$(RM) /tmp/v$(RPMVERSION).tar.gz
 
 # Install/Uninstall
 install uninstall:
