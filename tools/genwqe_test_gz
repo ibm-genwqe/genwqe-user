@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# Copyright 2015, International Business Machines
+# Copyright 2015, 2016 International Business Machines
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,12 +31,11 @@ export ZLIB_CARD=-1
 
 # Directories used
 INSTALL_DIR="/usr"                           # Tool RPM install directory
-TOOLS_DIR="${INSTALL_DIR}/bin/genwqe"        # gzip, gunzip install directory
 TMP_DIR="/tmp"                               # Temporary directory to use
 DATA_DIR="${TMP_DIR}/$$_testdata"            # directory for testdata
 ORIG_DATA="${TMP_DIR}/orig"                  # directory for original data
-GZIPTOOL="${TOOLS_DIR}/gzip"
-GUNZIPTOOL="${TOOLS_DIR}/gunzip"
+GZIPTOOL="genwqe_gzip"
+GUNZIPTOOL="genwqe_gunzip"
 
 # GenWQE Global values
 DEVICE_ID=":044b"
@@ -126,7 +125,7 @@ function check_tools
 {
     for t in ${GZIPTOOL} ${GUNZIPTOOL} ; do
 	echo -n "Checking if ${t} is there ... "
-	if [ ! -x ${t} ]; then
+	if [ ! -x `which ${t}` ]; then
 	    echo "failure"
 	    exit -3;
 	fi
@@ -267,16 +266,6 @@ function genwqe_check_supported_bitstream_versions()
         done
     fi
 }
-
-# The tools RPM is a prerequisite for this test (see purpose description above)
-#
-if [ ! -d ${TOOLS_DIR} ]; then
-    echo "$PROGRAM: ERROR: gzip and gunzip tools not found in $TOOLS_DIR."
-    echo "Make sure the GenWQELibZ RPM Package is installed and gzip and gunzip"
-    echo "are executable for ${USER} in $TOOLS_DIR."
-    echo
-    exit -1
-fi
 
 # Parse any options given on the command line
 while getopts "A:vVhsSi:C:p:" opt; do
