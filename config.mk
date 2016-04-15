@@ -59,12 +59,13 @@ endif
 HAS_GIT = $(shell git describe > /dev/null 2>&1 && echo y || echo n)
 
 ifeq (${HAS_GIT},y)
-VERSION ?= $(shell git describe --abbrev=4 --always --tags)
+VERSION ?= $(shell git describe --abbrev=4 --always --tags | sed -e 's/v//g')
 RPMVERSION ?= $(shell git describe --abbrev=0 --tags | cut -c 2-7)
 else
 VERSION=4.0.16
 RPMVERSION=$(VERSION)
 endif
+MAJOR_VERS=$(shell echo $(VERSION) | cut -d'.' -f1)
 
 PLATFORM ?= $(shell uname -i)
 

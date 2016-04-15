@@ -24,7 +24,11 @@ LDLIBS += -lpthread -ldl -lrt
 
 ### Accelerated libz implemenation (Accelerated Data Compression/ADC)
 libname=libzADC
-projA = $(libname).a $(libname)-$(libversion).so $(libname).so
+projA = $(libname).a \
+	$(libname).so \
+	$(libname).$(MAJOR_VERS).so \
+	$(libname)-$(libversion).so
+
 src = wrapper.c hardware.c software.c
 objs = __libzHW.o __libcard.o __libDDCB.o $(src:.c=.o)
 
@@ -131,11 +135,14 @@ __$(libname).o: $(objs) $(libz_a)
 $(libname).a: __$(libname).o
 	$(AR) rcs $@ $^
 
-$(libname).so: $(libname)-$(libversion).so
+$(libname).so:  $(libname)-$(libversion).so
+	ln -sf $< $@
+
+$(libname).$(MAJOR_VERS).so: $(libname)-$(libversion).so
 	ln -sf $< $@
 
 $(libname)-$(libversion).so: __$(libname).o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,$@ \
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,$(libname).$(MAJOR_VERS).so \
 		 -Wl,--version-script=libzADC.map -o $@ $^ $(LDLIBS)
 
 # Produce z_ prefixed verson of software zlib. We need this when we
@@ -174,7 +181,7 @@ install: install_zlib
 
 install_zlib: all
 	mkdir -p $(LIB_INSTALL_PATH)
-	cp -uv $(projA) $(LIB_INSTALL_PATH)
+	cp -auv $(projA) $(LIB_INSTALL_PATH)
 	(cd $(LIB_INSTALL_PATH) && \
 		ln -sf $(libname).a libz.a && \
 		ln -sf $(libname)-$(libversion).so libz.so && \
