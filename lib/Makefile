@@ -27,7 +27,7 @@ libname=libzADC
 projA = $(libname).a \
 	$(libname).so \
 	$(libname).so.$(MAJOR_VERS) \
-	$(libname)-$(libversion).so
+	$(libname).so.$(libversion)
 
 src = wrapper.c hardware.c software.c
 objs = __libzHW.o __libcard.o __libDDCB.o $(src:.c=.o)
@@ -35,13 +35,13 @@ objs = __libzHW.o __libcard.o __libDDCB.o $(src:.c=.o)
 ### libzHW
 src0 = libzHW.c inflate.c deflate.c
 libname0 = libzHW
-proj0 = $(libname0).a $(libname0)-$(libversion).so $(libname0).so
+proj0 = $(libname0).a $(libname0).so.$(libversion) $(libname0).so
 objs0 = $(src0:.c=.o)
 
 ### libcard
 src1 = libcard.c
 libname1 = libcard
-proj1 = $(libname1).a $(libname1)-$(libversion).so $(libname1).so
+proj1 = $(libname1).a $(libname1).so.$(libversion) $(libname1).so
 objs1 = $(src1:.c=.o)
 
 ### libDDCB requires libcxl for CAPI support
@@ -53,7 +53,7 @@ src2 += ddcb_capi.c
 endif
 
 libname2 = libDDCB
-proj2 = $(libname2).a $(libname2)-$(libversion).so $(libname2).so
+proj2 = $(libname2).a $(libname2).so.$(libversion) $(libname2).so
 objs2 = $(src2:.c=.o)
 
 projs += $(projA) $(proj0) $(proj1) $(proj2)
@@ -96,10 +96,10 @@ __$(libname0).o: $(objs0)
 $(libname0).a: __$(libname0).o
 	$(AR) rcs $(ARFLAGS) $@ $^
 
-$(libname0).so: $(libname0)-$(libversion).so
+$(libname0).so: $(libname0).so.$(libversion)
 	ln -sf $< $@
 
-$(libname0)-$(libversion).so: __$(libname0).o
+$(libname0).so.$(libversion): __$(libname0).o
 	$(CC) $(LDFLAGS) -shared -Wl,-soname,$@ -o $@ $^
 
 ### libcard
@@ -109,10 +109,10 @@ __$(libname1).o: $(objs1)
 $(libname1).a: __$(libname1).o
 	$(AR) rcs $(ARFLAGS) $@ $^
 
-$(libname1).so: $(libname1)-$(libversion).so
+$(libname1).so: $(libname1).so.$(libversion)
 	ln -sf $< $@
 
-$(libname1)-$(libversion).so: __$(libname1).o
+$(libname1).so.$(libversion): __$(libname1).o
 	$(CC) $(LDFLAGS) -shared -Wl,-soname,$@ -o $@ $^
 
 ### libDDCB
@@ -122,10 +122,10 @@ __$(libname2).o: $(objs2) $(libcxl_a)
 $(libname2).a: __$(libname2).o
 	$(AR) rcs $(ARFLAGS) $@ $^
 
-$(libname2).so: $(libname2)-$(libversion).so
+$(libname2).so: $(libname2).so.$(libversion)
 	ln -sf $< $@
 
-$(libname2)-$(libversion).so: __$(libname2).o
+$(libname2).so.$(libversion): __$(libname2).o
 	$(CC) $(LDFLAGS) -shared -Wl,-soname,$@ -o $@ $^
 
 ### libzADC
@@ -135,13 +135,13 @@ __$(libname).o: $(objs) $(libz_a)
 $(libname).a: __$(libname).o
 	$(AR) rcs $@ $^
 
-$(libname).so:  $(libname)-$(libversion).so
+$(libname).so:  $(libname).so.$(libversion)
 	ln -sf $< $@
 
-$(libname).so.$(MAJOR_VERS): $(libname)-$(libversion).so
+$(libname).so.$(MAJOR_VERS): $(libname).so.$(libversion)
 	ln -sf $< $@
 
-$(libname)-$(libversion).so: __$(libname).o
+$(libname).so.$(libversion): __$(libname).o
 	$(CC) $(LDFLAGS) -shared -Wl,-soname,$(libname).so.$(MAJOR_VERS) \
 		 -Wl,--version-script=libzADC.map -o $@ $^ $(LDLIBS)
 
@@ -184,8 +184,8 @@ install_zlib: all
 	cp -auv $(projA) $(LIB_INSTALL_PATH)
 	(cd $(LIB_INSTALL_PATH) && \
 		ln -sf $(libname).a libz.a && \
-		ln -sf $(libname)-$(libversion).so libz.so && \
-		ln -sf $(libname)-$(libversion).so libz.so.1)
+		ln -sf $(libname).so.$(libversion) libz.so && \
+		ln -sf $(libname).so.$(libversion) libz.so.1)
 	mkdir -p $(INCLUDE_INSTALL_PATH)
 	cp -uv ../include/zaddons.h $(INCLUDE_INSTALL_PATH)
 
