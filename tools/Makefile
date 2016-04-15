@@ -79,8 +79,10 @@ genwqe_gunzip.o: genwqe_gzip.c
 %.o: %.c $(libs)
 	$(CC) -c $(CPPFLAGS) $(CFLAGS) $< -o $@
 
+### Setting LD_LIBRARY_PATH helps to try tools with dynamic linkage
 %.1: %
-	$(HELP2MAN) -N --output=$@ --name "IBM Hardware Accelerator Tool." ./$<
+	LD_LIBRARY_PATH=../lib $(HELP2MAN) -N --output=$@ \
+		--name "IBM Hardware Accelerator Tool." ./$<
 
 %.1.gz: %.1
 	gzip --best -c $< > $@
