@@ -26,7 +26,7 @@ LDLIBS += -lpthread -ldl -lrt
 libname=libzADC
 projA = $(libname).a \
 	$(libname).so \
-	$(libname).$(MAJOR_VERS).so \
+	$(libname).so.$(MAJOR_VERS) \
 	$(libname)-$(libversion).so
 
 src = wrapper.c hardware.c software.c
@@ -138,11 +138,11 @@ $(libname).a: __$(libname).o
 $(libname).so:  $(libname)-$(libversion).so
 	ln -sf $< $@
 
-$(libname).$(MAJOR_VERS).so: $(libname)-$(libversion).so
+$(libname).so.$(MAJOR_VERS): $(libname)-$(libversion).so
 	ln -sf $< $@
 
 $(libname)-$(libversion).so: __$(libname).o
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,$(libname).$(MAJOR_VERS).so \
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,$(libname).so.$(MAJOR_VERS) \
 		 -Wl,--version-script=libzADC.map -o $@ $^ $(LDLIBS)
 
 # Produce z_ prefixed verson of software zlib. We need this when we
