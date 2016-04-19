@@ -64,9 +64,6 @@ developing applications that use %{name}.
 %endif
 
 %build
-%ifarch ppc64le
-%{__make} -C ext/libcxl CFLAGS="-I../include"
-%endif
 
 %{__make} %{?_smp_mflags} tools lib VERSION=%{version} \
        CONFIG_ZLIB_PATH=%{_libdir}/libz.so.1 %{?libcxl}
