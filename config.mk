@@ -69,7 +69,7 @@ MAJOR_VERS=$(shell echo $(VERSION) | cut -d'.' -f1)
 
 PLATFORM ?= $(shell uname -i)
 
-CFLAGS ?= -W -Wall -Werror -Wwrite-strings -Wextra -Os -g \
+CFLAGS ?= -W -Wall -Werror -Wwrite-strings -Wextra -O2 -g \
 	-Wmissing-prototypes # -Wstrict-prototypes -Warray-bounds
 CFLAGS += -DGIT_VERSION=\"$(VERSION)\" \
 	-I. -I../include -I../include/linux/uapi
