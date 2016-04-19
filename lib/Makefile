@@ -61,31 +61,27 @@ projs += $(projA) $(proj0) $(proj1) $(proj2)
 all: $(projs)
 
 ifdef WITH_LIBCXL
-$(libcxl_a): ..check_libcxl
 
-ddcb_capi.o: ..check_libcxl
+ddcb_capi.o: $(libcxl_a)
+
+$(libcxl_a): ..check_libcxl
+	$(MAKE) -C $(CONFIG_LIBCXL_PATH)
 
 .PHONY: ..check_libcxl
 ..check_libcxl:
-ifneq ($(CONFIG_LIBCXL_PATH),)
-	@printf "\t[INFO]\tUsing $(libcxl_a).\n"
+	@if [ ! -d $(CONFIG_LIBCXL_PATH) ]; then 			\
+		printf  "\t[ERROR]\t$(CONFIG_LIBCXL_PATH) not found!\n";\
+		echo;							\
+		echo "  Please clone libcxl git before continuing:";	\
+		echo "    git clone https://github.com/ibm-capi/libcxl";\
+		echo;							\
+		exit 1;							\
+	fi
 	@if [ ! -f $(CONFIG_LIBCXL_PATH)/include/misc/cxl.h ]; then	\
 		mkdir -p $(CONFIG_LIBCXL_PATH)/include/misc/;		\
 		cp ../ext/include/misc/cxl.h 				\
 			$(CONFIG_LIBCXL_PATH)/include/misc/cxl.h;	\
 	fi
-	$(MAKE) -C $(CONFIG_LIBCXL_PATH)
-	@if [ ! -f $(libcxl_a) ]; then 					\
-	  printf  "\t[ERROR]\t$(libcxl_a) not found!\n"; 		\
-	  echo;								\
-	  echo "  Please clone libcxl git before continuing. E.g.:";	\
-	  echo "    git clone https://github.com/ibm-capi/libcxl";	\
-	  echo;                                                         \
-	  exit 1; \
-	fi
-else
-	# @printf "\t[INFO]\tNot using libcxl.a.\n"
-endif
 
 endif	# WITH_LIBCXL
 
