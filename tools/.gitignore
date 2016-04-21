@@ -1,0 +1,13 @@
+genwqe_cksum
+genwqe_csv2vpd
+genwqe_echo
+genwqe_ffdc
+genwqe_gunzip
+genwqe_gzip
+genwqe_memcopy
+genwqe_peek
+genwqe_poke
+genwqe_update
+genwqe_vpdconv
+genwqe_vpdupdate
+zlib_mt_perf
