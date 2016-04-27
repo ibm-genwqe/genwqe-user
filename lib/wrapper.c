@@ -105,6 +105,7 @@ struct _internal_state {
 	uint64_t magic0;
 	enum zlib_impl impl;	/* hardware or software implementation */
 	void *priv_data;	/* state from level below */
+	bool allow_switching;
 
 	/* For delayed inflateInit2() we need to remember parameters */
 	int level;
@@ -940,10 +941,14 @@ static int __inflateInit2_(z_streamp strm, struct _internal_state *w)
 					       w->stream_size) :
 			       z_inflateInit2_(strm, w->windowBits, w->version,
 					       w->stream_size);
-		if (Z_OK == rc) break;	/* OK, i Can exit now */
+		if (Z_OK == rc)
+			break;	/* OK, i Can exit now */
+
 		pr_trace("[%p] %s: fallback to software (rc=%d)\n",
 			 strm, __func__, rc);
 		w->impl = ZLIB_SW_IMPL;
+		w->allow_switching = false;
+
 		retries++;
 	} while (retries < 2);
 
@@ -978,6 +983,7 @@ int inflateInit2_(z_streamp strm, int  windowBits,
 	if (w == NULL)
 		return Z_MEM_ERROR;
 
+	w->allow_switching = true;
 	w->magic0 = MAGIC0;
 	w->magic1 = MAGIC1;
 	w->windowBits = windowBits;
@@ -1046,6 +1052,7 @@ int inflateReset(z_streamp strm)
 		pthread_mutex_unlock(&stats_mutex);
 	}
 
+	w->allow_switching = true;
 	w->gzhead = NULL;	/* clear gz header */
 	w->dictLength = 0;	/* clear cached dictionary */
 
@@ -1090,6 +1097,7 @@ int inflateReset2(z_streamp strm, int windowBits)
 		pthread_mutex_unlock(&stats_mutex);
 	}
 
+	w->allow_switching = true;
 	w->dictLength = 0;	/* clear cached dictionary */
 
 	strm->state = w->priv_data;
@@ -1343,7 +1351,7 @@ int inflate(z_streamp strm, int flush)
 	 * decision to use HW or SW is deferred until we see avail_in
 	 * != 0 for the first time.
 	 */
-	if (strm->total_in == 0) {
+	if ((strm->total_in == 0) && (w->allow_switching)) {
 		/* Special case where there is no data. This occurs
 		   quite often in the JAVA use-case. */
 		if (strm->avail_in == 0)
@@ -1450,6 +1458,9 @@ int inflate(z_streamp strm, int flush)
 	strm->state = w->priv_data;
 	rc = w->impl ? h_inflate(strm, flush) :
 		       z_inflate(strm, flush);
+
+	/* stop switching after lowlevel inflate has been called */
+	w->allow_switching = false;
 	strm->state = (void *)w;
 
 	pr_trace("[%p]            flush=%d %s next_in=%p avail_in=%d "
