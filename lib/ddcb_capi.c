@@ -882,7 +882,7 @@ static int ddcb_execute(void *card_data, struct ddcb_cmd *cmd)
 
 	rc = __ddcb_execute_multi(card_data, cmd);
 	if (DDCB_OK != rc)
-		errno = EINTR;
+		errno = EBADF;	/* Return Invalid exchange */
 
 	return rc;
 }
