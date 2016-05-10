@@ -45,7 +45,6 @@
 #include <time.h>
 #include <asm/byteorder.h>
 
-#define __USE_GNU
 #include <sched.h>
 
 #include <zlib.h>

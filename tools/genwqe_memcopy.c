@@ -28,7 +28,6 @@
 #include <asm/byteorder.h>
 #include <pthread.h>
 
-#define __USE_GNU
 #include <sched.h>
 
 #include "libddcb.h"

@@ -33,7 +33,6 @@
 #include <time.h>
 #include <limits.h>
 #include <fcntl.h>
-#define _GNU_SOURCE
 #include <signal.h>
 #include <pthread.h>
 #include <semaphore.h>
@@ -47,6 +46,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <dirent.h>
+#include <unistd.h>
 
 #include <libddcb.h>
 #include <ddcb.h>
@@ -608,7 +608,7 @@ static int card_dev_open(struct dev_ctx *ctx)
 		return DDCB_ERR_ENOMEM;
 	}
 
-	sem_wait(&ctx->open_done_sem);
+	TEMP_FAILURE_RETRY(sem_wait(&ctx->open_done_sem));
 	rc = ctx->afu_rc;	/* Get RC */
 	if (DDCB_OK != rc) {
 		/* The thread was not able to open or init tha AFU */
@@ -823,7 +823,7 @@ static int __ddcb_execute_multi(void *card_data, struct ddcb_cmd *cmd)
 
 	while (my_cmd) {
 		sem_getvalue(&ctx->free_sem, &val);
-		sem_wait(&ctx->free_sem);
+		TEMP_FAILURE_RETRY(sem_wait(&ctx->free_sem));
 
 		pthread_mutex_lock(&ctx->lock);
 
@@ -857,7 +857,7 @@ static int __ddcb_execute_multi(void *card_data, struct ddcb_cmd *cmd)
 
 	/* Block Caller */
 	VERBOSE2("[%s] Wait ttx: %p\n", __func__, ttx);
-	sem_wait(&ttx->wait_sem);
+	TEMP_FAILURE_RETRY(sem_wait(&ttx->wait_sem));
 	rt_trace(0x00af, ttx->seqnum, idx, ttx);
 	VERBOSE2("[%s] return ttx: %p\n", __func__, ttx);
 	return ttx->compl_code;	/* Give Completion code back to caller */
@@ -882,7 +882,7 @@ static int ddcb_execute(void *card_data, struct ddcb_cmd *cmd)
 
 	rc = __ddcb_execute_multi(card_data, cmd);
 	if (DDCB_OK != rc)
-		errno = EINTR;
+		errno = EBADF;	/* Return Invalid exchange */
 
 	return rc;
 }

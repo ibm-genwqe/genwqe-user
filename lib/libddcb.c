@@ -35,7 +35,6 @@
 #include <time.h>
 #include <limits.h>
 #include <fcntl.h>
-#define _GNU_SOURCE
 #include <signal.h>
 #include <pthread.h>
 #include <semaphore.h>

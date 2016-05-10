@@ -32,7 +32,6 @@
 #include <sys/time.h>
 #include <asm/byteorder.h>
 
-#define __USE_GNU
 #include <sched.h>
 
 #include "genwqe_tools.h"
