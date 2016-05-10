@@ -6,10 +6,8 @@
 #include <signal.h>
 #include <sys/time.h>
 
-#define __USE_GNU
 #include <sched.h>
 
-#define _GNU_SOURCE
 #include <utmpx.h>
 
 #include "force_cpu.h"
