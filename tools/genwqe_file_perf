@@ -1,0 +1,228 @@
+#!/bin/bash
+
+#
+# Copyright 2015, 2016, International Business Machines
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# This testcase proceses significant interrupt stress. Run that for a day
+# and you will know if your device driver and software can surive sudden
+# abborts while running a lot of interrrupt stress.
+#
+# Start N echos and kill them after a couple of seconds.
+#
+
+card=0
+verbose=0
+iterations=1
+count=1
+PLATFORM=`uname -p`
+start_time=`date`
+options=""
+verbose=0
+logging=0
+
+test_data=linux-3.17.tar
+sizes="1 8 16 64 256 1024 4096 8192 9000 12000 14000 16000 32000 48000 56000 64000 96000 128000 200000 300000 400000 500000"
+
+# Set default accelerator based on platform we are running on
+if [ ${PLATFORM} == "ppc64le" ]; then
+    accelerator=CAPI
+else
+    accelerator=GENWQE
+fi
+
+function usage() {
+    echo "Usage:"
+    echo "  genwqe_parallel_echo"
+    echo "    [-A] <accelerator> GENWQE|CAPI"
+    echo "    [-C] <card>        card to be used for the test"
+    echo "    [-c] <count>       send <count> echos and than stop"
+    echo "    [-i] <iterations>  repeat  multiple times for more testing"
+    echo "    [-t] <test_data>   file to use for performance measurement"
+    echo "    [-l] Enable system load logging"
+    echo "         sadc - System activity data collector and gnuplot"
+    echo "         must be installed"
+    echo "    [-v]               verbose"
+    echo
+}
+
+function erase_files() {
+    for s in ${sizes} ; do
+        rm -f ${s}KiB.bin ${s}KiB.orig ${s}KiB.gz out.stderr
+    done
+    rm -f system_load.sar system_load.csv system_load.txt system_load.gnuplot
+}
+
+function cleanup() {
+    if [ $logging -eq 1 ]; then
+        system_load_logging_stop
+    fi
+    echo "EXIT ..."
+}
+  
+trap cleanup SIGINT
+trap cleanup SIGKILL
+trap cleanup SIGTERM
+
+###############################################################################
+# System Load Logging
+###############################################################################
+
+function system_load_logging_start() {
+    rm -f system_load.sar system_load.pid
+    /usr/lib/sysstat/sadc 1 system_load.sar &
+    echo $! > system_load.pid
+}
+
+function system_load_logging_stop() {
+    kill -9 `cat system_load.pid`
+
+    # Skip the 1st 4 lines, since they container some header information
+    cp system_load.sar system_load.$ZLIB_ACCELERATOR.sar
+    sar -u -f system_load.sar | tail -n +3 > system_load.txt
+    grep -v Average system_load.txt > system_load.csv
+
+    start=`head -n1 system_load.csv | cut -f1 -d' '`
+    end=`tail -n1 system_load.csv | cut -f1 -d' '`
+
+    cat <<EOF > system_load.gnuplot
+# Gnuplot Config
+#
+set terminal pdf size 16,8
+set output "system_load.pdf"
+set autoscale
+set title "System Load using $ZLIB_ACCELERATOR"
+set xdata time
+set timefmt "%H:%M:%S"
+set xlabel "Time"
+set xrange ["$start":"$end"]
+set ylabel "CPU Utilization"
+# Set yrange small, we use only one CPU using 100.00 is not useful here
+set yrange ["0.00":"5.00"]
+set style data lines
+set grid
+# set datafile separator " "
+plot "system_load.csv" using 1:4 title "%user", '' using 1:6 title "%system", '' using 1:9 title "%idle"
+EOF
+
+    # Instructing gnuplot to generate a png with out CPU load statistics
+    cat system_load.gnuplot | gnuplot
+
+    # Safe it under an accelerator unique name
+    mv system_load.pdf system_load.${ZLIB_ACCELERATOR}.pdf
+}
+
+while getopts "A:C:c:t:li:vh" opt; do
+    case $opt in
+	A)
+	accelerator=$OPTARG;
+	;;
+	C)
+	card=$OPTARG;
+	;;
+	c)
+	count="-c $OPTARG";
+	;;
+	t)
+	test_data=${OPTARG};
+	;;
+	l)
+	logging=1;
+	;;
+        i)
+        iterations=$OPTARG;
+        ;;
+	b)
+	verbose=1;
+	;;
+        h)
+        usage;
+        exit 0;
+        ;;
+	t)
+	tools_dir=$OPTARG;
+	;;
+        \?)
+        echo "Invalid option: -$OPTARG" >&2
+        ;;
+    esac
+done
+
+if [ ${accelerator} = SW ]; then
+    options="-s"
+fi
+
+ZLIB_ACCELERATOR=${accelerator}
+
+# Generate core dumps, in case something needs debug
+ulimit -c unlimited
+
+echo "ACCELERATOR: ${accelerator}"
+
+if [ ! -f ${test_data} ]; then
+	echo "Testdata: ${test_data} missing!"
+	echo "Use -t <test_data> to specify alternate file."
+	exit 1
+fi
+
+for s in ${sizes} ; do
+	dd if=${test_data} of=${s}KiB.bin bs=1024 count=${s} 2> /dev/null
+done
+
+if [ $logging -eq 1 ]; then
+    system_load_logging_start
+fi
+
+echo "KiB ; sec ; sec"
+for s in ${sizes} ; do
+    for i in `seq 1 ${iterations}` ; do
+
+        (time genwqe_gzip -A ${accelerator} ${options} -C ${card} -c \
+            ${s}KiB.bin > ${s}KiB.gz) 2> out.stderr 
+        if [ $? -ne 0 ]; then
+	    echo "Compression failed ..."
+	    exit 1
+        fi
+
+	c=`grep real out.stderr | cut -f2 -d'm' | cut -d's' -f1`;
+	if [ $verbose -eq 1 ]; then
+		cat out.stderr
+	fi
+
+        (time genwqe_gunzip -A ${accelerator} ${options} -C ${card} -c \
+            ${s}KiB.gz > ${s}KiB.orig) 2> out.stderr
+        if [ $? -ne 0 ]; then
+	    echo "Decompression failed ..."
+	    exit 1
+        fi
+
+	d=`grep real out.stderr | cut -f2 -d'm' | cut -d's' -f1`;
+	if [ $verbose -eq 1 ]; then
+		cat out.stderr
+	fi
+
+        echo "${s} ; ${c} ; ${d}"
+	rm -f ${s}KiB.orig ${s}KiB.gz out.stderr
+    done
+done
+
+if [ $logging -eq 1 ]; then
+    system_load_logging_stop
+fi
+
+erase_files
+
+exit 0
