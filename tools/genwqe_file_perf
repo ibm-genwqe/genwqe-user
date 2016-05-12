@@ -33,6 +33,7 @@ start_time=`date`
 options=""
 verbose=0
 logging=0
+keep=0
 
 test_data=linux-3.17.tar
 sizes="1 8 16 64 256 1024 4096 8192 9000 12000 14000 16000 32000 48000 56000 64000 96000 128000 200000 300000 400000 500000"
@@ -52,10 +53,17 @@ function usage() {
     echo "    [-c] <count>       send <count> echos and than stop"
     echo "    [-i] <iterations>  repeat  multiple times for more testing"
     echo "    [-t] <test_data>   file to use for performance measurement"
+    echo "    [-k]               keep output data and write to filesystem"
     echo "    [-l] Enable system load logging"
     echo "         sadc - System activity data collector and gnuplot"
     echo "         must be installed"
     echo "    [-v]               verbose"
+    echo
+    echo "To exclude influences from reading and writing to disk,"
+    echo "it is recommended to create a ramdisk e.g. by using tmpfs"
+    echo "to get more precise measurements about what is caused by"
+    echo "the accellerator and what is caused by using faster or smaller"
+    echo "disks."
     echo
 }
 
@@ -125,7 +133,7 @@ EOF
     mv system_load.pdf system_load.${ZLIB_ACCELERATOR}.pdf
 }
 
-while getopts "A:C:c:t:li:vh" opt; do
+while getopts "A:C:c:t:kli:vh" opt; do
     case $opt in
 	A)
 	accelerator=$OPTARG;
@@ -141,6 +149,9 @@ while getopts "A:C:c:t:li:vh" opt; do
 	;;
 	l)
 	logging=1;
+	;;
+	k)
+	keep=1;
 	;;
         i)
         iterations=$OPTARG;
@@ -189,7 +200,13 @@ fi
 echo "KiB ; sec ; sec"
 for s in ${sizes} ; do
     for i in `seq 1 ${iterations}` ; do
+	if [ ${keep} -eq 1 ]; then
+            outfile=${s}KiB.orig
+        else
+            outfile=/dev/null
+        fi
 
+        sync
         (time genwqe_gzip -A ${accelerator} ${options} -C ${card} -c \
             ${s}KiB.bin > ${s}KiB.gz) 2> out.stderr 
         if [ $? -ne 0 ]; then
@@ -202,8 +219,9 @@ for s in ${sizes} ; do
 		cat out.stderr
 	fi
 
-        (time genwqe_gunzip -A ${accelerator} ${options} -C ${card} -c \
-            ${s}KiB.gz > ${s}KiB.orig) 2> out.stderr
+        sync
+        (time genwqe_gunzip -A ${accelerator} -o512KiB ${options} -C ${card} \
+            -c ${s}KiB.gz > ${outfile}) 2> out.stderr
         if [ $? -ne 0 ]; then
 	    echo "Decompression failed ..."
 	    exit 1
