@@ -198,7 +198,7 @@ for s in ${sizes} ; do
     fi
 
     sync
-    (time genwqe_gzip -A ${accelerator} ${options} -C ${card} -c \
+    (time genwqe_gzip -A ${accelerator} ${options} -B ${card} -c \
 	${s}KiB.bin > ${s}KiB.gz) 2> out.stderr
     if [ $? -ne 0 ]; then
 	echo "Compression failed ..."
@@ -211,7 +211,7 @@ for s in ${sizes} ; do
     fi
 
     sync
-    (time genwqe_gunzip -A ${accelerator} -o512KiB ${options} -C ${card} \
+    (time genwqe_gunzip -A ${accelerator} -o512KiB ${options} -B ${card} \
 	-c ${s}KiB.gz > ${outfile}) 2> out.stderr
     if [ $? -ne 0 ]; then
 	echo "Decompression failed ..."
