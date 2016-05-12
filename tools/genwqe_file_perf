@@ -61,7 +61,8 @@ function erase_files() {
     for s in ${sizes} ; do
 	rm -f ${s}KiB.bin ${s}KiB.orig ${s}KiB.gz out.stderr
     done
-    rm -f system_load.sar system_load.csv system_load.txt system_load.gnuplot
+    rm -f system_load.sar system_load.*.sar system_load.csv system_load.txt \
+	system_load.gnuplot system_load.pid
 }
 
 function cleanup() {
@@ -81,6 +82,7 @@ trap cleanup SIGTERM
 
 function system_load_logging_start() {
     rm -f system_load.sar system_load.pid
+    sync
     /usr/lib/sysstat/sadc 1 system_load.sar &
     echo $! > system_load.pid
 }
