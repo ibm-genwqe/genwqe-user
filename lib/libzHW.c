@@ -239,13 +239,13 @@ void zedc_asiv_infl_print(zedc_streamp strm)
 
 	if (zedc_dbg > 3) {
 		pr_info("Workspace/Dict0:\n");
-		ddcb_hexdump(stderr, wsp->dict[0], ZEDC_DICT_LEN);
+		ddcb_hexdump(zedc_log, wsp->dict[0], ZEDC_DICT_LEN);
 
 		pr_info("Workspace/Dict1:\n");
-		ddcb_hexdump(stderr, wsp->dict[1], ZEDC_DICT_LEN);
+		ddcb_hexdump(zedc_log, wsp->dict[1], ZEDC_DICT_LEN);
 
 		pr_info("Workspace/Tree:\n");
-		ddcb_hexdump(stderr, wsp->tree, ZEDC_TREE_LEN);
+		ddcb_hexdump(zedc_log, wsp->tree, ZEDC_TREE_LEN);
 	}
 }
 
@@ -334,9 +334,9 @@ void zedc_asv_defl_print(zedc_streamp strm, int dbg)
 
 	if (dbg) {
 		pr_log(dbg, "  OBITS:\n");
-		ddcb_hexdump(stderr, asv->obits, ZEDC_ONUMBYTES_v1);
+		ddcb_hexdump(zedc_log, asv->obits, ZEDC_ONUMBYTES_v1);
 		pr_log(dbg, "  OBITS_EXTRA:\n");
-		ddcb_hexdump(stderr, asv->obits_extra, ZEDC_ONUMBYTES_EXTRA);
+		ddcb_hexdump(zedc_log, asv->obits_extra, ZEDC_ONUMBYTES_EXTRA);
 	}
 }
 
@@ -390,13 +390,13 @@ void zedc_asv_infl_print(zedc_streamp strm)
 
 	if (zedc_dbg > 3) {
 		pr_info("Workspace/Dict0:\n");
-		ddcb_hexdump(stderr, wsp->dict[0], ZEDC_DICT_LEN);
+		ddcb_hexdump(zedc_log, wsp->dict[0], ZEDC_DICT_LEN);
 
 		pr_info("Workspace/Dict1:\n");
-		ddcb_hexdump(stderr, wsp->dict[1], ZEDC_DICT_LEN);
+		ddcb_hexdump(zedc_log, wsp->dict[1], ZEDC_DICT_LEN);
 
 		pr_info("Workspace/Tree:\n");
-		ddcb_hexdump(stderr, wsp->tree, ZEDC_TREE_LEN);
+		ddcb_hexdump(zedc_log, wsp->tree, ZEDC_TREE_LEN);
 	}
 }
 

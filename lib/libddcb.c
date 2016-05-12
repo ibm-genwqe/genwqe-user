@@ -155,6 +155,9 @@ void ddcb_hexdump(FILE *fp, const void *buff, unsigned int size)
 	char ascii[17];
 	char str[2] = { 0x0, };
 
+	if (fp == NULL)
+		return;
+
 	for (i = 0; i < size; i++) {
 		if ((i & 0x0f) == 0x00) {
 			fprintf(fp, " %08x:", i);
@@ -564,7 +567,7 @@ static void _done(void)
 			continue;
 
 		if (ddcb_gather_statistics()) {
-			fprintf(stderr,
+			fprintf(libddcb_fd_out,
 				"libddcb statistics for %s\n"
 				"  open    ; %5lld ; %8lld usec\n"
 				"  execute ; %5lld ; %8lld usec\n"
@@ -578,7 +581,7 @@ static void _done(void)
 				(long long)accel->time_close);
 			pthread_mutex_destroy(&accel->slock);
 		}
-		accel_dump_statistics(accel, stderr);
+		accel_dump_statistics(accel, libddcb_fd_out);
 	}
 	return;
 }
