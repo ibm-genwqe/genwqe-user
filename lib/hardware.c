@@ -1451,6 +1451,8 @@ void zedc_hw_init(void)
 	char *card = getenv("ZLIB_CARD");
 	char *xcheck_str = getenv("ZLIB_CROSS_CHECK");
 
+	zedc_set_logfile(zlib_log);
+
 	if (verb != NULL) {
 		int z, c;
 

@@ -479,6 +479,7 @@ int zedc_inflateGetHeader(zedc_streamp strm, gzedc_headerp head);
 /** miscellaneous */
 int zedc_inflateSaveBuffers(zedc_streamp strm, const char *prefix);
 void zedc_lib_debug(int onoff);	/* debug outputs on/off */
+void zedc_set_logfile(FILE *logfile);
 
 /**
  * The application can compare zedc_Version and ZEDC_VERSION for

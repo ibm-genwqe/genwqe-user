@@ -38,6 +38,7 @@
 #include <libzHW.h>
 #include "hw_defs.h"
 
+FILE *zedc_log = NULL;
 int zedc_dbg = 0;
 
 /* lookup table for error text messages */
@@ -77,6 +78,11 @@ static int zedc_nerr = ARRAY_SIZE(zedc_errlist);
 const char *zedc_Version(void)
 {
 	return GIT_VERSION;
+}
+
+void zedc_set_logfile(FILE *logfile)
+{
+  zedc_log = logfile;
 }
 
 int zedc_clearerr(zedc_handle_t zedc)

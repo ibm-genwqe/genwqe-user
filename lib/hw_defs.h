@@ -39,32 +39,37 @@ static inline pid_t gettid(void)
 }
 
 extern int zedc_dbg;
+extern FILE *zedc_log;
 
-#define pr_err(fmt, ...)						\
-	fprintf(stderr, "%08x.%08x %s:%u: Error: " fmt,			\
-		getpid(), gettid(), __FILE__, __LINE__, ## __VA_ARGS__)
+#define pr_err(fmt, ...) do {						\
+		if (zedc_log)						\
+			fprintf(zedc_log, "%08x.%08x %s:%u: Error: " fmt, \
+				getpid(), gettid(), __FILE__, __LINE__,	\
+				## __VA_ARGS__);			\
+	} while (0)
 
 #define pr_warn(fmt, ...) do {						\
-		fprintf(stderr, "%08x.%08x %s:%u: Warn: " fmt,		\
-			getpid(), gettid(), __FILE__, __LINE__,		\
-			## __VA_ARGS__);				\
+		if (zedc_log)						\
+			fprintf(zedc_log, "%08x.%08x %s:%u: Warn: " fmt, \
+				getpid(), gettid(), __FILE__, __LINE__,	\
+				## __VA_ARGS__);			\
 	} while (0)
 
 #define	pr_dbg(fmt, ...) do {						\
-		if (zedc_dbg)						\
-			fprintf(stderr, fmt, ## __VA_ARGS__);		\
+		if (zedc_log && zedc_dbg)				\
+			fprintf(zedc_log, fmt, ## __VA_ARGS__);		\
 	} while (0)
 
 #define	pr_info(fmt, ...) do {						\
-		if (zedc_dbg)						\
-			fprintf(stderr, "%08x.%08x %s:%u: Info: " fmt,	\
+		if (zedc_log && zedc_dbg)				\
+			fprintf(zedc_log, "%08x.%08x %s:%u: Info: " fmt, \
 				getpid(), gettid(), __FILE__, __LINE__,	\
 				## __VA_ARGS__);			\
 	} while (0)
 
 #define	pr_log(dbg, fmt, ...) do {					\
-		if ((dbg))						\
-			fprintf(stderr, "%08x.%08x %s:%u: Info: " fmt,	\
+		if (zedc_log && (dbg))					\
+			fprintf(zedc_log, "%08x.%08x %s:%u: Info: " fmt, \
 				getpid(), gettid(), __FILE__, __LINE__,	\
 				## __VA_ARGS__);			\
 	} while (0)
