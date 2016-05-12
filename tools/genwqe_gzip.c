@@ -669,8 +669,10 @@ int main(int argc, char **argv)
 	SET_BINARY_MODE(stdin);
 	SET_BINARY_MODE(stdout);
 
-	if (strstr(prog, "gunzip") != 0)
+	if (strstr(prog, "gunzip") != 0) {
 		compress = false;
+		CHUNK_o *= 4; /* adjust default output buffer size to avoid memcpy */
+	}
 
 	while (1) {
 		int ch;
