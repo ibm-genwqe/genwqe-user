@@ -352,7 +352,7 @@ static void usage(FILE *fp, char *prog, int argc, char *argv[])
 		"  -i, --i_bufsize   input buffer size (%d KiB)\n"
 		"  -o, --o_bufsize   output buffer size (%d KiB)\n"
 		"  -N, --name=NAME   write NAME into gzip header\n"
-		"  -C, --commente=CM write CM into gzip header\n"
+		"  -C, --comment=CM  write CM into gzip header\n"
 		"  -E, --extra=EXTRA write EXTRA (file) into gzip header\n"
 		"\n"
 		"With no FILE, or when FILE is -, read standard input.\n"
