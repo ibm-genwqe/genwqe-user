@@ -57,6 +57,7 @@
 #define	NUM_DDCBS		4  /* DDCB queue length */
 
 extern int libddcb_verbose;
+extern FILE *libddcb_fd_out;
 
 #include <sys/syscall.h>   /* For SYS_xxx definitions */
 
@@ -66,25 +67,26 @@ static inline pid_t gettid(void)
 }
 
 #define VERBOSE0(fmt, ...) do {						\
-		fprintf(stderr, "%08x.%08x: " fmt,			\
-			getpid(), gettid(), ## __VA_ARGS__);		\
+		if (libddcb_fd_out)					\
+			fprintf(libddcb_fd_out, "%08x.%08x: " fmt,	\
+				getpid(), gettid(), ## __VA_ARGS__);	\
 	} while (0)
 
 #define VERBOSE1(fmt, ...) do {						\
-		if (libddcb_verbose > 0)				\
-			fprintf(stderr, "%08x.%08x: " fmt,		\
+		if (libddcb_fd_out && (libddcb_verbose > 0))		\
+			fprintf(libddcb_fd_out, "%08x.%08x: " fmt,	\
 				getpid(), gettid(), ## __VA_ARGS__);	\
 	} while (0)
 
 #define VERBOSE2(fmt, ...) do {						\
-		if (libddcb_verbose > 1)				\
-			fprintf(stderr, "%08x.%08x: " fmt,		\
+		if (libddcb_fd_out && (libddcb_verbose > 1))		\
+			fprintf(libddcb_fd_out, "%08x.%08x: " fmt,	\
 				getpid(), gettid(), ## __VA_ARGS__);	\
 	} while (0)
 
 #define VERBOSE3(fmt, ...) do {						\
-		if (libddcb_verbose > 3)				\
-			fprintf(stderrr, "%08x.%08x: " fmt,		\
+		if (libddcb_fd_out && (libddcb_verbose > 3))		\
+			fprintf(libddcb_fd_out, "%08x.%08x: " fmt,	\
 				getpid(), gettid(), ## __VA_ARGS__);	\
 	} while (0)
 
@@ -219,9 +221,9 @@ static void rt_trace_dump(void)
 	VERBOSE0("Index: %d Warp: %d\n", trc_idx, trc_wrap);
 	for (i = 0; i < RT_TRACE_SIZE; i++) {
 		if (0 == trc_buff[i].tok) break;
-		fprintf(stderr, "%03d: %04d : %04x - %04x - %04x - %p\n",
-			i, trc_buff[i].tid, trc_buff[i].tok,
-			trc_buff[i].n1, trc_buff[i].n2, trc_buff[i].p);
+		VERBOSE0("%03d: %04d : %04x - %04x - %04x - %p\n",
+			 i, trc_buff[i].tid, trc_buff[i].tok,
+			 trc_buff[i].n1, trc_buff[i].n2, trc_buff[i].p);
 	}
 	trc_idx = 0;
 	pthread_mutex_unlock(&trc_lock);
@@ -260,7 +262,7 @@ static inline void cmd_2_ddcb(ddcb_t *pddcb, struct ddcb_cmd *cmd,
 	if (libddcb_verbose > 3) {
 		VERBOSE0("DDCB [%016llx] Seqnum 0x%x before execution:\n",
 			(long long)(unsigned long)(void *)pddcb, seqnum);
-		ddcb_hexdump(stderr, pddcb, sizeof(ddcb_t));
+		ddcb_hexdump(libddcb_fd_out, pddcb, sizeof(ddcb_t));
 	}
 }
 
@@ -291,6 +293,9 @@ static void afu_print_status(struct cxl_afu_h *afu_h, FILE *fp)
 	int i;
 	uint64_t addr, reg;
 	long cr_device = -1, cr_vendor = -1, cr_class = -1;
+
+	if (fp == NULL)
+		return;
 
 	cxl_get_cr_device(afu_h, 0, &cr_device);
 	cxl_get_cr_vendor(afu_h, 0, &cr_vendor);
@@ -477,7 +482,7 @@ static int __afu_open(struct dev_ctx *ctx)
 	ctx->cid_id = (int)mmio_dat & 0xffff;	/* only need my context */
 
 	if (libddcb_verbose > 1)
-		afu_print_status(ctx->afu_h, stderr);
+		afu_print_status(ctx->afu_h, libddcb_fd_out);
 	ctx->verify = ctx;
 	VERBOSE1("       [%s] AFU[%d:%d] Exit rc: %d\n", __func__,
 		ctx->card_no, ctx->cid_id, rc);
@@ -552,7 +557,7 @@ static inline int __afu_close(struct dev_ctx *ctx, bool force)
 		}
 	}
 	if (libddcb_verbose > 1)
-		afu_print_status(ctx->afu_h, stderr);
+		afu_print_status(ctx->afu_h, libddcb_fd_out);
 
 	cxl_mmio_unmap(afu_h);
 	cxl_afu_free(afu_h);
@@ -570,7 +575,7 @@ static void afu_dump_queue(struct dev_ctx *ctx)
 
 	for (i = 0, ddcb = &ctx->ddcb[0]; i < ctx->ddcb_num; i++, ddcb++) {
 		VERBOSE0("DDCB %d [%016llx]\n", i, (long long)ddcb);
-		ddcb_hexdump(stderr, ddcb, sizeof(ddcb_t));
+		ddcb_hexdump(libddcb_fd_out, ddcb, sizeof(ddcb_t));
 	}
 }
 
@@ -936,7 +941,7 @@ static bool __ddcb_done_post(struct dev_ctx *ctx, int compl_code)
 			 "compl_code: %d retc16: %4.4x\n",
 			ctx->card_no, ctx->cid_id, idx, (long long)ddcb, compl_code,
 			ddcb->retc_16);
-		ddcb_hexdump(stderr, ddcb, sizeof(ddcb_t));
+		ddcb_hexdump(libddcb_fd_out, ddcb, sizeof(ddcb_t));
 	}
 
 	/* Copy the ddcb back to cmd, and check for error */
@@ -1090,7 +1095,7 @@ static int __ddcb_process_irqs(struct dev_ctx *ctx)
 		 */
 		if (rc < 0) {
 			VERBOSE0("ERROR: waiting for interrupt! rc: %d\n", rc);
-			afu_print_status(ctx->afu_h, stderr);
+			afu_print_status(ctx->afu_h, libddcb_fd_out);
 			while (__ddcb_done_post(ctx, DDCB_ERR_SELECTFAIL)) {
 				/* empty */
 			}
@@ -1133,7 +1138,7 @@ static int __ddcb_process_irqs(struct dev_ctx *ctx)
 				ctx->event.fault.flags,
 				(long long)ctx->event.fault.addr,
 				(long long)ctx->event.fault.dsisr);
-			afu_print_status(ctx->afu_h, stderr);
+			afu_print_status(ctx->afu_h, libddcb_fd_out);
 			afu_dump_queue(ctx);
 			rt_trace_dump();
 			while (__ddcb_done_post(ctx, DDCB_ERR_EVENTFAIL)) {
@@ -1145,7 +1150,7 @@ static int __ddcb_process_irqs(struct dev_ctx *ctx)
 				 "error: 0x%016llx\n",
 				ctx->event.afu_error.flags,
 				(long long)ctx->event.afu_error.error);
-			afu_print_status(ctx->afu_h, stderr);
+			afu_print_status(ctx->afu_h, libddcb_fd_out);
 			while (__ddcb_done_post(ctx, DDCB_ERR_EVENTFAIL)) {
 				/* empty */
 			}
@@ -1396,6 +1401,9 @@ static void __dev_dump(struct dev_ctx *ctx, FILE *fp)
 	unsigned int i;
 	bool work_done = false;
 
+	if (fp == NULL)
+		return;
+
 	for (i = 0; i < NUM_DDCBS + 1; i++) {
 		if (0 != ctx->completed_tasks[i]) {
 			work_done = true;
@@ -1404,7 +1412,9 @@ static void __dev_dump(struct dev_ctx *ctx, FILE *fp)
 	}
 	if (false == work_done)
 		return;	/* Exit if not used */
-	/* Keep this in a single print so we do not get mixed lines from  other process */
+
+	/* Keep this in a single print so we do not get mixed lines
+	   from other process */
 	fprintf(fp, "  AFU[%d:%d] irqs: %d] Completed DDCBs: %lld\n"
 		    "  Stats: %d(wait), %d(x1), %d(x2), %d(x3), %d(x4 an more)\n",
 		ctx->card_no, ctx->cid_id, ctx->process_irqs,

@@ -38,6 +38,7 @@
 #include <libzHW.h>
 #include "hw_defs.h"
 
+FILE *zedc_log = NULL;
 int zedc_dbg = 0;
 
 /* lookup table for error text messages */
@@ -77,6 +78,11 @@ static int zedc_nerr = ARRAY_SIZE(zedc_errlist);
 const char *zedc_Version(void)
 {
 	return GIT_VERSION;
+}
+
+void zedc_set_logfile(FILE *logfile)
+{
+  zedc_log = logfile;
 }
 
 int zedc_clearerr(zedc_handle_t zedc)
@@ -233,13 +239,13 @@ void zedc_asiv_infl_print(zedc_streamp strm)
 
 	if (zedc_dbg > 3) {
 		pr_info("Workspace/Dict0:\n");
-		ddcb_hexdump(stderr, wsp->dict[0], ZEDC_DICT_LEN);
+		ddcb_hexdump(zedc_log, wsp->dict[0], ZEDC_DICT_LEN);
 
 		pr_info("Workspace/Dict1:\n");
-		ddcb_hexdump(stderr, wsp->dict[1], ZEDC_DICT_LEN);
+		ddcb_hexdump(zedc_log, wsp->dict[1], ZEDC_DICT_LEN);
 
 		pr_info("Workspace/Tree:\n");
-		ddcb_hexdump(stderr, wsp->tree, ZEDC_TREE_LEN);
+		ddcb_hexdump(zedc_log, wsp->tree, ZEDC_TREE_LEN);
 	}
 }
 
@@ -328,9 +334,9 @@ void zedc_asv_defl_print(zedc_streamp strm, int dbg)
 
 	if (dbg) {
 		pr_log(dbg, "  OBITS:\n");
-		ddcb_hexdump(stderr, asv->obits, ZEDC_ONUMBYTES_v1);
+		ddcb_hexdump(zedc_log, asv->obits, ZEDC_ONUMBYTES_v1);
 		pr_log(dbg, "  OBITS_EXTRA:\n");
-		ddcb_hexdump(stderr, asv->obits_extra, ZEDC_ONUMBYTES_EXTRA);
+		ddcb_hexdump(zedc_log, asv->obits_extra, ZEDC_ONUMBYTES_EXTRA);
 	}
 }
 
@@ -384,13 +390,13 @@ void zedc_asv_infl_print(zedc_streamp strm)
 
 	if (zedc_dbg > 3) {
 		pr_info("Workspace/Dict0:\n");
-		ddcb_hexdump(stderr, wsp->dict[0], ZEDC_DICT_LEN);
+		ddcb_hexdump(zedc_log, wsp->dict[0], ZEDC_DICT_LEN);
 
 		pr_info("Workspace/Dict1:\n");
-		ddcb_hexdump(stderr, wsp->dict[1], ZEDC_DICT_LEN);
+		ddcb_hexdump(zedc_log, wsp->dict[1], ZEDC_DICT_LEN);
 
 		pr_info("Workspace/Tree:\n");
-		ddcb_hexdump(stderr, wsp->tree, ZEDC_TREE_LEN);
+		ddcb_hexdump(zedc_log, wsp->tree, ZEDC_TREE_LEN);
 	}
 }
 
