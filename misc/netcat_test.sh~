@@ -1,0 +1,35 @@
+#!/bin/bash
+#
+# Example:
+#  http://www.screenage.de/blog/2007/12/30/using-netcat-and-tar-for-network-file-transfer/
+#
+
+if [ $1 = -receiver ]; then
+    echo "Tidy up ..."
+    rm -f linux_from_tul2.*
+
+    echo "Receive plain tar ..."
+    time nc -w 10 tul2 7878 > linux_from_tul2.tar
+    sleep 5
+
+    echo "Receive software tar.gz ..."
+    time nc -w 10 tul2 7878 > linux_from_tul2.sw.tar.gz
+    sleep 5
+
+    echo "Receive hardware tar.gz ..."
+    time nc -w 10 tul2 7878 > linux_from_tul2.hw.tar.gz
+    sleep 5
+
+else
+
+    echo "Send plain tar ..."
+    time tar c linux | nc -q 1 -l -p 7878
+
+    echo "Send software tar.gz ..."
+    time tar cz linux | nc -q 1 -l -p 7878
+
+    echo "Send hardware tar.gz ..."
+    time PATH=/usr/bin/genwqe:$PATH ZLIB_TRACE=0x0 ZLIB_ACCELERATOR=CAPI tar cz linux | nc -q 1 -l -p 7878
+
+
+fi
