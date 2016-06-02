@@ -18,6 +18,8 @@
 #
 # Test-script to measure and tune performance of zlib soft- or hardware
 # implementation. In combination with netcat and tar/gzip.
+# Unless being executed in a tmpfs/ramdisk this test also measure I/O
+# to read and write data.
 #
 
 # FIXME Adjust to your needs ...
@@ -37,19 +39,27 @@ if [ $1 = -receiver ]; then
     echo "; ${duration}"
     sleep 5
 
-    echo -n " (2) Receive sw.tar.gz ...                   "
+    echo -n " (2) Receive tar and extract it ...          "
+    mkdir -p linux_from_tul2
+    (time nc -w 10 ${sender} 7878 | \
+	tar x -C linux_from_tul2 --strip-components=1) 2> output.stderr
+    duration=`grep real output.stderr | perl -e '$a=<STDIN>; $a=~m/([0-9]*)m([0-9]*)\.([0-9]*)/; $sec=$1*60+$2; $msec=$3; print "$sec,$msec"'`
+    echo "; ${duration}"
+    sleep 5
+
+    echo -n " (3) Receive sw.tar.gz ...                   "
     (time nc -w 10 ${sender} 7878 > linux_from_tul2.sw.tar.gz) 2> output.stderr
     duration=`grep real output.stderr | perl -e '$a=<STDIN>; $a=~m/([0-9]*)m([0-9]*)\.([0-9]*)/; $sec=$1*60+$2; $msec=$3; print "$sec,$msec"'`
     echo "; ${duration}"
     sleep 5
 
-    echo -n " (3) Receive hw.tar.gz ...                   "
+    echo -n " (4) Receive hw.tar.gz ...                   "
     (time nc -w 10 ${sender} 7878 > linux_from_tul2.hw.tar.gz) 2> output.stderr
     duration=`grep real output.stderr | perl -e '$a=<STDIN>; $a=~m/([0-9]*)m([0-9]*)\.([0-9]*)/; $sec=$1*60+$2; $msec=$3; print "$sec,$msec"'`
     echo "; ${duration}"
     sleep 5
 
-    echo -n " (4) Receive and extract hw.tar.gz in hw ... "
+    echo -n " (5) Receive and extract hw.tar.gz in hw ... "
     mkdir -p linux_from_tul2.hw
     (time nc -w 10 ${sender} 7878 | \
 	PATH=/usr/bin/genwqe:$PATH ZLIB_TRACE=0x0 ZLIB_ACCELERATOR=CAPI \
@@ -59,7 +69,7 @@ if [ $1 = -receiver ]; then
     echo "; ${duration}"
     sleep 5
 
-    echo -n " (5) Receive and extract hw.tar.gz in sw ... "
+    echo -n " (6) Receive and extract hw.tar.gz in sw ... "
     mkdir -p linux_from_tul2.sw
     (time nc -w 10 ${sender} 7878 | \
 	tar xz -C linux_from_tul2.sw \
@@ -75,18 +85,21 @@ if [ $1 = -sender ]; then
     echo " (1) Send tar ..."
     time tar c linux | nc -q 1 -l -p 7878
 
-    echo " (2) Send sw.tar.gz ..."
-    time tar cz linux | nc -q 1 -l -p 7878
+    echo " (2) Send tar ..."
+    time tar c linux | nc -q 1 -l -p 7878
 
-    echo " (3) Send hw.tar.gz ..."
-    time PATH=/usr/bin/genwqe:$PATH ZLIB_TRACE=0x0 ZLIB_ACCELERATOR=CAPI \
-	tar cz linux | nc -q 1 -l -p 7878
+    echo " (3) Send sw.tar.gz ..."
+    time tar cz linux | nc -q 1 -l -p 7878
 
     echo " (4) Send hw.tar.gz ..."
     time PATH=/usr/bin/genwqe:$PATH ZLIB_TRACE=0x0 ZLIB_ACCELERATOR=CAPI \
 	tar cz linux | nc -q 1 -l -p 7878
 
     echo " (5) Send hw.tar.gz ..."
+    time PATH=/usr/bin/genwqe:$PATH ZLIB_TRACE=0x0 ZLIB_ACCELERATOR=CAPI \
+	tar cz linux | nc -q 1 -l -p 7878
+
+    echo " (6) Send hw.tar.gz ..."
     time PATH=/usr/bin/genwqe:$PATH ZLIB_TRACE=0x0 ZLIB_ACCELERATOR=CAPI \
 	tar cz linux | nc -q 1 -l -p 7878
 
