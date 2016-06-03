@@ -25,6 +25,13 @@
 # FIXME Adjust to your needs ...
 sender=tul2
 
+function extract_real_time() {
+    local file=$1;
+
+    duration=`grep real $file | perl -e '$a=<STDIN>; $a=~m/([0-9]*)m([0-9]*)\.([0-9]*)/; $sec=$1*60+$2; $msec=$3; print "$sec,$msec"'`
+    echo "; ${duration}"
+}
+
 function usage() {
     echo "netcat_test.sh [-sender|-receiver]"
 }
@@ -33,73 +40,109 @@ if [ $1 = -receiver ]; then
     echo "Tidy up ..."
     rm -rf linux_from_tul2.*
 
-    echo -n " (1) Receive tar ...                         "
-    (time nc -w 10 ${sender} 7878 > linux_from_tul2.tar) 2> output.stderr
-    duration=`grep real output.stderr | perl -e '$a=<STDIN>; $a=~m/([0-9]*)m([0-9]*)\.([0-9]*)/; $sec=$1*60+$2; $msec=$3; print "$sec,$msec"'`
-    echo "; ${duration}"
+    echo -n " (1) Receive plain tar ...                   "
+    sync
+    (time nc -w 10 ${sender} 7878 > linux_from_tul2.plain.tar) 2> output.stderr
+    extract_real_time output.stderr
     sleep 5
 
-    echo -n " (2) Receive tar and extract it ...          "
+    echo -n " (2) Receive plain hw.tar.gz ...             "
+    sync
+    (time nc -w 10 ${sender} 7878 > linux_from_tul2.plain.hw.tar.gz) 2> output.stderr
+    extract_real_time output.stderr
+    sleep 5
+
+    echo -n " (3) Receive plain sw.tar.gz ...             "
+    sync
+    (time nc -w 10 ${sender} 7878 > linux_from_tul2.plain.sw.tar.gz) 2> output.stderr
+    extract_real_time output.stderr
+    sleep 5
+
+    echo -n " (4) Receive generated tar ...               "
+    sync
+    (time nc -w 10 ${sender} 7878 > linux_from_tul2.generated.tar) 2> output.stderr
+    extract_real_time output.stderr
+    sleep 5
+
+    echo -n " (5) Receive tar and extract it ...          "
     mkdir -p linux_from_tul2
+    sync
     (time nc -w 10 ${sender} 7878 | \
 	tar x -C linux_from_tul2 --strip-components=1) 2> output.stderr
-    duration=`grep real output.stderr | perl -e '$a=<STDIN>; $a=~m/([0-9]*)m([0-9]*)\.([0-9]*)/; $sec=$1*60+$2; $msec=$3; print "$sec,$msec"'`
-    echo "; ${duration}"
+    extract_real_time output.stderr
     sleep 5
 
-    echo -n " (3) Receive sw.tar.gz ...                   "
-    (time nc -w 10 ${sender} 7878 > linux_from_tul2.sw.tar.gz) 2> output.stderr
-    duration=`grep real output.stderr | perl -e '$a=<STDIN>; $a=~m/([0-9]*)m([0-9]*)\.([0-9]*)/; $sec=$1*60+$2; $msec=$3; print "$sec,$msec"'`
-    echo "; ${duration}"
+    echo -n " (6) Receive sw.tar.gz ...                   "
+    sync
+    (time nc -w 10 ${sender} 7878 > linux_from_tul2.generated.sw.tar.gz) 2> output.stderr
+    extract_real_time output.stderr
     sleep 5
 
-    echo -n " (4) Receive hw.tar.gz ...                   "
-    (time nc -w 10 ${sender} 7878 > linux_from_tul2.hw.tar.gz) 2> output.stderr
-    duration=`grep real output.stderr | perl -e '$a=<STDIN>; $a=~m/([0-9]*)m([0-9]*)\.([0-9]*)/; $sec=$1*60+$2; $msec=$3; print "$sec,$msec"'`
-    echo "; ${duration}"
+    echo -n " (7) Receive hw.tar.gz ...                   "
+    (time nc -w 10 ${sender} 7878 > linux_from_tul2.generated.hw.tar.gz) 2> output.stderr
+    extract_real_time output.stderr
     sleep 5
 
-    echo -n " (5) Receive and extract hw.tar.gz in hw ... "
+    echo -n " (8) Receive and extract hw.tar.gz in hw ... "
     mkdir -p linux_from_tul2.hw
+    sync
     (time nc -w 10 ${sender} 7878 | \
 	PATH=/usr/bin/genwqe:$PATH ZLIB_TRACE=0x0 ZLIB_ACCELERATOR=CAPI \
 	tar xz -C linux_from_tul2.hw \
 	--strip-components=1) 2> output.stderr
-    duration=`grep real output.stderr | perl -e '$a=<STDIN>; $a=~m/([0-9]*)m([0-9]*)\.([0-9]*)/; $sec=$1*60+$2; $msec=$3; print "$sec,$msec"'`
-    echo "; ${duration}"
+    extract_real_time output.stderr
     sleep 5
 
-    echo -n " (6) Receive and extract hw.tar.gz in sw ... "
+    echo -n " (9) Receive and extract hw.tar.gz in sw ... "
+    sync
     mkdir -p linux_from_tul2.sw
     (time nc -w 10 ${sender} 7878 | \
 	tar xz -C linux_from_tul2.sw \
 	--strip-components=1) 2> output.stderr
-    duration=`grep real output.stderr | perl -e '$a=<STDIN>; $a=~m/([0-9]*)m([0-9]*)\.([0-9]*)/; $sec=$1*60+$2; $msec=$3; print "$sec,$msec"'`
-    echo "; ${duration}"
+    extract_real_time output.stderr
     sleep 5
 
     exit 0
 fi
 
 if [ $1 = -sender ]; then
+    echo " (1a) Generate tar if it is not exsiting yet ..."
+    if [ ! -f linux.tar ]; then
+	time tar cf linux.tar linux
+    else
+	echo "    linux.tar already existing, skipping"
+    fi
+    du -ch linux.tar
+    echo "Please start receiver now."
+    
     echo " (1) Send tar ..."
-    time tar c linux | nc -q 1 -l -p 7878
+    cat linux.tar | nc -q 1 -l -p 7878
 
-    echo " (2) Send tar ..."
-    time tar c linux | nc -q 1 -l -p 7878
+    echo " (2) Send hw.tar.gz ..."
+    time PATH=/usr/bin/genwqe:$PATH ZLIB_TRACE=0x0 ZLIB_ACCELERATOR=CAPI \
+	time genwqe_gzip -c linux.tar | nc -q 1 -l -p 7878
 
     echo " (3) Send sw.tar.gz ..."
+    time gzip -c linux.tar | nc -q 1 -l -p 7878
+
+    echo " (4) Generate and send tar ..."
+    time tar c linux | nc -q 1 -l -p 7878
+
+    echo " (5) Generate and send tar ..."
+    time tar c linux | nc -q 1 -l -p 7878
+
+    echo " (6) Generate and send sw.tar.gz ..."
     time tar cz linux | nc -q 1 -l -p 7878
 
-    echo " (4) Send hw.tar.gz ..."
+    echo " (7) Generate and send hw.tar.gz ..."
     time PATH=/usr/bin/genwqe:$PATH ZLIB_TRACE=0x0 ZLIB_ACCELERATOR=CAPI \
 	tar cz linux | nc -q 1 -l -p 7878
 
-    echo " (5) Send hw.tar.gz ..."
+    echo " (8) Generate and send hw.tar.gz ..."
     time PATH=/usr/bin/genwqe:$PATH ZLIB_TRACE=0x0 ZLIB_ACCELERATOR=CAPI \
 	tar cz linux | nc -q 1 -l -p 7878
 
-    echo " (6) Send hw.tar.gz ..."
+    echo " (9) Generate and send hw.tar.gz ..."
     time PATH=/usr/bin/genwqe:$PATH ZLIB_TRACE=0x0 ZLIB_ACCELERATOR=CAPI \
 	tar cz linux | nc -q 1 -l -p 7878
 
