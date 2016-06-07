@@ -107,6 +107,11 @@ fi
 
 if [ $1 = -sender ]; then
     echo " (1a) Generate tar if it is not exsiting yet ..."
+
+    if [ ! -d linux ]; then
+	echo "linux directory missing, needed to perform this measurement!"
+	exit 1
+    fi
     if [ ! -f linux.tar ]; then
 	time tar cf linux.tar linux
     else
