@@ -208,7 +208,7 @@ const char *accel_strerror(accel_t card, int card_rc); /* card errcode */
 
 void ddcb_hexdump(FILE *fp, const void *buff, unsigned int size);
 void ddcb_debug(int verbosity);
-void ddcb_debug_log(FILE *fd_out);
+void ddcb_set_logfile(FILE *fd_out);
 
 /**
  * @brief Get accel_handle

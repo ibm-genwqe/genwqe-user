@@ -1451,7 +1451,7 @@ void zedc_hw_init(void)
 	char *card = getenv("ZLIB_CARD");
 	char *xcheck_str = getenv("ZLIB_CROSS_CHECK");
 
-	ddcb_debug_log(zlib_log);
+	ddcb_set_logfile(zlib_log);
 	zedc_set_logfile(zlib_log);
 
 	if (verb != NULL) {
@@ -1504,8 +1504,10 @@ void zedc_hw_done(void)
 	unsigned int card_no;
 	int flags = (zlib_inflate_flags | zlib_deflate_flags);
 
-	zedc_set_logfile(NULL);
-	ddcb_debug_log(NULL);
+	if (zlib_log != stderr) {
+		zedc_set_logfile(NULL);
+		ddcb_set_logfile(NULL);
+	}
 
 	if ((flags & ZLIB_FLAG_CACHE_HANDLES) == 0x0)
 		return;

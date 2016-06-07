@@ -191,7 +191,7 @@ void ddcb_debug(int verbosity)
 	libddcb_verbose = verbosity;
 }
 
-void ddcb_debug_log(FILE *fd_out)
+void ddcb_set_logfile(FILE *fd_out)
 {
 	libddcb_fd_out  = fd_out;
 }
