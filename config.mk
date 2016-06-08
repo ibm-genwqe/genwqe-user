@@ -134,11 +134,12 @@ CONFIG_LIBCXL_PATH ?= ../../pslse/libcxl
 CFLAGS += -DCONFIG_BUILD_SIMCODE -I../ext/include
 endif
 
+CFLAGS += -I../include
 # Can be overwritten by makfile option
 ifeq ($(BUNDLE_LIBCXL),1)
 WITH_LIBCXL=1
 CONFIG_LIBCXL_PATH ?= ../ext/libcxl
-CFLAGS += -I../ext/include -I../include
+CFLAGS += -I../ext/include
 endif
 
 # Finally, set any path needed.
