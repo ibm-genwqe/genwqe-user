@@ -35,6 +35,12 @@
 #include <libcxl.h>
 #include "afu_regs.h"
 
+/*
+ * This needs to be in sync with the max number of cards supported in
+ * ddcb_capi.c.
+ */
+#define NUM_CARDS 4 /* max number of CAPI cards in system */
+
 static const char *version = GIT_VERSION;
 static int verbose = 0;
 static FILE *fd_out;
@@ -568,9 +574,9 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if ((mctx->card < 0) || (mctx->card > 1)) {
-		fprintf(stderr, "%d for Option -C is invalid, please provide "
-			"either 0 or 1 !\n", mctx->card);
+	if ((mctx->card < 0) || (mctx->card >= NUM_CARDS)) {
+		fprintf(stderr, "Err: %d for option -C is invalid, please provide "
+			"0..%d!\n", mctx->card, NUM_CARDS-1);
 		exit(EXIT_FAILURE);
 	}
 
@@ -635,7 +641,8 @@ int main(int argc, char *argv[])
 	if (0 != afu_m_open(mctx)) {
 		VERBOSE0("Err: failed to open Master Context for "
 			 "CAPI Card: %u\n"
-			 "\tCheck Permissions in /dev/cxl/* or kernel log.\n"
+			 "\tCheck existence/permissions of /dev/cxl/* or see "
+			 "kernel logfile.\n"
 			 "\terrno=%d %s\n",
 			 mctx->card, errno, strerror(errno));
 		exit(EXIT_FAILURE);
