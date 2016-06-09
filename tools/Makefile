@@ -44,10 +44,10 @@ projs += genwqe_maint genwqe_loadtree
 CAPI_INSTALL=capi_install
 
 # If we are bundling, we need to link statically.  Otherwise, go dynamic.
-ifdef BUNDLE_LIBCXL
+ifeq ($(BUNDLE_LIBCXL),1)
 LDLIBS += $(libcxl_a)
 else
-LDLIBS = -lcxl
+LDLIBS += -lcxl
 endif # !CONFIG_LIBCXL_PATH
 
 endif # WITH_LIBCXL
