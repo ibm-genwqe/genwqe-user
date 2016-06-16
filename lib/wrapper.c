@@ -81,8 +81,8 @@ unsigned int zlib_inflate_flags = (CONFIG_INFLATE_IMPL & ~ZLIB_IMPL_MASK);
 unsigned int zlib_deflate_flags = (CONFIG_DEFLATE_IMPL & ~ZLIB_IMPL_MASK);
 
 static unsigned int zlib_inflate_threshold = CONFIG_INFLATE_THRESHOLD;
-static pthread_mutex_t stats_mutex; /* mutex to protect global statistics */
-static struct zlib_stats stats;	/* global statistics */
+static pthread_mutex_t zlib_stats_mutex; /* mutex to protect global stats */
+static struct zlib_stats zlib_stats;	/* global statistics */
 
 /**
  * wrapper internal_state, hw/sw have different view of what
@@ -286,7 +286,7 @@ static void _init(void)
 		 zlib_inflate_impl, zlib_deflate_impl, zlib_inflate_threshold);
 
 	if (zlib_gather_statistics()) {
-		rc = pthread_mutex_init(&stats_mutex, NULL);
+		rc = pthread_mutex_init(&zlib_stats_mutex, NULL);
 		if (rc != 0)
 			pr_err("initializing phtread_mutex failed!\n");
 	}
@@ -304,13 +304,13 @@ static void __deflate_update_totals(z_streamp strm)
 		total_in_slot = strm->total_in / 4096;
 		if (total_in_slot >= ZLIB_SIZE_SLOTS)
 			total_in_slot = ZLIB_SIZE_SLOTS - 1;
-		stats.deflate_total_in[total_in_slot]++;
+		zlib_stats.deflate_total_in[total_in_slot]++;
 	}
 	if (strm->total_out) {
 		total_out_slot = strm->total_out / 4096;
 		if (total_out_slot >= ZLIB_SIZE_SLOTS)
 			total_out_slot = ZLIB_SIZE_SLOTS - 1;
-		stats.deflate_total_out[total_out_slot]++;
+		zlib_stats.deflate_total_out[total_out_slot]++;
 	}
 }
 
@@ -322,14 +322,14 @@ static void __inflate_update_totals(z_streamp strm)
 		total_in_slot = strm->total_in / 4096;
 		if (total_in_slot >= ZLIB_SIZE_SLOTS)
 			total_in_slot = ZLIB_SIZE_SLOTS - 1;
-		stats.inflate_total_in[total_in_slot]++;
+		zlib_stats.inflate_total_in[total_in_slot]++;
 	}
 
 	if (strm->total_out) {
 		total_out_slot = strm->total_out / 4096;
 		if (total_out_slot >= ZLIB_SIZE_SLOTS)
 			total_out_slot = ZLIB_SIZE_SLOTS - 1;
-		stats.inflate_total_out[total_out_slot]++;
+		zlib_stats.inflate_total_out[total_out_slot]++;
 	}
 }
 
@@ -341,9 +341,9 @@ static void __inflate_update_totals(z_streamp strm)
 static void __print_stats(void)
 {
 	unsigned int i;
-	struct zlib_stats *s = &stats;
+	struct zlib_stats *s = &zlib_stats;
 
-	pthread_mutex_lock(&stats_mutex);
+	pthread_mutex_lock(&zlib_stats_mutex);
 	pr_info("deflateInit: %ld\n", s->deflateInit);
 	pr_info("deflate: %ld sw: %ld hw: %ld\n",
 		s->deflate[ZLIB_SW_IMPL] + s->deflate[ZLIB_HW_IMPL],
@@ -464,7 +464,7 @@ static void __print_stats(void)
 	if (s->crc32_combine)
 		pr_info("crc32_combine: %ld\n", s->crc32_combine);
 
-	pthread_mutex_unlock(&stats_mutex);
+	pthread_mutex_unlock(&zlib_stats_mutex);
 }
 
 /**
@@ -528,9 +528,9 @@ int deflateInit2_(z_streamp strm,
 		return Z_STREAM_ERROR;
 
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
-		stats.deflateInit++;
-		pthread_mutex_unlock(&stats_mutex);
+		pthread_mutex_lock(&zlib_stats_mutex);
+		zlib_stats.deflateInit++;
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 
 	w = calloc(1, sizeof(*w));
@@ -583,10 +583,10 @@ int deflateReset(z_streamp strm)
 
 	pr_trace("[%p] deflateReset w=%p impl=%d\n", strm, w, w->impl);
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
-		stats.deflateReset++;
+		pthread_mutex_lock(&zlib_stats_mutex);
+		zlib_stats.deflateReset++;
 		__deflate_update_totals(strm);
-		pthread_mutex_unlock(&stats_mutex);
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 
 	strm->state = w->priv_data;
@@ -616,9 +616,9 @@ int deflateSetDictionary(z_streamp strm,
 		 (long long)z_adler32(1, dictionary, dictLength));
 
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
-		stats.deflateSetDictionary++;
-		pthread_mutex_unlock(&stats_mutex);
+		pthread_mutex_lock(&zlib_stats_mutex);
+		zlib_stats.deflateSetDictionary++;
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 
 	strm->state = w->priv_data;
@@ -644,9 +644,9 @@ int deflateSetHeader(z_streamp strm, gz_headerp head)
 	pr_trace("[%p] deflateSetHeader\n", strm);
 
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
-		stats.deflateSetHeader++;
-		pthread_mutex_unlock(&stats_mutex);
+		pthread_mutex_lock(&zlib_stats_mutex);
+		zlib_stats.deflateSetHeader++;
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 
 	strm->state = w->priv_data;
@@ -670,9 +670,9 @@ int deflatePrime(z_streamp strm, int bits, int value)
 		return Z_STREAM_ERROR;
 
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
-		stats.deflatePrime++;
-		pthread_mutex_unlock(&stats_mutex);
+		pthread_mutex_lock(&zlib_stats_mutex);
+		zlib_stats.deflatePrime++;
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 
 	strm->state = w->priv_data;
@@ -702,9 +702,9 @@ int deflateCopy(z_streamp dest, z_streamp source)
 		return Z_STREAM_ERROR;
 
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
-		stats.deflateCopy++;
-		pthread_mutex_unlock(&stats_mutex);
+		pthread_mutex_lock(&zlib_stats_mutex);
+		zlib_stats.deflateCopy++;
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 
 	w_dest = calloc(1, sizeof(*w_dest));
@@ -751,18 +751,18 @@ int deflate(z_streamp strm, int flush)
 		return Z_STREAM_ERROR;
 
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
+		pthread_mutex_lock(&zlib_stats_mutex);
 		avail_in_slot = strm->avail_in / 4096;
 		if (avail_in_slot >= ZLIB_SIZE_SLOTS)
 			avail_in_slot = ZLIB_SIZE_SLOTS - 1;
-		stats.deflate_avail_in[avail_in_slot]++;
+		zlib_stats.deflate_avail_in[avail_in_slot]++;
 
 		avail_out_slot = strm->avail_out / 4096;
 		if (avail_out_slot >= ZLIB_SIZE_SLOTS)
 			avail_out_slot = ZLIB_SIZE_SLOTS - 1;
-		stats.deflate_avail_out[avail_out_slot]++;
-		stats.deflate[w->impl]++;
-		pthread_mutex_unlock(&stats_mutex);
+		zlib_stats.deflate_avail_out[avail_out_slot]++;
+		zlib_stats.deflate[w->impl]++;
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 
 	pr_trace("[%p] deflate:   flush=%d %s next_in=%p avail_in=%d "
@@ -827,10 +827,10 @@ int deflateEnd(z_streamp strm)
 		return Z_STREAM_ERROR;
 
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
-		stats.deflateEnd++;
+		pthread_mutex_lock(&zlib_stats_mutex);
+		zlib_stats.deflateEnd++;
 		__deflate_update_totals(strm);
-		pthread_mutex_unlock(&stats_mutex);
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 
 	rc = __deflateEnd(strm, w);
@@ -869,9 +869,9 @@ int deflateParams(z_streamp strm, int level, int strategy)
 	w->strategy = strategy;
 
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
-		stats.deflateParams++;
-		pthread_mutex_unlock(&stats_mutex);
+		pthread_mutex_lock(&zlib_stats_mutex);
+		zlib_stats.deflateParams++;
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 
 	pr_trace("[%p] deflateParams level=%d strategy=%d impl=%d\n",
@@ -974,9 +974,9 @@ int inflateInit2_(z_streamp strm, int  windowBits,
 	strm->total_out = 0;
 
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
-		stats.inflateInit++;
-		pthread_mutex_unlock(&stats_mutex);
+		pthread_mutex_lock(&zlib_stats_mutex);
+		zlib_stats.inflateInit++;
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 
 	w = calloc(1, sizeof(*w));
@@ -1046,10 +1046,10 @@ int inflateReset(z_streamp strm)
 	 */
 	pr_trace("[%p] inflateReset\n", strm);
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
-		stats.inflateReset++;
+		pthread_mutex_lock(&zlib_stats_mutex);
+		zlib_stats.inflateReset++;
 		__inflate_update_totals(strm);
-		pthread_mutex_unlock(&stats_mutex);
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 
 	w->allow_switching = true;
@@ -1091,10 +1091,10 @@ int inflateReset2(z_streamp strm, int windowBits)
 	 */
 	pr_trace("[%p] inflateReset2 impl=%d\n", strm, w->impl);
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
-		stats.inflateReset2++;
+		pthread_mutex_lock(&zlib_stats_mutex);
+		zlib_stats.inflateReset2++;
 		__inflate_update_totals(strm);
-		pthread_mutex_unlock(&stats_mutex);
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 
 	w->allow_switching = true;
@@ -1126,9 +1126,9 @@ int inflateSetDictionary(z_streamp strm,
 		return Z_STREAM_ERROR;
 
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
-		stats.inflateSetDictionary++;
-		pthread_mutex_unlock(&stats_mutex);
+		pthread_mutex_lock(&zlib_stats_mutex);
+		zlib_stats.inflateSetDictionary++;
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 
 	strm->state = w->priv_data;
@@ -1177,9 +1177,9 @@ int inflateGetDictionary(z_streamp strm, Bytef *dictionary, uInt *dictLength)
 		return Z_STREAM_ERROR;
 
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
-		stats.inflateGetDictionary++;
-		pthread_mutex_unlock(&stats_mutex);
+		pthread_mutex_lock(&zlib_stats_mutex);
+		zlib_stats.inflateGetDictionary++;
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 
 	strm->state = w->priv_data;
@@ -1218,9 +1218,9 @@ int inflateGetHeader(z_streamp strm, gz_headerp head)
 	pr_trace("[%p] inflateGetHeader: head=%p\n", strm, head);
 
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
-		stats.inflateGetHeader++;
-		pthread_mutex_unlock(&stats_mutex);
+		pthread_mutex_lock(&zlib_stats_mutex);
+		zlib_stats.inflateGetHeader++;
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 
 	w->gzhead = head;
@@ -1241,9 +1241,9 @@ int inflatePrime(z_streamp strm, int bits, int value)
 		return Z_STREAM_ERROR;
 
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
-		stats.inflatePrime++;
-		pthread_mutex_unlock(&stats_mutex);
+		pthread_mutex_lock(&zlib_stats_mutex);
+		zlib_stats.inflatePrime++;
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 
 	strm->state = w->priv_data;
@@ -1267,9 +1267,9 @@ int inflateSync(z_streamp strm)
 		return Z_STREAM_ERROR;
 
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
-		stats.inflateSync++;
-		pthread_mutex_unlock(&stats_mutex);
+		pthread_mutex_lock(&zlib_stats_mutex);
+		zlib_stats.inflateSync++;
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 
 	strm->state = w->priv_data;
@@ -1311,10 +1311,10 @@ int inflateEnd(z_streamp strm)
 		return Z_STREAM_ERROR;
 
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
-		stats.inflateEnd++;
+		pthread_mutex_lock(&zlib_stats_mutex);
+		zlib_stats.inflateEnd++;
 		__inflate_update_totals(strm);
-		pthread_mutex_unlock(&stats_mutex);
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 
 	rc = __inflateEnd(strm, w);
@@ -1434,18 +1434,18 @@ int inflate(z_streamp strm, int flush)
 	}
 
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
+		pthread_mutex_lock(&zlib_stats_mutex);
 		avail_in_slot = strm->avail_in / 4096;
 		if (avail_in_slot >= ZLIB_SIZE_SLOTS)
 			avail_in_slot = ZLIB_SIZE_SLOTS - 1;
-		stats.inflate_avail_in[avail_in_slot]++;
+		zlib_stats.inflate_avail_in[avail_in_slot]++;
 
 		avail_out_slot = strm->avail_out / 4096;
 		if (avail_out_slot >= ZLIB_SIZE_SLOTS)
 			avail_out_slot = ZLIB_SIZE_SLOTS - 1;
-		stats.inflate_avail_out[avail_out_slot]++;
-		stats.inflate[w->impl]++;
-		pthread_mutex_unlock(&stats_mutex);
+		zlib_stats.inflate_avail_out[avail_out_slot]++;
+		zlib_stats.inflate[w->impl]++;
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 
 	pr_trace("[%p] inflate:   flush=%d %s next_in=%p avail_in=%d "
@@ -1515,9 +1515,9 @@ uLong zlibCompileFlags(void)
 uLong adler32(uLong adler, const Bytef *buf, uInt len)
 {
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
-		stats.adler32++;
-		pthread_mutex_unlock(&stats_mutex);
+		pthread_mutex_lock(&zlib_stats_mutex);
+		zlib_stats.adler32++;
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 	pr_trace("adler32(len=%lld)\n", (long long)len);
 
@@ -1532,9 +1532,9 @@ uLong adler32(uLong adler, const Bytef *buf, uInt len)
 uLong adler32_combine(uLong adler1, uLong adler2, z_off_t len2)
 {
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
-		stats.adler32_combine++;
-		pthread_mutex_unlock(&stats_mutex);
+		pthread_mutex_lock(&zlib_stats_mutex);
+		zlib_stats.adler32_combine++;
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 	pr_trace("adler32_combine(len2=%lld)\n", (long long)len2);
 
@@ -1548,9 +1548,9 @@ uLong adler32_combine(uLong adler1, uLong adler2, z_off_t len2)
 uLong crc32(uLong crc, const Bytef *buf, uInt len)
 {
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
-		stats.crc32++;
-		pthread_mutex_unlock(&stats_mutex);
+		pthread_mutex_lock(&zlib_stats_mutex);
+		zlib_stats.crc32++;
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 	pr_trace("crc32(len=%lld)\n", (long long)len);
 
@@ -1565,9 +1565,9 @@ uLong crc32(uLong crc, const Bytef *buf, uInt len)
 uLong crc32_combine(uLong crc1, uLong crc2, z_off_t len2)
 {
 	if (zlib_gather_statistics()) {
-		pthread_mutex_lock(&stats_mutex);
-		stats.crc32_combine++;
-		pthread_mutex_unlock(&stats_mutex);
+		pthread_mutex_lock(&zlib_stats_mutex);
+		zlib_stats.crc32_combine++;
+		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 	pr_trace("crc32_combine(len2=%lld)\n", (long long)len2);
 
@@ -1585,7 +1585,7 @@ static void _done(void)
 {
 	if (zlib_gather_statistics()) {
 		__print_stats();
-		pthread_mutex_destroy(&stats_mutex);
+		pthread_mutex_destroy(&zlib_stats_mutex);
 	}
 
 	zedc_hw_done();
