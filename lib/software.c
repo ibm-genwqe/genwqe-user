@@ -313,6 +313,13 @@ gzFile gzdopen(int fd, const char *mode)
 	return (* p_gzdopen)(fd, mode);
 }
 
+static int (* p_gzbuffer)(gzFile file, unsigned size);
+int gzbuffer(gzFile file, unsigned size)
+{
+	check_sym(p_gzbuffer, -1);
+	return (* p_gzbuffer)(file, size);
+}
+
 static int (* p_gzwrite)(gzFile file, voidpc buf, unsigned len);
 int gzwrite(gzFile file, voidpc buf, unsigned len)
 
@@ -600,6 +607,7 @@ load_syms:
 
 	register_sym(gzopen);
 	register_sym(gzdopen);
+	register_sym(gzbuffer);
 	register_sym(gzwrite);
 	register_sym(gzread);
 	register_sym(gzclose);
