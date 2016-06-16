@@ -118,18 +118,18 @@ uninstall_gzip_tools:
 	      $(DESTDIR)/bin/genwqe_test_gz
 
 install_manpages: $(manpages)
-	@mkdir -p $(DESTDIR)/share/man/man1
-	cp -uv $(manpages) $(DESTDIR)/share/man/man1
+	@mkdir -p $(DESTDIR)/usr/share/man/man1
+	cp -uv $(manpages) $(DESTDIR)/usr/share/man/man1
 
 install_release_manpages: $(manpages)
-	@mkdir -p $(DESTDIR)/man/man1
+	@mkdir -p $(DESTDIR)/usr/share/man/man1
 	cp -uv genwqe_memcopy.1 genwqe_echo.1 genwqe_update.1 \
-		$(DESTDIR)/man/man1
+		$(DESTDIR)/usr/share/man/man1
 
 uninstall_manpages:
 	@for f in $(manpages) ; do				\
-		echo "removing $(DESTDIR)/man/man1/$$f ...";	\
-		$(RM) $(DESTDIR)/man/man1/$$f;			\
+		echo "removing $(DESTDIR)/usr/share/man/man1/$$f ...";	\
+		$(RM) $(DESTDIR)/usr/share/man/man1/$$f;		\
 	done
 
 capi_install: genwqe_maint
