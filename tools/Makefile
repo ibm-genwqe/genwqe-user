@@ -33,10 +33,11 @@ genwqe_cksum_libs = -lz
 genwqe_gzip_libs = ../lib/libzADC.a -ldl	# statically link our libz
 genwqe_gunzip_libs = ../lib/libzADC.a -ldl	# statically link our libz
 zlib_mt_perf_libs = ../lib/libzADC.a -ldl	# statically link our libz
+gzFile_test_libs = ../lib/libzADC.a -ldl	# statically link our libz
 
 projs = genwqe_update genwqe_gzip genwqe_gunzip zlib_mt_perf genwqe_memcopy \
 	genwqe_echo genwqe_peek genwqe_poke genwqe_cksum genwqe_vpdconv \
-	genwqe_vpdupdate genwqe_csv2vpd genwqe_ffdc
+	genwqe_vpdupdate genwqe_csv2vpd genwqe_ffdc gzFile_test
 
 ifdef WITH_LIBCXL
 # genwqe_maint is only used with CAPI support.

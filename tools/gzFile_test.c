@@ -52,8 +52,8 @@
 #define SET_BINARY_MODE(file)
 
 /** common error printf */
-#define pr_err(fmt, ...) do {					\
-		fprintf(stderr, "gzip: " fmt, ## __VA_ARGS__);	\
+#define pr_err(fmt, ...) do {						\
+		fprintf(stderr, "gzFile_test: " fmt, ## __VA_ARGS__);	\
 	} while (0)
 
 static const char *version = GIT_VERSION;
@@ -114,10 +114,18 @@ static inline uint64_t str_to_num(char *str)
 
 static void usage(FILE *fp, char *prog)
 {
-	fprintf(fp, "Usage: %s [OPTION]... [FILE]...\n"
+	fprintf(fp, "Usage: %s [OPTION]... [IN_FILE] [OUT_FILE]...\n"
+		"\n"
+		"Special options for testing and debugging:\n"
+		"  -A, --accelerator-type=GENWQE|CAPI CAPI is only available for IBM System p\n"
+		"  -B, --card=<card_no> -1 is for automatic card selection\n"
+		"  -O, --offset=<offset> Cut out data at this byte offset.\n"
+		"  -s, --size=<size>     Cut <size> bytes out.\n"
+		"  -i, --i_bufsize   input buffer size (%ld KiB)\n"
+		"  -o, --o_bufsize   output buffer size (%ld KiB)\n"
 		"\n"
 		"Report bugs via https://github.com/ibm-genwqe/genwqe-user.\n"
-		"\n", prog);
+		"\n", prog, CHUNK_i/1024, CHUNK_o/1024);
 }
 
 static inline
@@ -200,8 +208,8 @@ static int do_compress(const char *i_fname, const char *o_fname,
 	uint8_t *buf;
 
 	ifp = fopen(i_fname, "r");
-	if (ifp != NULL) {
-		pr_err("Could not open %s\n", i_fname);
+	if (ifp == NULL) {
+		pr_err("Could not open %s, %s\n", i_fname, strerror(errno));
 		return -1;
 	}
 
@@ -213,7 +221,7 @@ static int do_compress(const char *i_fname, const char *o_fname,
 
 	sprintf(mode, "wb%d", level);
 	ofp = gzopen(o_fname, mode);
-	if (ofp != NULL) {
+	if (ofp == NULL) {
 		pr_err("Could not open %s\n", o_fname);
 		goto err_buf;
 	}
@@ -263,8 +271,8 @@ static int do_decompress(const char *i_fname, const char *o_fname,
 	int rc;
 	uint8_t *buf;
 
-	ofp = fopen(o_fname, "r");
-	if (ofp != NULL) {
+	ofp = fopen(o_fname, "w+");
+	if (ofp == NULL) {
 		pr_err("Could not open %s\n", o_fname);
 		return -1;
 	}
@@ -276,7 +284,7 @@ static int do_decompress(const char *i_fname, const char *o_fname,
 	}
 
 	ifp = gzopen(i_fname, "rb");
-	if (ifp != NULL) {
+	if (ifp == NULL) {
 		pr_err("Could not open %s\n", i_fname);
 		goto err_buf;
 	}
@@ -293,6 +301,9 @@ static int do_decompress(const char *i_fname, const char *o_fname,
 			pr_err("gzread error %d\n", (int)len);
 			goto err_ifp;
 		}
+		if (len == 0)
+			break;
+
 		rc = fwrite(buf, len, 1, ofp);
 		if (rc < 1) {
 			pr_err("fwrite %d\n", rc);
@@ -359,16 +370,16 @@ int main(int argc, char **argv)
 
 			/* our own options */
 			{ "accelerator-type", required_argument, NULL, 'A' },
-			{ "card_no",	 required_argument, NULL, 'B' },
-			{ "size",	 required_argument, NULL, 's' },
-			{ "offset",	 required_argument, NULL, 'O' },
-			{ "decompress",	 no_argument, NULL, 'd' },
-			{ "i_bufsize",   required_argument, NULL, 'i' },
-			{ "o_bufsize",   required_argument, NULL, 'o' },
-			{ 0,		 no_argument,       NULL, 0   },
+			{ "card_no",	 required_argument,	 NULL, 'B' },
+			{ "size",	 required_argument,	 NULL, 's' },
+			{ "offset",	 required_argument,	 NULL, 'O' },
+			{ "decompress",	 no_argument,		 NULL, 'd' },
+			{ "i_bufsize",	 required_argument,	 NULL, 'i' },
+			{ "o_bufsize",	 required_argument,	 NULL, 'o' },
+			{ 0,		 no_argument,		 NULL, 0   },
 		};
 
-		ch = getopt_long(argc, argv, "123456789A:B:i:o:s:O:h?V",
+		ch = getopt_long(argc, argv, "123456789A:B:di:o:s:O:h?V",
 				 long_options, &option_index);
 		if (ch == -1)    /* all params processed ? */
 			break;
