@@ -118,13 +118,16 @@ uninstall_gzip_tools:
 	      $(DESTDIR)/bin/genwqe_test_gz
 
 install_manpages: $(manpages)
-	@mkdir -p $(DESTDIR)/share/man/man1
-	cp -uv $(manpages) $(DESTDIR)/share/man/man1
+	@mkdir -p $(MAN_INSTALL_PATH)
+	cp -uv $(manpages) $(MAN_INSTALL_PATH)
 
 install_release_manpages: $(manpages)
-	@mkdir -p $(DESTDIR)/man/man1
+	@mkdir -p $(MAN_INSTALL_PATH)
+
 	cp -uv genwqe_memcopy.1 genwqe_echo.1 genwqe_update.1 \
 		$(DESTDIR)/man/man1
+	cp -uv genwqe_memcopy.1 genwqe_echo.1 genwqe_update.1 \
+		$(MAN_INSTALL_PATH)
 
 uninstall_manpages:
 	@for f in $(manpages) ; do				\
