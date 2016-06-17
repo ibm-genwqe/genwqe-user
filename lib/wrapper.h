@@ -48,6 +48,13 @@
 #endif
 
 extern FILE *zlib_log;
+extern int zlib_trace;
+extern int zlib_accelerator;
+extern int zlib_card;
+extern unsigned int zlib_inflate_impl;
+extern unsigned int zlib_deflate_impl;
+extern unsigned int zlib_inflate_flags;
+extern unsigned int zlib_deflate_flags;
 
 #define zlib_trace_enabled()       (zlib_trace & 0x1)
 #define zlib_hw_trace_enabled()    (zlib_trace & 0x2)
@@ -132,6 +139,19 @@ struct zlib_stats {
 	unsigned long crc32_combine;
 };
 
+extern pthread_mutex_t zlib_stats_mutex; /* mutex to protect zlib_stats */
+extern struct zlib_stats zlib_stats;
+
+static inline void zlib_stats_inc(unsigned long *count)
+{
+	if (!zlib_gather_statistics())
+		return;
+
+	pthread_mutex_lock(&zlib_stats_mutex);
+	*count = *count + 1;
+	pthread_mutex_unlock(&zlib_stats_mutex);
+}
+
 /* Hardware implementation */
 int h_deflateInit2_(z_streamp strm, int level, int method,
 		    int windowBits, int memLevel,
@@ -211,14 +231,6 @@ uLong z_crc32(uLong crc, const Bytef *buf, uInt len);
 uLong z_crc32_combine(uLong crc1, uLong crc2, z_off_t len2);
 
 const char *z_zError(int err);
-
-extern int zlib_trace;
-extern int zlib_accelerator;
-extern int zlib_card;
-extern unsigned int zlib_inflate_impl;
-extern unsigned int zlib_deflate_impl;
-extern unsigned int zlib_inflate_flags;
-extern unsigned int zlib_deflate_flags;
 
 /* PCIe trigger function. Writes to register 0x0 which normally non-sense. */
 void error_trigger(void);
