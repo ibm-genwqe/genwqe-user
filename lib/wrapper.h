@@ -137,6 +137,35 @@ struct zlib_stats {
 	unsigned long adler32_combine;
 	unsigned long crc32;
 	unsigned long crc32_combine;
+
+	unsigned long gzopen64;
+	unsigned long gzopen;
+	unsigned long gzdopen;
+	unsigned long gzbuffer;
+	unsigned long gztell64;
+	unsigned long gztell;
+	unsigned long gzseek64;
+	unsigned long gzseek;
+	unsigned long gzwrite;
+	unsigned long gzread;
+	unsigned long gzclose;
+	unsigned long gzoffset64;
+	unsigned long gzoffset;
+	unsigned long gzrewind;
+	unsigned long gzputs;
+	unsigned long gzgets;
+	unsigned long gzputc;
+	unsigned long gzgetc;
+	unsigned long gzungetc;
+	unsigned long gzprintf;
+	unsigned long gzerror;
+	unsigned long gzeof;
+	unsigned long gzflush;
+	unsigned long compress;
+	unsigned long uncompress;
+	unsigned long adler32_combine64;
+	unsigned long crc32_combine64;
+	unsigned long get_crc_table;
 };
 
 extern pthread_mutex_t zlib_stats_mutex; /* mutex to protect zlib_stats */

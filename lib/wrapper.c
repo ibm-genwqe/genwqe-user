@@ -334,6 +334,19 @@ static void __inflate_update_totals(z_streamp strm)
 }
 
 /**
+ * Some statistics we print always, others we just print if someone
+ * actually called the function. Print out variable if it is not
+ * 0. Use variable name as string for the description.
+ */
+#define __sss(s...)       #s
+#define __stringify(s...) __sss(s)
+
+#define pr_stat(s, var) do {						\
+		if ((s)->var)						\
+			pr_info("%s: %lu\n", __stringify(var), (s)->var); \
+	} while (0)
+
+/**
  * __print_stats(): When library is not used any longer, print out
  * statistics e.g. when trace flag is set. This function is not
  * locking stats_mutex.
@@ -373,27 +386,15 @@ static void __print_stats(void)
 		pr_info("  deflate_total_out %4i KiB: %ld\n",
 			(i + 1) * 4, s->deflate_total_out[i]);
 	}
-	if (s->deflateReset)
-		pr_info("deflateReset: %ld\n", s->deflateReset);
 
-	if (s->deflateParams)
-		pr_info("deflateParams: %ld\n", s->deflateParams);
-
-	if (s->deflateSetDictionary)
-		pr_info("deflateSetDictionary: %ld\n",
-			s->deflateSetDictionary);
-
-	if (s->deflateSetHeader)
-		pr_info("deflateSetHeader: %ld\n", s->deflateSetHeader);
-
-	if (s->deflatePrime)
-		pr_info("deflatePrime: %ld\n", s->deflatePrime);
-
-	if (s->deflateCopy)
-		pr_info("deflateCopy: %ld\n", s->deflateCopy);
+	pr_stat(s, deflateReset);
+	pr_stat(s, deflateParams);
+	pr_stat(s, deflateSetDictionary);
+	pr_stat(s, deflateSetHeader);
+	pr_stat(s, deflatePrime);
+	pr_stat(s, deflateCopy);
 
 	pr_info("deflateEnd: %ld\n", s->deflateEnd);
-
 	pr_info("inflateInit: %ld\n", s->inflateInit);
 	pr_info("inflate: %ld sw: %ld hw: %ld\n",
 		s->inflate[ZLIB_SW_IMPL] + s->inflate[ZLIB_HW_IMPL],
@@ -424,45 +425,51 @@ static void __print_stats(void)
 			(i + 1) * 4, s->inflate_total_out[i]);
 	}
 
-	if (s->inflateReset)
-		pr_info("inflateReset: %ld\n", s->inflateReset);
-
-	if (s->inflateReset2)
-		pr_info("inflateReset2: %ld\n", s->inflateReset2);
-
-	if (s->inflateSetDictionary)
-		pr_info("inflateSetDictionary: %ld\n",
-			s->inflateSetDictionary);
-
-	if (s->inflateGetDictionary)
-		pr_info("inflateGetDictionary: %ld\n",
-			s->inflateGetDictionary);
-
-	if (s->inflateGetHeader)
-		pr_info("inflateGetHeader: %ld\n", s->inflateGetHeader);
-
-	if (s->inflateSync)
-		pr_info("inflateSync: %ld\n", s->inflateSync);
-
-	if (s->inflatePrime)
-		pr_info("inflatePrime: %ld\n", s->inflatePrime);
-
-	if (s->inflateCopy)
-		pr_info("inflateCopy: %ld\n", s->inflateCopy);
+	pr_stat(s, inflateReset);
+	pr_stat(s, inflateReset2);
+	pr_stat(s, inflateSetDictionary);
+	pr_stat(s, inflateGetDictionary);
+	pr_stat(s, inflateGetHeader);
+	pr_stat(s, inflateSync);
+	pr_stat(s, inflatePrime);
+	pr_stat(s, inflateCopy);
 
 	pr_info("inflateEnd: %ld\n", s->inflateEnd);
 
-	if (s->adler32)
-		pr_info("adler32: %ld\n", s->adler32);
+	pr_stat(s, adler32);
+	pr_stat(s, adler32_combine);
+	pr_stat(s, crc32);
+	pr_stat(s, crc32_combine);
+	pr_stat(s, adler32_combine64);
+	pr_stat(s, crc32_combine64);
+	pr_stat(s, get_crc_table);
 
-	if (s->adler32_combine)
-		pr_info("adler32_combine: %ld\n", s->adler32_combine);
+	pr_stat(s, gzopen64);
+	pr_stat(s, gzopen);
+	pr_stat(s, gzdopen);
+	pr_stat(s, gzbuffer);
+	pr_stat(s, gztell64);
+	pr_stat(s, gztell);
+	pr_stat(s, gzseek64);
+	pr_stat(s, gzseek);
+	pr_stat(s, gzwrite);
+	pr_stat(s, gzread);
+	pr_stat(s, gzclose);
+	pr_stat(s, gzoffset64);
+	pr_stat(s, gzoffset);
+	pr_stat(s, gzrewind);
+	pr_stat(s, gzputs);
+	pr_stat(s, gzgets);
+	pr_stat(s, gzputc);
+	pr_stat(s, gzgetc);
+	pr_stat(s, gzungetc);
+	pr_stat(s, gzprintf);
+	pr_stat(s, gzerror);
+	pr_stat(s, gzeof);
+	pr_stat(s, gzflush);
 
-	if (s->crc32)
-		pr_info("crc32: %ld\n", s->crc32);
-
-	if (s->crc32_combine)
-		pr_info("crc32_combine: %ld\n", s->crc32_combine);
+	pr_stat(s, compress);
+	pr_stat(s, uncompress);
 
 	pthread_mutex_unlock(&zlib_stats_mutex);
 }

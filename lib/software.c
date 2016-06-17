@@ -302,6 +302,7 @@ const char *z_zlibVersion(void)
 static gzFile (* p_gzopen)(const char *path, const char *mode);
 gzFile gzopen(const char *path, const char *mode)
 {
+	zlib_stats_inc(&zlib_stats.gzopen);
 	check_sym(p_gzopen, NULL);
 	return (* p_gzopen)(path, mode);
 }
@@ -309,6 +310,7 @@ gzFile gzopen(const char *path, const char *mode)
 static gzFile (* p_gzdopen)(int fd, const char *mode);
 gzFile gzdopen(int fd, const char *mode)
 {
+	zlib_stats_inc(&zlib_stats.gzdopen);
 	check_sym(p_gzdopen, NULL);
 	return (* p_gzdopen)(fd, mode);
 }
@@ -316,6 +318,7 @@ gzFile gzdopen(int fd, const char *mode)
 static int (* p_gzbuffer)(gzFile file, unsigned size);
 int gzbuffer(gzFile file, unsigned size)
 {
+	zlib_stats_inc(&zlib_stats.gzbuffer);
 	check_sym(p_gzbuffer, -1);
 	return (* p_gzbuffer)(file, size);
 }
@@ -324,13 +327,15 @@ static int (* p_gzwrite)(gzFile file, voidpc buf, unsigned len);
 int gzwrite(gzFile file, voidpc buf, unsigned len)
 
 {
-	check_sym(p_gzwrite, 0);
+	zlib_stats_inc(&zlib_stats.gzwrite);
+	check_sym(p_gzwrite, -1);
 	return (* p_gzwrite)(file, buf, len);
 }
 
 static int (* p_gzread)(gzFile file, voidp buf, unsigned len);
 int gzread(gzFile file, voidp buf, unsigned len)
 {
+	zlib_stats_inc(&zlib_stats.gzread);
 	check_sym(p_gzread, -1);
 	return (* p_gzread)(file, buf, len);
 }
@@ -338,6 +343,7 @@ int gzread(gzFile file, voidp buf, unsigned len)
 static int (* p_gzclose)(gzFile file);
 int gzclose(gzFile file)
 {
+	zlib_stats_inc(&zlib_stats.gzclose);
 	check_sym(p_gzread, Z_STREAM_ERROR);
 	return (* p_gzclose)(file);
 }
@@ -345,6 +351,7 @@ int gzclose(gzFile file)
 static int (* p_gzungetc)(int c, gzFile file);
 int gzungetc(int c, gzFile file)
 {
+	zlib_stats_inc(&zlib_stats.gzungetc);
 	check_sym(p_gzungetc, -1);
 	return (* p_gzungetc)(c, file);
 }
@@ -352,6 +359,7 @@ int gzungetc(int c, gzFile file)
 static int (* p_gzflush)(gzFile file, int flush);
 int gzflush(gzFile file, int flush)
 {
+	zlib_stats_inc(&zlib_stats.gzflush);
 	check_sym(p_gzflush, Z_STREAM_ERROR);
 	return (* p_gzflush)(file, flush);
 }
@@ -359,6 +367,7 @@ int gzflush(gzFile file, int flush)
 static int (* p_gzeof)(gzFile file);
 int gzeof(gzFile file)
 {
+	zlib_stats_inc(&zlib_stats.gzeof);
 	check_sym(p_gzeof, 0);
 	return (* p_gzeof)(file);
 }
@@ -366,6 +375,7 @@ int gzeof(gzFile file)
 static z_off_t (* p_gztell)(gzFile file);
 z_off_t gztell(gzFile file)
 {
+	zlib_stats_inc(&zlib_stats.gztell);
 	check_sym(p_gztell, -1ll);
 	return (* p_gztell)(file);
 }
@@ -373,6 +383,7 @@ z_off_t gztell(gzFile file)
 static const char * (* p_gzerror)(gzFile file, int *errnum);
 const char *gzerror(gzFile file, int *errnum)
 {
+	zlib_stats_inc(&zlib_stats.gzerror);
 	check_sym(p_gzerror, NULL);
 	return (* p_gzerror)(file, errnum);
 }
@@ -380,6 +391,7 @@ const char *gzerror(gzFile file, int *errnum)
 static z_off_t (* p_gzseek)(gzFile file, z_off_t offset, int whence);
 z_off_t gzseek(gzFile file, z_off_t offset, int whence)
 {
+	zlib_stats_inc(&zlib_stats.gzseek);
 	check_sym(p_gzseek, -1ll);
 	return (* p_gzseek)(file, offset, whence);
 }
@@ -387,6 +399,7 @@ z_off_t gzseek(gzFile file, z_off_t offset, int whence)
 static int (* p_gzrewind)(gzFile file);
 int gzrewind(gzFile file)
 {
+	zlib_stats_inc(&zlib_stats.gzrewind);
 	check_sym(p_gzrewind, -1);
 	return (* p_gzrewind)(file);
 }
@@ -394,6 +407,7 @@ int gzrewind(gzFile file)
 static char * (* p_gzgets)(gzFile file, char *buf, int len);
 char * gzgets(gzFile file, char *buf, int len)
 {
+	zlib_stats_inc(&zlib_stats.gzgets);
 	check_sym(p_gzgets, NULL);
 	return (* p_gzgets)(file, buf, len);
 }
@@ -401,6 +415,7 @@ char * gzgets(gzFile file, char *buf, int len)
 static int (* p_gzputc)(gzFile file, int c);
 int gzputc(gzFile file, int c)
 {
+	zlib_stats_inc(&zlib_stats.gzputc);
 	check_sym(p_gzputc, -1);
 	return (* p_gzputc)(file, c);
 }
@@ -410,6 +425,7 @@ static int (* p_gzgetc)(gzFile file);
 #undef gzgetc
 int gzgetc(gzFile file)
 {
+	zlib_stats_inc(&zlib_stats.gzgetc);
 	check_sym(p_gzgetc, -1);
 	return (* p_gzgetc)(file);
 }
@@ -417,6 +433,7 @@ int gzgetc(gzFile file)
 static int (* p_gzputs)(gzFile file, const char *s);
 int gzputs(gzFile file, const char *s)
 {
+	zlib_stats_inc(&zlib_stats.gzputs);
 	check_sym(p_gzputs, -1);
 	return (* p_gzputs)(file, s);
 }
@@ -427,6 +444,7 @@ int gzprintf(gzFile file, const char *format, ...)
 	int count;
 	va_list ap;
 
+	zlib_stats_inc(&zlib_stats.gzprintf);
 	check_sym(p_gzprintf, -1);
 
 	va_start(ap, format);
@@ -441,6 +459,7 @@ static int (* p_compress)(Bytef *dest, uLongf *destLen,
 int compress(Bytef *dest, uLongf *destLen, const Bytef *source,
 	     uLong sourceLen)
 {
+	zlib_stats_inc(&zlib_stats.compress);
 	check_sym(p_compress, Z_STREAM_ERROR);
 	return (* p_compress)(dest, destLen, source, sourceLen);
 }
@@ -450,6 +469,7 @@ static int (* p_uncompress)(Bytef *dest, uLongf *destLen,
 int uncompress(Bytef *dest, uLongf *destLen, const Bytef *source,
 	       uLong sourceLen)
 {
+	zlib_stats_inc(&zlib_stats.uncompress);
 	check_sym(p_uncompress, Z_STREAM_ERROR);
 	return (* p_uncompress)(dest, destLen, source, sourceLen);
 }
@@ -459,6 +479,7 @@ static uLong (* p_adler32_combine64)(uLong adler1, uLong adler2,
 				     z_off64_t len2);
 uLong adler32_combine64(uLong adler1, uLong adler2, z_off64_t len2)
 {
+	zlib_stats_inc(&zlib_stats.adler32_combine64);
 	check_sym(p_adler32_combine64, Z_STREAM_ERROR);
 	return (* p_adler32_combine64)(adler1, adler2, len2);
 }
@@ -466,6 +487,7 @@ uLong adler32_combine64(uLong adler1, uLong adler2, z_off64_t len2)
 static uLong (* p_crc32_combine64)(uLong crc1, uLong crc2, z_off64_t len2);
 uLong crc32_combine64(uLong crc1, uLong crc2, z_off64_t len2)
 {
+	zlib_stats_inc(&zlib_stats.crc32_combine64);
 	check_sym(p_crc32_combine64, Z_STREAM_ERROR);
 	return (* p_crc32_combine64)(crc1, crc2, len2);
 }
@@ -473,6 +495,7 @@ uLong crc32_combine64(uLong crc1, uLong crc2, z_off64_t len2)
 static gzFile (* p_gzopen64)(const char *path, const char *mode);
 gzFile gzopen64(const char *path, const char *mode)
 {
+	zlib_stats_inc(&zlib_stats.gzopen64);
 	check_sym(p_gzopen64, NULL);
 	return (* p_gzopen64)(path, mode);
 }
@@ -480,6 +503,7 @@ gzFile gzopen64(const char *path, const char *mode)
 static z_off64_t (* p_gztell64)(gzFile file);
 z_off64_t gztell64(gzFile file)
 {
+	zlib_stats_inc(&zlib_stats.gztell64);
 	check_sym(p_gztell64, -1ll);
 	return (* p_gztell64)(file);
 }
@@ -487,6 +511,7 @@ z_off64_t gztell64(gzFile file)
 static z_off_t (* p_gzseek64)(gzFile file, z_off64_t offset, int whence);
 z_off_t gzseek64(gzFile file, z_off64_t offset, int whence)
 {
+	zlib_stats_inc(&zlib_stats.gzseek64);
 	check_sym(p_gzseek64, -1ll);
 	return (* p_gzseek64)(file, offset, whence);
 }
@@ -494,6 +519,7 @@ z_off_t gzseek64(gzFile file, z_off64_t offset, int whence)
 static z_off_t (* p_gzoffset)(gzFile file);
 z_off_t gzoffset(gzFile file)
 {
+	zlib_stats_inc(&zlib_stats.gzoffset);
 	check_sym(p_gzoffset, -1ll);
 	return (* p_gzoffset)(file);
 }
@@ -501,6 +527,7 @@ z_off_t gzoffset(gzFile file)
 static z_off64_t (* p_gzoffset64)(gzFile file);
 z_off_t gzoffset64(gzFile file)
 {
+	zlib_stats_inc(&zlib_stats.gzoffset64);
 	check_sym(p_gzoffset64, -1ll);
 	return (* p_gzoffset64)(file);
 }
@@ -508,6 +535,7 @@ z_off_t gzoffset64(gzFile file)
 static const z_crc_t *(* p_get_crc_table)(void);
 const z_crc_t *get_crc_table()
 {
+	zlib_stats_inc(&zlib_stats.get_crc_table);
 	check_sym(p_get_crc_table, NULL);
 	return (* p_get_crc_table)();
 }
