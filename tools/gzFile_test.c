@@ -56,6 +56,11 @@
 		fprintf(stderr, "gzFile_test: " fmt, ## __VA_ARGS__);	\
 	} while (0)
 
+/** common error printf */
+#define pr_info(fmt, ...) do {						\
+		fprintf(stderr, fmt, ## __VA_ARGS__);	\
+	} while (0)
+
 static const char *version = GIT_VERSION;
 
 static unsigned long CHUNK_i = 32 * 1024;
@@ -117,6 +122,7 @@ static void usage(FILE *fp, char *prog)
 	fprintf(fp, "Usage: %s [OPTION]... [IN_FILE] [OUT_FILE]...\n"
 		"\n"
 		"Special options for testing and debugging:\n"
+		"  -v, --verbose\n"
 		"  -A, --accelerator-type=GENWQE|CAPI CAPI is only available for IBM System p\n"
 		"  -B, --card=<card_no> -1 is for automatic card selection\n"
 		"  -O, --offset=<offset> Cut out data at this byte offset.\n"
@@ -220,7 +226,7 @@ static int do_compress(const char *i_fname, const char *o_fname,
 	}
 
 	sprintf(mode, "wb%d", level);
-	ofp = gzopen(o_fname, mode);
+	ofp = gzopen64(o_fname, mode);
 	if (ofp == NULL) {
 		pr_err("Could not open %s\n", o_fname);
 		goto err_buf;
@@ -243,6 +249,11 @@ static int do_compress(const char *i_fname, const char *o_fname,
 			pr_err("gzwrite %d\n", rc);
 			goto err_ofp;
 		}
+
+		if (verbose == 1)
+			pr_info("  gztell64 returned %lld\n",
+				(long long)gztell64(ofp));
+
 	} while (!feof(ifp));
 
 	gzclose(ofp);
@@ -301,6 +312,11 @@ static int do_decompress(const char *i_fname, const char *o_fname,
 			pr_err("gzread error %d\n", (int)len);
 			goto err_ifp;
 		}
+
+		if (verbose == 1)
+			pr_info("  gztell64 returned %lld\n",
+				(long long)gztell64(ifp));
+
 		if (len == 0)
 			break;
 
@@ -379,7 +395,7 @@ int main(int argc, char **argv)
 			{ 0,		 no_argument,		 NULL, 0   },
 		};
 
-		ch = getopt_long(argc, argv, "123456789A:B:di:o:s:O:h?V",
+		ch = getopt_long(argc, argv, "123456789A:B:di:o:s:O:h?Vv",
 				 long_options, &option_index);
 		if (ch == -1)    /* all params processed ? */
 			break;
