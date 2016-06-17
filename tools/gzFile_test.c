@@ -311,7 +311,7 @@ static int do_decompress(const char *i_fname, const char *o_fname,
 		off64_t offs_rc;
 
 		offs_rc = gzseek64(ifp, offs, SEEK_SET);
-		if (offs_rc == -1) {
+		if (offs_rc == offs) {
 			pr_err("Could not seek %lld to desired offset %lld\n",
 			       (long long)offs_rc, (long long)offs);
 			goto err_ifp;
