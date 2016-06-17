@@ -172,3 +172,4 @@ endif
 DESTDIR ?= /usr
 LIB_INSTALL_PATH ?= $(DESTDIR)/lib64/genwqe
 INCLUDE_INSTALL_PATH ?= $(DESTDIR)/include/genwqe
+MAN_INSTALL_PATH ?= $(DESTDIR)/share/man/man1
