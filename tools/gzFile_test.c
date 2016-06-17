@@ -21,7 +21,8 @@
  */
 
 /*
- * Test the gzFile functionality provided by zlib.h.
+ * Test the gzFile functionality provided by zlib.h. Not intended to
+ * use for production and example.
  */
 
 #include <stdio.h>
