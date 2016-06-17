@@ -58,7 +58,7 @@
 
 /** common error printf */
 #define pr_info(fmt, ...) do {						\
-		fprintf(stderr, fmt, ## __VA_ARGS__);	\
+		fprintf(stderr, fmt, ## __VA_ARGS__);			\
 	} while (0)
 
 static const char *version = GIT_VERSION;
@@ -273,12 +273,11 @@ static int do_compress(const char *i_fname, const char *o_fname,
 
 static int do_decompress(const char *i_fname, const char *o_fname,
 			 size_t chunk_i, size_t chunk_o,
-			 off64_t offs __attribute__((unused)),
-			 size_t size __attribute__((unused)))
+			 off64_t offs, ssize_t size)
 {
 	gzFile ifp;
 	FILE *ofp;
-	ssize_t len;
+	ssize_t len, written_bytes = 0;
 	int rc;
 	uint8_t *buf;
 
@@ -306,6 +305,19 @@ static int do_decompress(const char *i_fname, const char *o_fname,
 		goto err_ifp;
 	}
 
+	/* If size is not 0, we intend to cut some data out. Seek to
+	   the right offset to start at the right position */
+	if (size != 0) {
+		off64_t offs_rc;
+
+		offs_rc = gzseek64(ifp, offs, SEEK_SET);
+		if (offs_rc == -1) {
+			pr_err("Could not seek %lld to desired offset %lld\n",
+			       (long long)offs_rc, (long long)offs);
+			goto err_ifp;
+		}
+	}
+
 	do {
 		len = gzread(ifp, buf, chunk_i);
 		if (len < 0) {
@@ -317,8 +329,20 @@ static int do_decompress(const char *i_fname, const char *o_fname,
 			pr_info("  gztell64 returned %lld\n",
 				(long long)gztell64(ifp));
 
+		if (verbose)
+			pr_info("  read %lld bytes\n", (long long)len);
+
 		if (len == 0)
 			break;
+
+		/* If size is not 0, we intend to cut some data out. */
+		/* We have read a little bit too much. */
+		if (size != 0)
+			if (written_bytes + len > size)
+				len = size - written_bytes;
+
+		if (verbose)
+			pr_info("  write %lld bytes\n", (long long)len);
 
 		rc = fwrite(buf, len, 1, ofp);
 		if (rc < 1) {
@@ -326,7 +350,18 @@ static int do_decompress(const char *i_fname, const char *o_fname,
 			goto err_ifp;
 		}
 
-	} while (len < (int)chunk_i); /* is this right? */
+		written_bytes += len;
+
+		/* If size is not 0, we intend to cut some data out. */
+		/* We have enough data. */
+		if ((size != 0ull) && (size == written_bytes))
+			break;
+
+		if (verbose)
+			pr_err("len=%lld chunk_i=%lld\n",
+			       (long long)len, (long long)chunk_i);
+
+	} while (len <= (int)chunk_i); /* is this right? */
 
 	rc = gzclose(ifp);
 	if (rc != Z_OK) {
@@ -494,9 +529,11 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
-	fprintf(stderr, "Compress %s to %s in %ld bytes, "
-		"out %ld bytes with level %d\n",
-		i_fname, o_fname, CHUNK_i, CHUNK_o, level);
+	fprintf(stderr, "%sCompress %s to %s in %ld bytes, "
+		"out %ld bytes chunks with level %d (size=%lld, offs=%lld)\n",
+		use_compress ? "" : "De",
+		i_fname, o_fname, CHUNK_i, CHUNK_o,
+		level, (long long)size, (long long)offs);
 
 	if (use_compress)
 		rc = do_compress(i_fname, o_fname, CHUNK_i, CHUNK_o,
