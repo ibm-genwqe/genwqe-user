@@ -68,6 +68,25 @@ static unsigned long CHUNK_i = 32 * 1024;
 static unsigned long CHUNK_o = 8 * 1024;  /* too small ;-) */
 static int verbose = 0;
 
+#if ZLIB_VERNUM < 0x1280
+/* Testcase will only handle 32-bit offsets when using zlib version
+   smaller than 1.2.8 */
+gzFile gzopen64(const char *path, const char *mode)
+{
+	return gzopen(path, mode);
+}
+
+z_off64_t gztell64(gzFile file)
+{
+	return gztell(file);
+}
+
+z_off_t gzseek64(gzFile file, z_off64_t offset, int whence)
+{
+	return gzseek(file, offset, whence);
+}
+#endif
+
 /**
  * Common tool return codes
  *	 0: EX_OK/EXIT_SUCCESS
