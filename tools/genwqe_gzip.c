@@ -997,6 +997,11 @@ int main(int argc, char **argv)
 			deflateEnd(&strm);
 			goto err_out;
 		}
+		if (verbose)
+			fprintf(stderr,
+				"deflateBound() %lld bytes for %lld bytes input\n",
+				(long long)deflateBound(&strm, CHUNK_i),
+				(long long)CHUNK_i);
 
 		/* do compression if no arguments */
 		rc = def(i_fp, o_fp, &strm, in, out);

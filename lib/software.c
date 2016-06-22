@@ -82,6 +82,13 @@ int z_deflateParams(z_streamp strm, int level, int strategy)
 	return (* p_deflateParams)(strm, level, strategy);
 }
 
+static uLong (* p_deflateBound)(z_streamp strm, uLong sourceLen);
+uLong z_deflateBound(z_streamp strm, uLong sourceLen)
+{
+	check_sym(p_deflateBound, Z_STREAM_ERROR);
+	return (* p_deflateBound)(strm, sourceLen);
+}
+
 static int (* p_deflateReset)(z_streamp strm);
 int z_deflateReset(z_streamp strm)
 {
@@ -610,6 +617,7 @@ load_syms:
 
 	register_sym(deflateInit2_);
 	register_sym(deflateParams);
+	register_sym(deflateBound);
 	register_sym(deflateReset);
 	register_sym(deflatePrime);
 	register_sym(deflateCopy);

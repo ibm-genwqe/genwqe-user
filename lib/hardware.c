@@ -165,6 +165,26 @@ static void __free(void *ptr)
 	free(ptr);
 }
 
+/**
+ * Theoretical maximum size of the data is worst case of 9/8
+ * of the input buffer. We add one page more because our
+ * hardware encoder is sometimes storing some left-over bytes.
+ *
+ * zLib documentation: "The worst case choice of
+ * parameters can result in an expansion of at most
+ * 13.5%, plus eleven bytes."
+ *
+ * zEDC was better here than zEDCv2. zEDCv2 requires
+ * us to increase the factor to 15/8, which wastes
+ * some memory in most cases. What a pitty.
+ */
+uLong h_deflateBound(z_streamp strm __attribute__((unused)), uLong sourceLen)
+{
+	unsigned int page_size = sysconf(_SC_PAGESIZE);
+
+	return sourceLen * 15/8 + page_size;
+}
+
 int h_deflateInit2_(z_streamp strm,
 		    int level,
 		    int method,
@@ -239,21 +259,8 @@ int h_deflateInit2_(z_streamp strm,
 			goto close_card;
 		}
 
-		/**
-		 * Theoretical maximum size of the data is worst case of 9/8
-		 * of the input buffer. We add one page more because our
-		 * hardware encoder is sometimes storing some left-over bytes.
-		 *
-		 * zLib documentation: "The worst case choice of
-		 * parameters can result in an expansion of at most
-		 * 13.5%, plus eleven bytes."
-		 *
-		 * zEDC was better here than zEDCv2. zEDCv2 requires
-		 * us to increase the factor to 15/8, which wastes
-		 * some memory in most cases. What a pitty.
-		 */
-		s->obuf_total = s->obuf_avail = zlib_ibuf_total * 15/8 +
-			page_size;
+		s->obuf_total = s->obuf_avail =
+			h_deflateBound(strm, zlib_ibuf_total);
 
 		s->obuf_base = s->obuf = s->obuf_next =
 			zedc_memalign(zedc, s->obuf_total,

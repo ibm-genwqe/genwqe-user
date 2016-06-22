@@ -113,6 +113,7 @@ struct zlib_stats {
 	unsigned long deflateSetDictionary;
 	unsigned long deflateSetHeader;
 	unsigned long deflateParams;
+	unsigned long deflateBound;
 	unsigned long deflatePrime;
 	unsigned long deflateCopy;
 	unsigned long deflateEnd;
@@ -187,6 +188,7 @@ int h_deflateInit2_(z_streamp strm, int level, int method,
 		    int strategy, const char *version,
 		    int stream_size);
 int h_deflateParams(z_streamp strm, int level, int strategy);
+uLong h_deflateBound(z_streamp strm, uLong sourceLen);
 
 int h_deflateReset(z_streamp strm);
 int h_deflateSetDictionary(z_streamp strm, const Bytef *dictionary,
@@ -219,6 +221,7 @@ int z_deflateInit2_(z_streamp strm, int level, int method,
 		    int windowBits, int memLevel, int strategy,
 		    const char *version, int stream_size);
 int z_deflateParams(z_streamp strm, int level, int strategy);
+uLong z_deflateBound(z_streamp strm, uLong sourceLen);
 
 int z_deflateReset(z_streamp strm);
 int z_deflateSetDictionary(z_streamp strm, const Bytef *dictionary,
