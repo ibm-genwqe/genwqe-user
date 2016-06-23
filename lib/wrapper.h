@@ -113,6 +113,7 @@ struct zlib_stats {
 	unsigned long deflateSetDictionary;
 	unsigned long deflateSetHeader;
 	unsigned long deflateParams;
+	unsigned long deflateBound;
 	unsigned long deflatePrime;
 	unsigned long deflateCopy;
 	unsigned long deflateEnd;
@@ -161,8 +162,12 @@ struct zlib_stats {
 	unsigned long gzerror;
 	unsigned long gzeof;
 	unsigned long gzflush;
+
 	unsigned long compress;
+	unsigned long compress2;
+	unsigned long compressBound;
 	unsigned long uncompress;
+
 	unsigned long adler32_combine64;
 	unsigned long crc32_combine64;
 	unsigned long get_crc_table;
@@ -187,6 +192,7 @@ int h_deflateInit2_(z_streamp strm, int level, int method,
 		    int strategy, const char *version,
 		    int stream_size);
 int h_deflateParams(z_streamp strm, int level, int strategy);
+uLong h_deflateBound(z_streamp strm, uLong sourceLen);
 
 int h_deflateReset(z_streamp strm);
 int h_deflateSetDictionary(z_streamp strm, const Bytef *dictionary,
@@ -219,6 +225,7 @@ int z_deflateInit2_(z_streamp strm, int level, int method,
 		    int windowBits, int memLevel, int strategy,
 		    const char *version, int stream_size);
 int z_deflateParams(z_streamp strm, int level, int strategy);
+uLong z_deflateBound(z_streamp strm, uLong sourceLen);
 
 int z_deflateReset(z_streamp strm);
 int z_deflateSetDictionary(z_streamp strm, const Bytef *dictionary,

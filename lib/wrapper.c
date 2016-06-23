@@ -389,6 +389,7 @@ static void __print_stats(void)
 
 	pr_stat(s, deflateReset);
 	pr_stat(s, deflateParams);
+	pr_stat(s, deflateBound);
 	pr_stat(s, deflateSetDictionary);
 	pr_stat(s, deflateSetHeader);
 	pr_stat(s, deflatePrime);
@@ -469,6 +470,8 @@ static void __print_stats(void)
 	pr_stat(s, gzflush);
 
 	pr_stat(s, compress);
+	pr_stat(s, compress2);
+	pr_stat(s, compressBound);
 	pr_stat(s, uncompress);
 
 	pthread_mutex_unlock(&zlib_stats_mutex);
@@ -797,6 +800,28 @@ static int __deflateEnd(z_streamp strm, struct _internal_state *w)
 		       z_deflateEnd(strm);
 	strm->state = NULL;
 
+	return rc;
+}
+
+uLong deflateBound(z_streamp strm, uLong sourceLen)
+{
+	int rc;
+	struct _internal_state *w;
+
+	if (strm == NULL)
+		return Z_STREAM_ERROR;
+
+	w = (struct _internal_state *)strm->state;
+	if (w == NULL)
+		return Z_STREAM_ERROR;
+
+	zlib_stats_inc(&zlib_stats.deflateBound);
+
+	strm->state = w->priv_data;
+	rc = w->impl ? h_deflateBound(strm, sourceLen) :
+		       z_deflateBound(strm, sourceLen);
+
+	strm->state = (void *)w;
 	return rc;
 }
 

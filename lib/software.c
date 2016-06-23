@@ -82,6 +82,13 @@ int z_deflateParams(z_streamp strm, int level, int strategy)
 	return (* p_deflateParams)(strm, level, strategy);
 }
 
+static uLong (* p_deflateBound)(z_streamp strm, uLong sourceLen);
+uLong z_deflateBound(z_streamp strm, uLong sourceLen)
+{
+	check_sym(p_deflateBound, Z_STREAM_ERROR);
+	return (* p_deflateBound)(strm, sourceLen);
+}
+
 static int (* p_deflateReset)(z_streamp strm);
 int z_deflateReset(z_streamp strm)
 {
@@ -464,6 +471,24 @@ int compress(Bytef *dest, uLongf *destLen, const Bytef *source,
 	return (* p_compress)(dest, destLen, source, sourceLen);
 }
 
+static int (* p_compress2)(Bytef *dest, uLongf *destLen,
+			   const Bytef *source, uLong sourceLen, int level);
+int compress2(Bytef *dest, uLongf *destLen, const Bytef *source,
+	      uLong sourceLen, int level)
+{
+	zlib_stats_inc(&zlib_stats.compress2);
+	check_sym(p_compress2, Z_STREAM_ERROR);
+	return (* p_compress2)(dest, destLen, source, sourceLen, level);
+}
+
+static uLong (* p_compressBound)(uLong sourceLen);
+uLong compressBound(uLong sourceLen)
+{
+	zlib_stats_inc(&zlib_stats.compressBound);
+	check_sym(p_compressBound, Z_STREAM_ERROR);
+	return (* p_compressBound)(sourceLen);
+}
+
 static int (* p_uncompress)(Bytef *dest, uLongf *destLen,
 			    const Bytef *source, uLong sourceLen);
 int uncompress(Bytef *dest, uLongf *destLen, const Bytef *source,
@@ -610,6 +635,7 @@ load_syms:
 
 	register_sym(deflateInit2_);
 	register_sym(deflateParams);
+	register_sym(deflateBound);
 	register_sym(deflateReset);
 	register_sym(deflatePrime);
 	register_sym(deflateCopy);
@@ -653,6 +679,8 @@ load_syms:
 	register_sym(gzprintf);
 
 	register_sym(compress);
+	register_sym(compress2);
+	register_sym(compressBound);
 	register_sym(uncompress);
 
 	register_sym(zError);
