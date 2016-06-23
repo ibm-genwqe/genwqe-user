@@ -471,6 +471,7 @@ static void __print_stats(void)
 
 	pr_stat(s, compress);
 	pr_stat(s, compress2);
+	pr_stat(s, compressBound);
 	pr_stat(s, uncompress);
 
 	pthread_mutex_unlock(&zlib_stats_mutex);
