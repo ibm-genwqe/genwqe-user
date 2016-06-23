@@ -162,8 +162,12 @@ struct zlib_stats {
 	unsigned long gzerror;
 	unsigned long gzeof;
 	unsigned long gzflush;
+
 	unsigned long compress;
+	unsigned long compress2;
+	unsigned long compressBound;
 	unsigned long uncompress;
+
 	unsigned long adler32_combine64;
 	unsigned long crc32_combine64;
 	unsigned long get_crc_table;
