@@ -38,6 +38,11 @@ version="https://github.com/ibm-genwqe/genwqe-user"
 verbose=""
 test_data="/tmp/test_data.bin"
 logging=0
+sadc=/usr/lib/sysstat/sadc
+
+# sadc is unfortunately at different location for different distributions
+# We try to figure out the location in the code below, if your sadc is at
+# a different spot, you might need to adopt the script.
 
 # Print usage message helper function
 function usage() {
@@ -80,9 +85,20 @@ function usage() {
 # System Load Logging
 ###############################################################################
 
+function system_load_find_sadc() {
+    if [ -x /usr/lib64/sa/sadc ]; then
+	sadc=/usr/lib64/sa/sadc
+    elif [ -x /usr/lib/sysstat/sadc ]; then
+	sadc=/usr/lib/sysstat/sadc
+    else
+	echo "Cannot find sadc tool for CPU load measurement!"
+	exit 1
+    fi
+}
+
 function system_load_logging_start() {
     rm -f system_load.sar system_load.pid
-    /usr/lib/sysstat/sadc 1 system_load.sar &
+    ${sadc} 1 system_load.sar &
     echo $! > system_load.pid
 }
 
@@ -91,7 +107,7 @@ function system_load_logging_stop() {
 
     # Skip the 1st 4 lines, since they container some header information
     cp system_load.sar system_load.$ZLIB_ACCELERATOR.sar
-    sar -u -f system_load.sar | tail -n +3 > system_load.txt
+    LC_TIME=posix sar -u -f system_load.sar | tail -n +4 > system_load.txt
     grep -v Average system_load.txt > system_load.csv
 
     start=`head -n1 system_load.csv | cut -f1 -d' '`
@@ -113,7 +129,7 @@ set yrange ["0.00":"100.00"]
 set style data lines
 set grid
 # set datafile separator " "
-plot "system_load.csv" using 1:4 title "%user", '' using 1:6 title "%system", '' using 1:9 title "%idle"
+plot "system_load.csv" using 1:3 title "%user" with lines lw 4, '' using 1:5 title "%system" with lines lw 4
 EOF
 
     # Instructing gnuplot to generate a png with out CPU load statistics
@@ -224,6 +240,7 @@ echo "IBM Processing accelerators:"
 lspci | grep "Processing accelerators: IBM"
 
 if [ $logging -eq 1 ]; then
+    system_load_find_sadc
     system_load_logging_start
 fi
 
