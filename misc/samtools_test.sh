@@ -257,6 +257,7 @@ function system_load_logging_stop() {
     cp system_load.sar system_load.$ZLIB_ACCELERATOR.sar
     LC_TIME=posix sar -u -f system_load.sar | tail -n +4 > system_load.txt
     grep -v Average system_load.txt > system_load.csv
+    LC_TIME=posix sar -u -f system_load.sar > system_load.$ZLIB_ACCELERATOR.csv
 
     start=`head -n1 system_load.csv | cut -f1 -d' '`
     end=`tail -n1 system_load.csv | cut -f1 -d' '`
@@ -271,7 +272,7 @@ set timefmt "%H:%M:%S"
 set xlabel "Time"
 set xrange ["$start":"$end"]
 set ylabel "CPU Utilization"
-set yrange ["0.00":"45.00"]
+set yrange ["0.00":"35.00"]
 set style data lines
 set grid
 # set datafile separator " "
