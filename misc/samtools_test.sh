@@ -29,6 +29,12 @@
 # the resulting output into a csv file which we use to generate some
 # charts from.
 #
+# Usage example:
+#
+#   for a in CAPI GENWQE SW ; do
+#       ./misc/samtools_test.sh -A${a} -C0 -d /home/haver/genomics ;
+#   done
+#
 
 export ZLIB_TRACE=0x0000
 export ZLIB_ACCELERATOR=GENWQE
