@@ -8,59 +8,6 @@ acceleration is provided to do zlib style compression/decompression
 according to RFC1950, RFC1951 and RFC1952. This can be used as
 alternative to the traditional software zlib.
 
-
-    /lib
-        card_defs.h         Some Macros to debug libcard.c
-        ddcb_capi.c         Low level API for CAPI (IBM System p only, see note below)
-        ddcb_card.c         Wrapper on top of ddcb_capi.c and libcard.c
-        deflate.c           Zlib deflate functions
-        hardware.c          libz functions
-        hw_defs.h
-        inflate.c           Zlib inflate functions
-        libcard.c           Low level API for GenWQE card
-        libddcb.c           Functions on top of ddcb_card.c
-        libzADC.map         Map file to build so files
-        libzHW.c            De/compression supporting RFC1950, RFC1951 and RFC1952
-        software.c          Interface to call system libz
-        wrapper.c           Wrapper for soft- and hardware-zlib
-        wrapper.h
-
-    /include
-        afu_regs.h
-        ddcb.h
-        deflate_ddcb.h
-        deflate_fifo.h
-        genwqe_vpd.h
-        libcard.h
-        libddcb.h
-        libzHW.h
-        memcopy_ddcb.h
-        zaddons.h
-
-    /tools
-        force_cpu.c         Helper util to select/force/pin CPU
-        force_cpu.h
-        genwqe_echo.c       Test program to send "echo" command to GenWQE
-        genwqe_gzip.c       Sample program for gzip using the GenWQE
-        genwqe_maint.c      Maintenance tool for CAPI Card (IBM System p only, see note below)
-        genwqe_memcopy.c    Test Program for Memcopy using GenWQE
-        genwqe_peek.c       Debug Program to read certain Registers from Accelerator
-        genwqe_poke.c       Debug Program to write certain Registers in Accelerator
-        genwqe_tools.h
-        genwqe_update.c     Tool to update GenWQE flash
-        genwqe_vpd_common.c Helper utilities
-        zlib_mt_perf.c      Sample program for inflate/deflate
-
-    /licenses
-        cla-corporate.txt
-        cla-individual.txt
-
-    /spec
-        genwqe-libz.spec    Spec file for building the tools RPM
-        genwqe-tools.spec   Spec file for building the libz RPM
-
-
-
 The GenWQE PCIe card can currently be aquired as an option to the
 latest IBM System p machines:
 + EJ12 regular height: [PCIe3 FPGA Accelerator Adapter (FC EJ12; CCIN 59AB)](http://www-01.ibm.com/support/knowledgecenter/POWER8/p8hcd/fcej12.htm?cp=POWER8%2F3-3-9-1-1-44)
