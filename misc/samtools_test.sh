@@ -265,7 +265,7 @@ set timefmt "%H:%M:%S"
 set xlabel "Time"
 set xrange ["$start":"$end"]
 set ylabel "CPU Utilization"
-set yrange ["0.00":"100.00"]
+set yrange ["0.00":"45.00"]
 set style data lines
 set grid
 # set datafile separator " "
