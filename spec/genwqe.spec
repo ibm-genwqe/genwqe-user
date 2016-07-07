@@ -120,6 +120,7 @@ ln -sf %{_bindir}/genwqe_gzip   %{buildroot}/%{_libdir}/genwqe/gzip
 %{_mandir}/man1/genwqe_poke.1.gz
 %{_mandir}/man1/genwqe_update.1.gz
 %{_mandir}/man1/zlib_mt_perf.1.gz
+%{_mandir}/man1/gzFile_test.1.gz
 
 %ifarch ppc64le
 %{_bindir}/genwqe_maint
