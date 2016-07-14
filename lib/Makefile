@@ -77,10 +77,16 @@ $(libcxl_a): ..check_libcxl
 		echo;							\
 		exit 1;							\
 	fi
-	@if [ ! -f $(CONFIG_LIBCXL_PATH)/include/misc/cxl.h ]; then	\
-		mkdir -p $(CONFIG_LIBCXL_PATH)/include/misc/;		\
-		cp ../ext/include/misc/cxl.h 				\
-			$(CONFIG_LIBCXL_PATH)/include/misc/cxl.h;	\
+	@if [ ! -f /usr/include/misc/cxl.h ]; then			\
+		printf  "\t[ERROR]\t/usr/include/misc/cxl.h not found!\n";\
+		echo;							\
+		echo "  Please ensure you are having up-todate";	\
+		echo "  kernel-headers when building the code.";        \
+		echo "  When using pslse, get a recent copy of the file";\
+		echo "  from kernel.org and copy the file manually to";	\
+		echo "  $(CONFIG_LIBCXL_PATH)/include/misc/cxl.h.";	\
+		echo;							\
+		exit 1;							\
 	fi
 
 endif	# WITH_LIBCXL
