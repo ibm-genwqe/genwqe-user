@@ -124,7 +124,10 @@ ifndef DISABLE_LIBCXL
 
 ifeq ($(PLATFORM), ppc64le)
 WITH_LIBCXL=1
-BUNDLE_LIBCXL ?= 1
+endif
+
+ifeq ($(PLATFORM), ppc64)
+WITH_LIBCXL=1
 endif
 
 ifdef BUILD_SIMCODE
