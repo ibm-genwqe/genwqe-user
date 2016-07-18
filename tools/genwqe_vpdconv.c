@@ -56,7 +56,7 @@ static void usage(char *name)
 	   "  --crcoff		do not check and correct crc in output File\n"
 	   "  --reverse		takes as input a binaray file and creates a CSV output file\n"
 	   "\n"
-	   "This utility converts a comma seperated VPD file (CSV file) for the GenWQE Card\n"
+	   "This utility converts a comma separated VPD file (CSV file) for the GenWQE Card\n"
 	   "to a binary file which can be used for flash programming for VPD data.\n"
 	   "The CVS input file format (0x%x) is fix. Only the data can be changed.\n",
 	   name, VPD_VERSION);
