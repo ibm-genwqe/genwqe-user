@@ -70,15 +70,15 @@ $(libcxl_a): ..check_libcxl
 .PHONY: ..check_libcxl
 ..check_libcxl:
 	@if [ $(BUNDLE_LIBCXL) -eq 1 ]; then				\
-	  @if [ ! -d $(CONFIG_LIBCXL_PATH) ]; then 			\
+	  if [ ! -d $(CONFIG_LIBCXL_PATH) ]; then 			\
 	    printf  "\t[ERROR]\t$(CONFIG_LIBCXL_PATH) not found!\n";	\
 	    echo;							\
 	    echo "  Please clone libcxl git before continuing:";	\
 	    echo "    git clone https://github.com/ibm-capi/libcxl";	\
 	    echo;							\
 	    exit 1;							\
-	  fi
-	  @if [ ! -f $(CONFIG_LIBCXL_PATH)/include/misc/cxl.h ]; then	\
+	  fi;								\
+	  if [ ! -f $(CONFIG_LIBCXL_PATH)/include/misc/cxl.h ]; then	\
 	    printf  "\t[ERROR]\t$(CONFIG_LIBCXL_PATH)/include/misc/cxl.h not found!\n";\
 	    echo;							\
 	    echo "  Please ensure you are having up-todate";		\
@@ -88,7 +88,7 @@ $(libcxl_a): ..check_libcxl
 	    echo "  $(CONFIG_LIBCXL_PATH)/include/misc/cxl.h.";		\
 	    echo;							\
 	    exit 1;							\
-	  fi
+	  fi								\
 	fi
 
 endif	# WITH_LIBCXL
