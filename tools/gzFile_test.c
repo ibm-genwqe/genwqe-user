@@ -226,7 +226,8 @@ file_write(const char *fname, const uint8_t *buff, size_t len)
 }
 
 static int do_compress(const char *i_fname, const char *o_fname,
-		       size_t chunk_i, size_t chunk_o, int level)
+		       size_t chunk_i,
+		       size_t chunk_o __attribute__((unused)), int level)
 {
 	char mode[16];
 	gzFile ofp;
@@ -296,7 +297,8 @@ static int do_compress(const char *i_fname, const char *o_fname,
 }
 
 static int do_decompress(const char *i_fname, const char *o_fname,
-			 size_t chunk_i, size_t chunk_o,
+			 size_t chunk_i,
+			 size_t chunk_o __attribute__((unused)),
 			 off64_t offs, ssize_t size)
 {
 	gzFile ifp;
