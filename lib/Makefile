@@ -69,7 +69,7 @@ $(libcxl_a): ..check_libcxl
 
 .PHONY: ..check_libcxl
 ..check_libcxl:
-	@if [ $(BUNDLE_LIBCXL) -eq 1)]; then				\
+	@if [ $(BUNDLE_LIBCXL) -eq 1 ]; then				\
 	  @if [ ! -d $(CONFIG_LIBCXL_PATH) ]; then 			\
 	    printf  "\t[ERROR]\t$(CONFIG_LIBCXL_PATH) not found!\n";	\
 	    echo;							\
