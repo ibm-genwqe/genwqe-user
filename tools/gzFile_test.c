@@ -71,17 +71,17 @@ static int verbose = 0;
 #if ZLIB_VERNUM < 0x1280
 /* Testcase will only handle 32-bit offsets when using zlib version
    smaller than 1.2.8 */
-gzFile gzopen64(const char *path, const char *mode)
+static gzFile gzopen64(const char *path, const char *mode)
 {
 	return gzopen(path, mode);
 }
 
-z_off64_t gztell64(gzFile file)
+static z_off64_t gztell64(gzFile file)
 {
 	return gztell(file);
 }
 
-z_off_t gzseek64(gzFile file, z_off64_t offset, int whence)
+static z_off_t gzseek64(gzFile file, z_off64_t offset, int whence)
 {
 	return gzseek(file, offset, whence);
 }
