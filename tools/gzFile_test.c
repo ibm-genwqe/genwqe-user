@@ -76,6 +76,8 @@ static gzFile gzopen64(const char *path, const char *mode)
 	return gzopen(path, mode);
 }
 
+typedef off64_t z_off64_t;
+
 static z_off64_t gztell64(gzFile file)
 {
 	return gztell(file);
