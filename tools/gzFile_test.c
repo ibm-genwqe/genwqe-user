@@ -254,11 +254,13 @@ static int do_compress(const char *i_fname, const char *o_fname,
 		goto err_buf;
 	}
 
+#if ZLIB_VERNUM >= 0x1280
 	rc = gzbuffer(ofp, chunk_o);
 	if (rc != 0) {
 		pr_err("Could not set gzFile buffer size %d\n", rc);
 		goto err_ofp;
 	}
+#endif
 
 	do {
 		len = fread(buf, 1, chunk_i, ifp);
@@ -321,11 +323,13 @@ static int do_decompress(const char *i_fname, const char *o_fname,
 		goto err_buf;
 	}
 
+#if ZLIB_VERNUM >= 0x1280
 	rc = gzbuffer(ifp, chunk_o);
 	if (rc != 0) {
 		pr_err("Could not set gzFile buffer size %d\n", rc);
 		goto err_ifp;
 	}
+#endif
 
 	/* If size is not 0, we intend to cut some data out. Seek to
 	   the right offset to start at the right position */
