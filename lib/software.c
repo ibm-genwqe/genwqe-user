@@ -661,7 +661,6 @@ load_syms:
 
 	register_sym(gzopen);
 	register_sym(gzdopen);
-	register_sym(gzbuffer);
 	register_sym(gzwrite);
 	register_sym(gzread);
 	register_sym(gzclose);
@@ -693,6 +692,7 @@ load_syms:
 
 
 #if ZLIB_VERNUM >= 0x1280
+	register_sym(gzbuffer);
 	register_sym(gzopen64);
 	register_sym(gzseek64);
 	register_sym(gztell64);
