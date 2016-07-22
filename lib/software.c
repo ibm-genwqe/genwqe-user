@@ -322,14 +322,6 @@ gzFile gzdopen(int fd, const char *mode)
 	return (* p_gzdopen)(fd, mode);
 }
 
-static int (* p_gzbuffer)(gzFile file, unsigned size);
-int gzbuffer(gzFile file, unsigned size)
-{
-	zlib_stats_inc(&zlib_stats.gzbuffer);
-	check_sym(p_gzbuffer, -1);
-	return (* p_gzbuffer)(file, size);
-}
-
 static int (* p_gzwrite)(gzFile file, voidpc buf, unsigned len);
 int gzwrite(gzFile file, voidpc buf, unsigned len)
 
@@ -500,6 +492,14 @@ int uncompress(Bytef *dest, uLongf *destLen, const Bytef *source,
 }
 
 #if ZLIB_VERNUM >= 0x1280
+static int (* p_gzbuffer)(gzFile file, unsigned size);
+int gzbuffer(gzFile file, unsigned size)
+{
+	zlib_stats_inc(&zlib_stats.gzbuffer);
+	check_sym(p_gzbuffer, -1);
+	return (* p_gzbuffer)(file, size);
+}
+
 static uLong (* p_adler32_combine64)(uLong adler1, uLong adler2,
 				     z_off64_t len2);
 uLong adler32_combine64(uLong adler1, uLong adler2, z_off64_t len2)
