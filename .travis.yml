@@ -1,8 +1,12 @@
 sudo: required
 dist: trusty
 language: c
+compiler: gcc
 before_install:
+  - echo "Update the distribution ..."
   - sudo apt-get -qq update
   - sudo apt-get --assume-yes install gcc help2man git make zlib1g-dev
-script: make
-compiler: gcc
+script:
+  - echo "Building the code
+  - make
+
