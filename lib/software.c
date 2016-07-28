@@ -491,7 +491,7 @@ int uncompress(Bytef *dest, uLongf *destLen, const Bytef *source,
 	return (* p_uncompress)(dest, destLen, source, sourceLen);
 }
 
-#if ZLIB_VERNUM >= 0x1280
+#if ZLIB_VERNUM >= 0x1270
 static int (* p_gzbuffer)(gzFile file, unsigned size);
 int gzbuffer(gzFile file, unsigned size)
 {
@@ -691,7 +691,7 @@ load_syms:
 	register_sym(crc32_combine);
 
 
-#if ZLIB_VERNUM >= 0x1280
+#if ZLIB_VERNUM >= 0x1270
 	register_sym(gzbuffer);
 	register_sym(gzopen64);
 	register_sym(gzseek64);
