@@ -68,9 +68,9 @@ static unsigned long CHUNK_i = 32 * 1024;
 static unsigned long CHUNK_o = 8 * 1024;  /* too small ;-) */
 static int verbose = 0;
 
-#if ZLIB_VERNUM < 0x1280
+#if ZLIB_VERNUM < 0x1270
 /* Testcase will only handle 32-bit offsets when using zlib version
-   smaller than 1.2.8 */
+   smaller than 1.2.7 */
 static gzFile gzopen64(const char *path, const char *mode)
 {
 	return gzopen(path, mode);
@@ -255,7 +255,7 @@ static int do_compress(const char *i_fname, const char *o_fname,
 		goto err_buf;
 	}
 
-#if ZLIB_VERNUM >= 0x1280
+#if ZLIB_VERNUM >= 0x1270
 	rc = gzbuffer(ofp, chunk_o);
 	if (rc != 0) {
 		pr_err("Could not set gzFile buffer size %d\n", rc);
@@ -325,7 +325,7 @@ static int do_decompress(const char *i_fname, const char *o_fname,
 		goto err_buf;
 	}
 
-#if ZLIB_VERNUM >= 0x1280
+#if ZLIB_VERNUM >= 0x1270
 	rc = gzbuffer(ifp, chunk_o);
 	if (rc != 0) {
 		pr_err("Could not set gzFile buffer size %d\n", rc);
