@@ -14,7 +14,7 @@ latest IBM System p machines:
 + EJ13 low profile: [PCIe3 LP FPGA Compression Accelerator Adapter (FC EJ13; CCIN 59AB)](http://www-01.ibm.com/support/knowledgecenter/POWER8/p8hcd/fcej13.htm?cp=POWER8%2F1-2-9-1-1-50&lang=en)
 
 And here the CAPI version of the adapter:
-+ EJ1A regular heigh: [CAPI Compression Accelerator Adapter (FC EJ1A and EJ1B; CCIN 2CF0)](http://www.ibm.com/support/knowledgecenter/POWER8/p8hcd/fcej1a.htm)
++ EJ1A regular heigh and EJ1B low profile: [CAPI Compression Accelerator Adapter (FC EJ1A and EJ1B; CCIN 2CF0)](http://www.ibm.com/support/knowledgecenter/POWER8/p8hcd/fcej1a.htm)
 
 On IBM System p servers, the accelerator card can use the new
 CAPI interface.  Install the [libcxl](https://github.com/ibm-capi/libcxl.git)
