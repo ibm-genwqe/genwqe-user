@@ -17,6 +17,6 @@ Additional documentation can be found at the  [IBM Knowledgecenter](http://www-0
 
 A programming and usage guide for the hardware accelerated zlib can be downloaded here: [Generic Work Queue Engine (GenWQE) Application Programming Guide](https://www.ibm.com/developerworks/community/blogs/fe313521-2e95-46f2-817d-44a4f27eba32/entry/Generic_Work_Queue_Engine_GenWQE_Application_Programming_Guide?lang=en).
 
-The User's guide for the CAPI Compression Accelerator Adapter (FC EJ1A and EJ1B; CCIN 2CF0) can be found here: [CAPI accelerated GZIP Compression Adapter User’s guide](https://www.ibm.com/developerworks/community/wikis/home?lang=en#!/wiki/W51a7ffcf4dfd_4b40_9d82_446ebc23c550/page/CAPI%20accelerated%20GZIP%20Compression%20Adapter%20User’s%20guide)
+The User's guide for the CAPI Compression Accelerator Adapter (FC EJ1A and EJ1B; CCIN 2CF0) can be found here: [CAPI accelerated GZIP Compression Adapter User’s guide](https://www.ibm.com/developerworks/community/wikis/home?lang=en#!/wiki/W51a7ffcf4dfd_4b40_9d82_446ebc23c550/page/CAPI%20accelerated%20GZIP%20Compression%20Adapter%20User’s%20guide).
 
 Possible distributors: If you take a snapshot of this into one of your releases, please let us know such that we can sync up testing. Thanks.
