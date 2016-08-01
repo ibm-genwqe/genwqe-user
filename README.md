@@ -16,11 +16,6 @@ latest IBM System p machines:
 And here the CAPI version of the adapter:
 + EJ1A full-heigh and EJ1B low-profile: [CAPI Compression Accelerator Adapter (FC EJ1A and EJ1B; CCIN 2CF0)](http://www.ibm.com/support/knowledgecenter/POWER8/p8hcd/fcej1a.htm)
 
-On IBM System p servers, the accelerator card can use the new
-CAPI interface.  Install the [libcxl](https://github.com/ibm-capi/libcxl.git)
-library into the toplevel ````genwqe-user```` directory and build the library
-via ````make```` before compiling the genwqe tools.
-
 If you like to contribute to this project, please fill out and sign
 one of our contributor license agreements to be found in /licenses and
 send this back to us before sending us contributions.
