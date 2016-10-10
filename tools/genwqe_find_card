@@ -1,0 +1,111 @@
+#!/bin/bash
+
+#
+# Copyright 2015, 2016, International Business Machines
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# Figure out GenWQE cards in the system. We have GENWQE/PCIe GZIP cards
+# and CAPI GZIP cards. This script should help automatic testing of
+# any available cards in one system. It should print out a list of
+# available cards of each type.
+#
+
+export accel=UNKNOWN
+
+# Parse any options given on the command line
+while getopts "A:C:t:PvVhl" opt; do
+	case ${opt} in
+		A)
+		accel=${OPTARG};
+		;;
+		V)
+		echo "${version}"
+		exit 0;
+		;;
+		h)
+		usage;
+		exit 0;
+		;;
+		\?)
+		echo "ERROR: Invalid option: -$OPTARG" >&2
+		exit 1;
+		;;
+	esac
+done
+
+# Print usage message helper function
+function usage() {
+	echo "Usage of $PROGRAM:"
+	echo "    [-A] <accelerator> use either GENWQE for the PCIe "
+	echo "         and CAPI for CAPI based solution available "
+	echo "         only on System p"
+}
+
+#
+# We need to take into account that there might be other CAPI cards
+# in our system. Therefore we check the psl_revision, which identifies
+# the card hardware and the device id in the configuration record cr0
+# which is the unique id the card has. The combination of both, should
+# be more or less bullet prove.
+#
+function detect_capi_cards() {
+	# We have MAX 4 CAPI cards in one system
+	for card in `seq 0 3` ; do
+		if [ ! -d /sys/class/cxl/card${card} ]; then
+			continue
+		fi
+		psl_revision=`cat /sys/class/cxl/card${card}/psl_revision`
+		if [ $psl_revision != 1 ] ; then
+			continue
+		fi
+		device=`cat /sys/class/cxl/card${card}/afu${card}.0/cr0/device`
+		if [ $device = 0x0602 ]; then
+			echo -n "${card} "
+		fi
+	done
+}
+
+#
+# GenWQE cards are unique, so there is not much complexity here. The
+# only thing to consider is that we can have up to 16 PCI functions,
+# one physical and 15 virtual ones for one card. Those appear as
+# virtual cards, and that is what we list here. If one likes to see
+# only the PFs or the VFs, some more ifs are needed, but it should be
+# doable too. Here there is currently no need for this.
+#
+function detect_genwqe_cards() {
+	# We can have a lot of genwqe cards/functions in one system
+	for card in `seq 0 127` ; do
+		if [ ! -d /sys/class/genwqe/genwqe${card}_card ]; then
+			continue
+		fi
+		echo -n "${card} "
+	done
+}
+
+case ${accel} in
+	# Set one or the other, but not not miss to set the accelerator
+	"UNKNOWN")
+	usage
+	exit 1
+	;;
+	"CAPI")
+	detect_capi_cards
+	;;
+	"GENWQE")
+	detect_genwqe_cards
+	;;
+esac
