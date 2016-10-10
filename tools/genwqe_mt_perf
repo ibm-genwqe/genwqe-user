@@ -152,7 +152,7 @@ while getopts "A:C:t:PvVhl" opt; do
 	P)
 	export ZLIB_DEFLATE_IMPL=0x81;
 	export ZLIB_INFLATE_IMPL=0x81;
-	;;	
+	;;
 	t)
 	test_data=${OPTARG};
 	;;
