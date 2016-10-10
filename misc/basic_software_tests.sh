@@ -39,7 +39,7 @@ card=0
 echo "Testing fallback to software if there is no card available"
 echo "TESTING ${accel} CARD ${card}"
 
-genwqe_mt_perf -A${accel} -C${card}
+genwqe_mt_perf -A${accel} -C${card} -M4
 if [ $? -ne 0 ]; then
 	echo "FAILED ${accel} CARD ${card}"
 	exit 1
