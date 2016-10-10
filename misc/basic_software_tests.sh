@@ -45,7 +45,7 @@ if [ $? -ne 0 ]; then
 	exit 1
 fi
 
-genwqe_test_gz -A${accel} -C${card} -vv -t cantrbry.tar.gz
+genwqe_test_gz -A${accel} -C${card} -vv -i10 -t cantrbry.tar.gz
 if [ $? -ne 0 ]; then
 	echo "FAILED ${accel} CARD ${card}"
 	exit 1
