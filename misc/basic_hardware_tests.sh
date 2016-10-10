@@ -34,8 +34,8 @@ if [ ! -f cantrbry.tar.gz ]; then
 fi
 
 # Tests
-for accel in CAPI GENWQE ; do
-	for card in `./tools/genwqe_find_card -ACAPI`; do
+for accel in GENWQE CAPI ; do
+	for card in `./tools/genwqe_find_card -A${accel}`; do
 		echo "TESTING ${accel} CARD ${card}"
 
 		genwqe_mt_perf -A${accel} -C${card}
@@ -44,7 +44,7 @@ for accel in CAPI GENWQE ; do
 			exit 1
 		fi
 
-		genwqe_test_gz -A${accel} -C${card} -vv -t cantrbry.tar.gz
+		genwqe_test_gz -A${accel} -C${card} -vv -i10 -t cantrbry.tar.gz
 		if [ $? -ne 0 ]; then
 			echo "FAILED ${accel} CARD ${card}"
 			exit 1
