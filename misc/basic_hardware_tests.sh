@@ -40,17 +40,17 @@ for accel in CAPI GENWQE ; do
 
 		genwqe_mt_perf -A${accel} -C${card}
 		if [ $? -ne 0 ]; then
-			echo "FAILED ${accel}"
+			echo "FAILED ${accel} CARD ${card}"
 			exit 1
 		fi
 
 		genwqe_test_gz -A${accel} -C${card} -vv -t cantrbry.tar.gz
 		if [ $? -ne 0 ]; then
-			echo "FAILED ${accel}"
+			echo "FAILED ${accel} CARD ${card}"
 			exit 1
 		fi
 
-		echo "PASSED ${accel}"
+		echo "PASSED ${accel} CARD ${card}"
 	done
 done
 
