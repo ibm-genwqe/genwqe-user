@@ -152,6 +152,15 @@ help:
 	@echo "      (default)"
 	@echo
 
+# Automatically perform tests - card selected automatically
+test: test_hardware test_software
+
+test_hardware: all
+	./misc/basic_hardware_tests.sh
+
+test_software: all
+	./misc/basic_software_tests.sh
+
 distclean: clean
 	@$(RM) -r sim_*	zlib-1.2.8 zlib-1.2.8.tar.gz
 
