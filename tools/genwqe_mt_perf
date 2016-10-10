@@ -303,4 +303,7 @@ if [ $logging -eq 1 ]; then
     system_load_logging_stop
 fi
 
+# Cleanup
+rm -f ${test_data} ${test_data}.gz
+
 exit 0

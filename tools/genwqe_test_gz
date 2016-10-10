@@ -31,6 +31,7 @@ export ZLIB_CARD=-1
 
 # Directories used
 INSTALL_DIR="/usr"                           # Tool RPM install directory
+TEST_DATA=${INSTALL_DIR}/share/testdata/testdata.tar.gz
 TMP_DIR="/tmp"                               # Temporary directory to use
 DATA_DIR="${TMP_DIR}/$$_testdata"            # directory for testdata
 ORIG_DATA="${TMP_DIR}/orig"                  # directory for original data
@@ -102,21 +103,22 @@ trap stop_jobs SIGKILL
 # Print usage message helper function
 function usage() {
     echo "Usage of $PROGRAM:"
-    echo "    [-h]  Print this help message."
-    echo "    [-s]  Run on software zlib if ${DRIVER} is not loaded."
-    echo "    [-S]  Run on software zlib even if ${DRIVER} is loaded."
-    echo "    [-i]  <iterations>  repeat multiple times for more testing."
-    echo "          Default: 100"
-    echo "    [-p]  <number of instances> of this test to run in parallel."
-    echo "          Default: 10"
-    echo "    [-A]  <accelerator> use either GENWQE for the PCIe and CAPI for"
-    echo "          CAPI based solution available only on System p"
-    echo "          Use SW to use software compress/decompression"
-    echo "    [-C]  <card> set the compression card to use (0, 1, ... )."
-    echo "          RED (or -1) drive work to all available cards."
-    echo "    [-v]  Print status and informational output."
-    echo "          -vv for more verbosity"
-    echo "    [-V]  Print program version (${version})"
+    echo "    [-h] Print this help message."
+    echo "    [-s] Run on software zlib if ${DRIVER} is not loaded."
+    echo "    [-S] Run on software zlib even if ${DRIVER} is loaded."
+    echo "    [-i] <iterations>  repeat multiple times for more testing."
+    echo "         Default: 100"
+    echo "    [-p] <number of instances> of this test to run in parallel."
+    echo "         Default: 10"
+    echo "    [-A] <accelerator> use either GENWQE for the PCIe and CAPI for"
+    echo "         CAPI based solution available only on System p"
+    echo "         Use SW to use software compress/decompression"
+    echo "    [-C] <card> set the compression card to use (0, 1, ... )."
+    echo "         RED (or -1) drive work to all available cards."
+    echo "    [-t] <testdata.tar.gz> Define alternate for test-data.tar.gz."
+    echo "    [-v] Print status and informational output."
+    echo "         -vv for more verbosity"
+    echo "    [-V] Print program version (${version})"
     echo
 }
 
@@ -133,10 +135,12 @@ function check_tools
     done
 }
 
-# Check for and create directory holding the original data
+# Check for and create directory holding the original data.
+# Pass location of original data to this function.
 function prep_orig_data()
 {
-    local d=${INSTALL_DIR}/share/testdata/testdata.tar.gz
+    local d=$1
+    local data=`basename $d`
 
     printv "Preparing data..."
 
@@ -156,8 +160,8 @@ function prep_orig_data()
     fi
     cp ${d} ${ORIG_DATA}
     cd ${ORIG_DATA}
-    tar zxf testdata.tar.gz
-    rm -f ${ORIG_DATA}/testdata.tar.gz
+    tar zxf ${data}
+    rm -f ${ORIG_DATA}/${data}
 }
 
 function ffdc_msg_and_cleanup()
@@ -268,7 +272,7 @@ function genwqe_check_supported_bitstream_versions()
 }
 
 # Parse any options given on the command line
-while getopts "A:vVhsSi:C:p:" opt; do
+while getopts "t:A:vVhsSi:C:p:" opt; do
     case ${opt} in
         s)
 	    driver_check=0;
@@ -284,6 +288,9 @@ while getopts "A:vVhsSi:C:p:" opt; do
             ;;
         p)
             nr_instances=${OPTARG};
+            ;;
+        t)
+            TEST_DATA=${OPTARG};
             ;;
         A)
             export ZLIB_ACCELERATOR=${OPTARG};
@@ -343,7 +350,7 @@ fi
 check_tools
 
 # provide source data
-prep_orig_data
+prep_orig_data ${TEST_DATA}
 
 TStart=`date +%s`
 
