@@ -53,5 +53,5 @@ fi
 
 echo "PASSED ${accel} CARD ${card}"
 
-dmesg -W > basic_software_test.dmesg
+dmesg -T > basic_software_test.dmesg
 exit 0;

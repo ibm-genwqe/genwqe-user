@@ -54,5 +54,5 @@ for accel in CAPI GENWQE ; do
 	done
 done
 
-dmesg -W > basic_hardware_test.dmesg
+dmesg -T > basic_hardware_test.dmesg
 exit 0;
