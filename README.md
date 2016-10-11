@@ -19,4 +19,4 @@ A programming and usage guide for the hardware accelerated zlib can be downloade
 
 The User's guide for the CAPI Compression Accelerator Adapter (FC EJ1A and EJ1B; CCIN 2CF0) can be found here: [CAPI accelerated GZIP Compression Adapter User’s guide](https://www.ibm.com/developerworks/community/wikis/home?lang=en#!/wiki/W51a7ffcf4dfd_4b40_9d82_446ebc23c550/page/CAPI%20accelerated%20GZIP%20Compression%20Adapter%20User’s%20guide).
 
-Possible distributors: If you take a snapshot of this into one of your releases, please let us know such that we can sync up testing. Thanks. 
+Possible distributors: If you take a snapshot of this into one of your releases, please let us know such that we can sync up testing. Thanks.
