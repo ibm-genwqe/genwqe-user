@@ -22,7 +22,7 @@
  *	used for making the vpd bin file from a cvs file.
  *	The input file format is defined and fix.
  *	This tool can alos convert a binary file back to
- *	the orginal CSV file.
+ *	the original CSV file.
  */
 
 #include <stdio.h>

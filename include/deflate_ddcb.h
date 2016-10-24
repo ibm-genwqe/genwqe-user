@@ -88,7 +88,7 @@ extern "C" {
 #define ZEDC_INFL_WORKSPACE_SIZE	(ZEDC_INFL_TREE_START + ZEDC_TREE_LEN)
 
 /*
- * Worksspace defintion for inflate and deflate.
+ * Worksspace definition for inflate and deflate.
  */
 struct zedc_wsp {
 	uint8_t dict[2][ZEDC_DICT_LEN];	/* two dicts + extra bytes */

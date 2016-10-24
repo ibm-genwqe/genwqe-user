@@ -243,10 +243,10 @@ __BEGIN_DECLS
 	    17 RC: Dictionary Read Data Cross Check Error
 	    16 RC: Decompression Control Cross Check Error
 	    15 RC: Decompression Control Slave IVL Count Error
-	    14 RC: Decompression Control Slave Dictionary Read Adress Parity Error
+	    14 RC: Decompression Control Slave Dictionary Read Address Parity Error
 	13...8 RO: Reserved
 	     7 RC: Decompression Control Master IVL Count Error
-	     6 RC: Decompression Control Master Dictionary Read Adress Parity Error
+	     6 RC: Decompression Control Master Dictionary Read Address Parity Error
 	 5...0 RO: Reserved
  */
 #define MMIO_FIR_REGS_NUM       6

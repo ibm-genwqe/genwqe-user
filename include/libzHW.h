@@ -114,7 +114,7 @@ extern "C" {
  * independend small transfers. E.g. 64KiB data will will cause an
  * osolete 32KiB dictionary transfer with zEDC/zEDCv2 bitstreams.
  *
- * For large files the effect is not noticable.
+ * For large files the effect is not noticeable.
  *
  * Note: This flag cannot be used in verification tools like
  * genwqe_zcomp, since there we check dictionary consistency by
@@ -201,7 +201,7 @@ typedef gzedc_header *gzedc_headerp;
  *
  *  1)  prefx:  used to contain the header data which did not fit
  *      into the user output buffer.
- *  1a) in addtion there is the obytes array which contais some more
+ *  1a) in addition there is the obytes array which contains some more
  *      output data too.
  *      We already removed in this version: obytes[], good
  *

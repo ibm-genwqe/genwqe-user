@@ -339,7 +339,7 @@ static void __fd_m_del(int fd)
  * Function: __fd_m_head_all()
  *
  * @brief: This function is called in the case whe a fd fails in Multi
- * fd mode. The card will tahn be removed from the list and it can be
+ * fd mode. The card will then be removed from the list and it can be
  * tat any device using the fd_list is trying to get the next fd and
  * this fd is removed in the meantime. I go over all devices and reset
  * then m_fd_ptr to the head of the List.
@@ -569,7 +569,7 @@ static void __node_delete(struct card_dev_t *node, void **head)
 #if defined(CONFIG_USE_SIGNAL)
 /**
  * FIXME The next task we need to solve is to figure out which
- * file-descriptor is actually broken, when we are receving SIGIO.
+ * file-descriptor is actually broken, when we are receiving SIGIO.
  * This descriptor must than be closed and not used again e.g. set to
  * -1. For recovery it might be reopened using an alternate card, or
  * when the currently unusable card should reappear after successful
@@ -582,7 +582,7 @@ static void __health_sa_sigaction(int sig, siginfo_t *si, void *data)
 	pr_warn("[%s] sig=%d si=%p data=%p si_fd=%d si_code=%d\n"
 		"  FIXME The next task we need to solve is to figure\n"
 		"  out which file-descriptor is actually broken, when\n"
-		"  we are receving SIGIO.\n\n",
+		"  we are receiving SIGIO.\n\n",
 		__func__, sig, si, data, si->si_fd, si->si_code);
 	card_health_signal++;
 	sem_post(&ld->health_sem);
@@ -1847,7 +1847,7 @@ int genwqe_flash_update(card_handle_t dev, struct card_upd_params *upd,
 		return GENWQE_ERRNO;
 	}
 
-	/* checksum accross complete file */
+	/* checksum across complete file */
 	load.crc = genwqe_ddcb_crc32((void *)(unsigned long)load.data_addr,
 				     load.size, (uint32_t)-1);
 

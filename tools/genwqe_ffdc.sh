@@ -151,7 +151,7 @@ function do_dump_debugfs ()
 	echo
 
 	echo "--------------------------------------------------------------------"
-	echo "FIRs from previous run (most likely where the problem occured)"
+	echo "FIRs from previous run (most likely where the problem occurred)"
 	echo "  See dump below for all FIRs/FECs."
 	echo "--------------------------------------------------------------------"
 	

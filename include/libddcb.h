@@ -67,7 +67,7 @@ extern "C" {
 #define DDCB_ERR_OPEN			-403 /* cannot open accelerator */
 #define DDCB_ERR_VERS_MISMATCH		-404 /* library version mismatch */
 #define DDCB_ERR_INVAL			-405 /* illegal parameters */
-#define DDCB_ERR_EXEC_DDCB		-411 /* ddcb exection failed */
+#define DDCB_ERR_EXEC_DDCB		-411 /* ddcb execution failed */
 #define DDCB_ERR_APPID			-414 /* application id wrong */
 #define DDCB_ERR_NOTIMPL		-415 /* funct not implemented */
 #define DDCB_ERR_ENOMEM			-416

@@ -1340,7 +1340,7 @@ static uint64_t _card_get_queue_work_time(void *card_data)
 }
 
 /**
- * Our CAPI version runs witht 250 MHz.
+ * Our CAPI version runs with 250 MHz.
  */
 static uint64_t _card_get_frequency(void *card_data __attribute__((unused)))
 {
