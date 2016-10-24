@@ -901,6 +901,7 @@ static int __save_buf_to_file(const char *fname, const uint8_t *buff, int len)
 	rc = fwrite(buff, len, 1, fp);
 	if (rc != 1) {
 		pr_err("Cannot write all data: %d\n", rc);
+		fclose(fp);
 		return ZEDC_ERRNO;
 	}
 	fclose(fp);

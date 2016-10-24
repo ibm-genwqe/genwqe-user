@@ -203,6 +203,7 @@ static BOOL convert_csv(void)
 	op = fopen(output_fn, "w");
 	if (op == NULL ) {
 		printf("Cannot open output file '%s'\n", output_fn);
+		fclose(ip);
 		return (FALSE);
 	}
 
@@ -341,6 +342,7 @@ static BOOL convert_csv(void)
 		buffer = malloc(last_byte);
 		if (NULL == buffer) {
 			printf("\nCannot allocate %d Bytes\n", last_byte);
+			fclose(op);
 			return (FALSE);
 		}
 		nrw = fread(buffer, 1, last_byte, op);

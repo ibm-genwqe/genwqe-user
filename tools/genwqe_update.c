@@ -91,10 +91,13 @@ static int read_card_type(int card_no)
 
 	rc = fread(sysfs_type, 1, sizeof(sysfs_type), fp);
 	sysfs_type[sizeof(sysfs_type)-1] = 0;
-	if (rc <= 0)
+	if (rc <= 0) {
+		fclose(fp);
 		return -2;
+	}
 
 	sysfs_type[strlen(sysfs_type)-1] = 0;  /* remove trailing '\n' */
+	fclose(fp);
 	return 0;
 }
 
