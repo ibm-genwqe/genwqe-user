@@ -418,7 +418,7 @@ static int inflate_rem_zlib_header(struct zedc_stream_s *strm)
  *
  * @param strm	inflate stream context
  *
- * @return	0	sucess
+ * @return	0	success
  *		1	need more data
  *		3	compliance check fails
  */

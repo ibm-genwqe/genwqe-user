@@ -473,7 +473,7 @@ static int deflate_process_results(struct zedc_stream_s *strm,
 		       strm->inp_processed, strm->avail_in,
 		       strm->retc, strm->attn, strm->progress);
 
-		/* Now become really verbose ... Let's see what happend. */
+		/* Now become really verbose ... Let's see what happens. */
 		zedc_asiv_defl_print(strm, 1);
 		zedc_asv_defl_print(strm, 1);
 
@@ -496,7 +496,7 @@ static int deflate_process_results(struct zedc_stream_s *strm,
 		       strm->avail_in, strm->avail_out,
 		       strm->retc, strm->attn, strm->progress);
 
-		/* Now become really verbose ... Let's see what happend. */
+		/* Now become really verbose ... Let's see what happens. */
 		zedc_asiv_defl_print(strm, 1);
 		zedc_asv_defl_print(strm, 1);
 
@@ -550,7 +550,7 @@ static int deflate_process_results(struct zedc_stream_s *strm,
 	if (dyn_huffman_supported(zedc)) {
 		/*
 		 * For the new format we can get more bytes than
-		 * orignially expected. In the v1 buffer there is one
+		 * originally expected. In the v1 buffer there is one
 		 * more byter and there is one byte in the middle of
 		 * the DDCB data, which has a different meaning
 		 * (out_dict_offs). We need to jump over it.

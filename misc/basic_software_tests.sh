@@ -19,7 +19,7 @@
 # Execute basic hardware tests for all available cards in a
 # test system. This runs for GENWQE as well as for CAPI GZIP cards.
 # It needs some test data to work on and prints out a message if the
-# test data is not availabe. Use for automated regression testing.
+# test data is not available. Use for automated regression testing.
 #
 
 export PATH=`pwd`/tools:$PATH

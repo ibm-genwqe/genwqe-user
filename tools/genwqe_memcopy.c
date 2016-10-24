@@ -85,8 +85,8 @@ struct memcpy_in_parms {
 	uint64_t in_ats_type;	/* ATS_TYPE_FLAT_RDWR or ATS_TYPE_SGL_RDWR */
 	unsigned int page_size;
 	int data_buf_size;	/* 4k default, changed with -s option */
-	unsigned int pgoffs_i;	/* offset in the 4k Alligned input buffer */
-	unsigned int pgoffs_o;	/* offset in the 4k Alligned output buffer */
+	unsigned int pgoffs_i;	/* offset in the 4k Aligned input buffer */
+	unsigned int pgoffs_o;	/* offset in the 4k Aligned output buffer */
 	uint32_t mcpy_crc32;	/* my value to compare */
 	uint32_t mcpy_adler32;	/* my value to compare */
 	int have_threads;
@@ -99,8 +99,8 @@ struct memcpy_thread_data {
 	int thread;
 	pthread_t tid;
 	accel_t accel;
-	uint8_t	*ibuf4k;	/* 4 K alligned buffer */
-	uint8_t *ibuf;		/* the 4k alligned buffer + pgoffs_i */
+	uint8_t	*ibuf4k;	/* 4 K aligned buffer */
+	uint8_t *ibuf;		/* the 4k aligned buffer + pgoffs_i */
 	struct memcpy_in_parms *ip;
 	uint64_t out_ats_type;	/* ATS_TYPE_FLAT_RDWR or
 					   ATS_TYPE_SGL_RDWR */

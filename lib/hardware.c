@@ -555,7 +555,7 @@ static void h_flush_obuf(z_streamp strm)
  * comes from the pre-pinnned output buffer into the user buffer.
  *
  * We observed so far that using a 1 MiB buffer helps to improve
- * performance a lot if the input data is e.g. arround 16 KiB per
+ * performance a lot if the input data is e.g. around 16 KiB per
  * request (zpipe.c defaults).
  */
 int h_deflate(z_streamp strm, int flush)

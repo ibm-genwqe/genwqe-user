@@ -30,7 +30,7 @@
  * from the hardware queue and converts the DDCB-request defined in
  * this file into a DDCB. Once the request is passed to the card, the
  * process/thread will sleep and will be awoken once the request is
- * finished with our without success or a timeout condition occured.
+ * finished with our without success or a timeout condition occurred.
  *
  * IBM Accelerator Family 'GenWQE'
  */

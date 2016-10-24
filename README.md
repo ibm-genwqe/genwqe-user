@@ -3,7 +3,7 @@ genwqe-user
 
 GenWQE (Generic Work Queue Engine) software supports the IBM PCIe3 FPGA or CAPI Compression Accelerator Adapters to speed up processing of the DEFLATE compression algorithm. This repository contains the source code to test, maintain and update the GenWQE PCIe/CAPI cards. Furthermore a zlib version with hardware acceleration is provided to do zlib style compression/decompression according to [RFC1950](https://www.ietf.org/rfc/rfc1950.txt), [RFC1951](https://www.ietf.org/rfc/rfc1951.txt) and [RFC1952](https://www.ietf.org/rfc/rfc1952.txt). This can be used as alternative to the traditional software zlib.
 
-The GenWQE PCIe or CAPI cards can currently be aquired as options to the
+The GenWQE PCIe or CAPI cards can currently be acquired as options to the
 latest IBM System p machines:
 + EJ12 full-height: [PCIe3 FPGA Compression Accelerator Adapter (FC EJ12; CCIN 59AB)](http://www-01.ibm.com/support/knowledgecenter/POWER8/p8hcd/fcej12.htm?cp=POWER8%2F3-3-9-1-1-44)
 + EJ13 low-profile: [PCIe3 LP FPGA Compression Accelerator Adapter (FC EJ13; CCIN 59AB)](http://www-01.ibm.com/support/knowledgecenter/POWER8/p8hcd/fcej13.htm?cp=POWER8%2F1-2-9-1-1-50&lang=en)

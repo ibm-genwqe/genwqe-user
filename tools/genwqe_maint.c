@@ -15,7 +15,7 @@
  */
 
 /*
- * Genwqe Capi Card Master Maintenence tool.
+ * Genwqe Capi Card Master Maintenance tool.
  */
 
 #include <stdio.h>
