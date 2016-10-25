@@ -225,7 +225,7 @@ else
     echo "no"
 fi
 
-export PATH=./tools:./genwqe-user/tools:$PATH
+export PATH=./tools:./genwqe-user/tools:/sbin:/usr/sbin:$PATH
 cpus=`cat /proc/cpuinfo | grep processor | wc -l`
 bufsize=1MiB
 count=1
