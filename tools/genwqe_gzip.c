@@ -584,8 +584,8 @@ static int do_list_contents(FILE *fp, char *out_f, int list_contents)
 		fprintf(stderr,
 			"         compressed        uncompressed  ratio "
 			"uncompressed_name\n"
-			"%19lld %19d  %2.2f%% %s\n",
-			(long long)st.st_size, size, ratio,
+			"%19lld %19lld  %2.2f%% %s\n",
+			(long long)st.st_size, (long long)size, ratio,
 			out_f);
 	} else {
 		time_t t = time(NULL);
@@ -595,10 +595,10 @@ static int do_list_contents(FILE *fp, char *out_f, int list_contents)
 		fprintf(stderr, "method  crc     date  time           "
 			"compressed        uncompressed  ratio "
 			"uncompressed_name\n"
-			"%s %x %s %2d %d:%d %19lld %19d  %2.2f%% %s\n",
+			"%s %x %s %2d %d:%d %19lld %19lld  %2.2f%% %s\n",
 			"defla", crc32,
 			mon[tm->tm_mon], tm->tm_mday, tm->tm_hour, tm->tm_min,
-			(long long)st.st_size, size, ratio,
+			(long long)st.st_size, (long long)size, ratio,
 			out_f);
 	}
 
