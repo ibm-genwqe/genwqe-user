@@ -967,7 +967,7 @@ static inline int __inflate(z_streamp strm, struct hw_state *s, int flush)
  * FIXME Circumvention for hardware deficiency
  *
  * Our hardware does not continue processing input bytes, once it has
- * no ouput bytes anymore. This causes our hardware missing the FEOB
+ * no output bytes anymore. This causes our hardware missing the FEOB
  * information which can be in empty blocks which follow the regular
  * data. Software would return Z_STREAM_END in those cases and not
  * Z_OK, which is expected by some applications e.g. the MongoDB zlib
