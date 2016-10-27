@@ -250,7 +250,7 @@ static inline void cmd_2_ddcb(ddcb_t *pddcb, struct ddcb_cmd *cmd,
 	pddcb->n.ats_64 = __cpu_to_be64(cmd->ats);
 	memcpy(&pddcb->n.asiv[0], &cmd->asiv[0], DDCB_ASIV_LENGTH_ATS);
 	pddcb->icrc_hsi_shi_32 = __cpu_to_be32(0x00000000); /* for crc */
-	/* Write seqnum into reserverd area, check for this seqnum is done in ddcb_2_cmd() */
+	/* Write seqnum into reserved area, check for this seqnum is done in ddcb_2_cmd() */
 	pddcb->rsvd_0e = __cpu_to_be16(seqnum);
 
 	/* DDCB completion irq */

@@ -176,7 +176,7 @@ static void __free(void *ptr)
  *
  * zEDC was better here than zEDCv2. zEDCv2 requires
  * us to increase the factor to 15/8, which wastes
- * some memory in most cases. What a pitty.
+ * some memory in most cases. What a pity.
  */
 uLong h_deflateBound(z_streamp strm __attribute__((unused)), uLong sourceLen)
 {
@@ -594,7 +594,7 @@ int h_deflate(z_streamp strm, int flush)
 
 		/* Give out what is already there */
 		h_flush_obuf(strm);
-		if (strm->avail_out == 0)	/* need more ouput space */
+		if (strm->avail_out == 0)	/* need more output space */
 			return Z_OK;
 		/*
 		 * Here we start the hardware to do the compression
@@ -649,7 +649,7 @@ int h_deflate(z_streamp strm, int flush)
 
 		/* Give out what is already there */
 		h_flush_obuf(strm);
-		if (strm->avail_out == 0)	/* need more ouput space */
+		if (strm->avail_out == 0)	/* need more output space */
 			return Z_OK;
 
 		ibuf_bytes = s->ibuf - s->ibuf_base;  /* accumulated input */

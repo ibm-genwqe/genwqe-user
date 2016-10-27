@@ -51,10 +51,10 @@ static void usage(const char *prog)
 		"  -V, --version      print version\n"
 		"  -C, --card=CARDNO\n"
 		"  -f, --file=VPD.BIN\n"
-		"  -d, --dump	      use multible d to increase dump info\n"
+		"  -d, --dump	      use multiple d to increase dump info\n"
 		"  -u, --update	      set this flag for update VPD\n"
 		"  -s, --show	      set this flag to display VPD from a card\n"
-		"  -v, --verbose      verbose level, use multible v's to increase\n"
+		"  -v, --verbose      verbose level, use multiple v's to increase\n"
 		"\n"
 		"This utility updates the Genwqes FLASH with new VPD\n"
 		"information from a *.bin file. Do not disconnect the card from power\n"
@@ -233,7 +233,7 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	/* simulation is not suppored with this tool */
+	/* simulation is not supported with this tool */
 	env = getenv("GENWQE_SIM");
 	if ((env) && (atoi(env) > 0)) {
 		pr_err("driver / HW simulation active !\n");

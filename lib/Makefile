@@ -22,7 +22,7 @@ libversion = $(VERSION)
 CFLAGS += -fPIC -fno-strict-aliasing
 LDLIBS += -lpthread -ldl -lrt
 
-### Accelerated libz implemenation (Accelerated Data Compression/ADC)
+### Accelerated libz implementation (Accelerated Data Compression/ADC)
 libname=libzADC
 projA = $(libname).a \
 	$(libname).so \
@@ -149,7 +149,7 @@ $(libname).so.$(libversion): __$(libname).o
 	$(CC) $(LDFLAGS) -shared -Wl,-soname,$(libname).so.$(MAJOR_VERS) \
 		 -Wl,--version-script=libzADC.map -o $@ $^ $(LDLIBS)
 
-# Produce z_ prefixed verson of software zlib. We need this when we
+# Produce z_ prefixed version of software zlib. We need this when we
 # want to include libz statially instead of using dlopen/dlsym to use
 # it.
 #

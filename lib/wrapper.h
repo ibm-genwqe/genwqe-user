@@ -18,7 +18,7 @@
 #define __WRAPPER_H__
 
 /*
- * Switching between software and hardware implemenation of zlib. The
+ * Switching between software and hardware implementation of zlib. The
  * hardware implementation is not implementing the full set of
  * interfaces but enough to do commonly used functionality for
  * compression and decompression.

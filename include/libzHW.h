@@ -111,7 +111,7 @@ extern "C" {
  * not large enough the DDCB will be repeated with the SAVE_DICT flag
  * enabled, such that compression/decompression can properly
  * continue. It might help to reduce hardware time especially for many
- * independend small transfers. E.g. 64KiB data will will cause an
+ * independent small transfers. E.g. 64KiB data will cause an
  * osolete 32KiB dictionary transfer with zEDC/zEDCv2 bitstreams.
  *
  * For large files the effect is not noticeable.
@@ -229,7 +229,7 @@ typedef struct zedc_stream_s {
 	int		flush;
 	int		data_type;	/**< best guess dtype: ascii/binary*/
 
-	/* stream data mangement */
+	/* stream data management */
 	const uint8_t	*next_in;	/**< next input byte */
 	unsigned int	avail_in;	/**< # of bytes available at next_in */
 	unsigned long	total_in;	/**< total nb of inp read so far */
@@ -244,7 +244,7 @@ typedef struct zedc_stream_s {
 	/*
 	 * PRIVATE AREA
 	 *
-	 * The definitions below are not intendet for normal use. We
+	 * The definitions below are not intended for normal use. We
 	 * have them at the moment here, because we liked to dump some
 	 * internals for problem determination and where too lazy to
 	 * hide them and add access functions. When moving towards a

@@ -772,7 +772,7 @@ int zedc_deflate(zedc_streamp strm, int flush)
 		    (strm->avail_out >= __be32_to_cpu(asv->outp_returned)))
 			break;
 
-		/* What a pitty, need to repeat to get back dictionary */
+		/* What a pity, need to repeat to get back dictionary */
 		if ((strm->flags & ZEDC_FLG_SKIP_LAST_DICT) &&
 		    (((flush == ZEDC_FINISH) || (flush == ZEDC_FULL_FLUSH)) &&
 		     (strm->avail_out >= strm->avail_in))) {
@@ -780,7 +780,7 @@ int zedc_deflate(zedc_streamp strm, int flush)
 			asiv->out_dict = out_dict;
 			asiv->out_dict_len = out_dict_len;
 
-			pr_warn("[%s] What a pitty, optimization did "
+			pr_warn("[%s] What a pity, optimization did "
 				"not work\n"
 				"  (RETC=%03x ATTN=%04x PROGR=%x)\n",
 				__func__, cmd->retc, cmd->attn, cmd->progress);

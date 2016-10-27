@@ -47,7 +47,7 @@ typedef enum { FALSE = 0, TRUE = 1 } BOOL;
  */
 static char input_fn[MAX_LINE];
 static char output_fn[MAX_LINE];
-static BOOL verbose_flag = FALSE; /** TRUE if verbse messages output */
+static BOOL verbose_flag = FALSE; /** TRUE if verbose messages output */
 static BOOL add_crc = FALSE;
 
 typedef enum _SOS_ENDIANNESS {

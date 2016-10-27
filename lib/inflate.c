@@ -1181,7 +1181,7 @@ int zedc_inflate(zedc_streamp strm, int flush)
 		if (asv->infl_stat & INFL_STAT_FINAL_EOB)
 			break;
 
-		/* What a pitty, we guessed wrong and need to
+		/* What a pity, we guessed wrong and need to
 		   repeat. We did not see the last byte in the last
 		   block yet! */
 		if ((strm->flags & ZEDC_FLG_SKIP_LAST_DICT) &&
@@ -1189,7 +1189,7 @@ int zedc_inflate(zedc_streamp strm, int flush)
 			cmd->cmdopts |= DDCB_OPT_INFL_SAVE_DICT;
 			asiv->out_dict = out_dict;
 			asiv->out_dict_len = out_dict_len;
-			pr_warn("[%s] What a pitty, we guessed wrong "
+			pr_warn("[%s] What a pity, we guessed wrong "
 				"and need to repeat\n", __func__);
 		}
 	}

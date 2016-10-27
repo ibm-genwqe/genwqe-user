@@ -557,7 +557,7 @@ static void __node_delete(struct card_dev_t *node, void **head)
 		node->next->prev = NULL;
 		*head = (void*)node->next;
 	} else {
-		/* someting in the middle, root_node stays */
+		/* something in the middle, root_node stays */
 		node->prev->next = node->next;
 		node->next->prev = node->prev;
 	}
@@ -836,7 +836,7 @@ static void *__inotify_thread(void *data)
 /*
  * Function: __inotify_create()
  *	This functions creates the inotify event handler thread
- *	only for multible mode
+ *	only for multiple mode
  */
 static void __inotify_create(struct lib_data_t *ld)
 {
@@ -1569,7 +1569,7 @@ void *genwqe_card_alloc_scb(card_handle_t card, size_t size)
  *                         at offset offs.
  *
  * Each 4-bit in the ATS array corresponds to 8 bytes in the scb. The
- * 1st ATS bits describe the ATS array itself and must therfore be
+ * 1st ATS bits describe the ATS array itself and must therefore be
  * plain data read-only: ATS_TYPE_DATA. The remaining bits can
  * identify plan data read-only or rw, sgl version 1 or sgl version 2,
  * or even a scb read-only or rw itself. Recursion avoidance when
