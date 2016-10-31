@@ -12,7 +12,7 @@
 
 #include "force_cpu.h"
 
-/* FIXME Fake this for old RHEL verions e.g. RHEL5.6 */
+/* FIXME Fake this for old RHEL versions e.g. RHEL5.6 */
 #ifndef CPU_ALLOC
 #define	  CPU_ALLOC(cpus)		      ({ void *ptr = NULL; ptr; })
 #define	  CPU_ALLOC_SIZE(cpus)		      ({ int val = 0; val; })

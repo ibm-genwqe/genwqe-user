@@ -61,7 +61,7 @@ static void usage(const char *prog)
 	       "    Reg 0x0008 CAPI Card Version Reg 2 (RO)\n"
 	       "    Reg 0x0080 CAPI Card Free Run Timer in 4 nsec (RO)\n"
 	       "    Reg 0x0180 Queue Work Time in 4 nsec (RO)\n"
-	       "    Reg 0x1000 ... 0x1028  6 Fir Regsiters (RW)\n"
+	       "    Reg 0x1000 ... 0x1028  6 Fir Registers (RW)\n"
 	       "\n"
 	       "   Only CAPI (debugging):\n"
 	       "     genwqe_peek -ACAPI -C0 --psl-bar=2 --width=64 0x150\n"

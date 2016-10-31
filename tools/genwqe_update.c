@@ -327,7 +327,7 @@ int main(int argc, char *argv[])
 
 	genwqe_card_lib_debug(verbose_flag);
 
-	/* simulation is not suppored with this tool */
+	/* simulation is not supported with this tool */
 	env = getenv("GENWQE_SIM");
 	if ((env) && (atoi(env) > 0)) {
 		pr_err("driver / HW simulation active !\n");

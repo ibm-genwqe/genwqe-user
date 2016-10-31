@@ -25,7 +25,7 @@
 # are needed to saturate the hardware.
 #
 # The buffersize test shows the influence of buffering and small buffers
-# on throughput. Hardware implemenation will normally work best with large
+# on throughput. Hardware implementation will normally work best with large
 # buffers.
 #
 

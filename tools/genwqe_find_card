@@ -97,7 +97,7 @@ function detect_genwqe_cards() {
 }
 
 case ${accel} in
-	# Set one or the other, but not not miss to set the accelerator
+	# Set one or the other, but not miss to set the accelerator
 	"UNKNOWN")
 	usage
 	exit 1

@@ -15,7 +15,7 @@
  */
 
 /*
- * Load a Text file file as a new tree into the Capi Card
+ * Load a Text file as a new tree into the Capi Card
  */
 
 #include <stdio.h>

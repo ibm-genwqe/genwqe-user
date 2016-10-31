@@ -32,7 +32,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include <sysexits.h>		/* standart application exit codes */
+#include <sysexits.h>		/* standard application exit codes */
 
 #define GENWQE_TOOL_VERS_STRING	"3.0.25"
 
@@ -139,7 +139,7 @@ extern int verbose_flag;
 			fprintf(stdout, fmt, ## __VA_ARGS__);	\
 	} while (0)
 
-/* FIXME Fake this for old RHEL verions e.g. RHEL5.6 */
+/* FIXME Fake this for old RHEL versions e.g. RHEL5.6 */
 #ifndef CLOCK_MONOTONIC_RAW
 #define   clock_gettime(clk_id, tp) ({ int val = 0; val; })
 #endif

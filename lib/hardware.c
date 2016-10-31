@@ -176,7 +176,7 @@ static void __free(void *ptr)
  *
  * zEDC was better here than zEDCv2. zEDCv2 requires
  * us to increase the factor to 15/8, which wastes
- * some memory in most cases. What a pitty.
+ * some memory in most cases. What a pity.
  */
 uLong h_deflateBound(z_streamp strm __attribute__((unused)), uLong sourceLen)
 {
@@ -594,7 +594,7 @@ int h_deflate(z_streamp strm, int flush)
 
 		/* Give out what is already there */
 		h_flush_obuf(strm);
-		if (strm->avail_out == 0)	/* need more ouput space */
+		if (strm->avail_out == 0)	/* need more output space */
 			return Z_OK;
 		/*
 		 * Here we start the hardware to do the compression
@@ -649,7 +649,7 @@ int h_deflate(z_streamp strm, int flush)
 
 		/* Give out what is already there */
 		h_flush_obuf(strm);
-		if (strm->avail_out == 0)	/* need more ouput space */
+		if (strm->avail_out == 0)	/* need more output space */
 			return Z_OK;
 
 		ibuf_bytes = s->ibuf - s->ibuf_base;  /* accumulated input */
@@ -967,7 +967,7 @@ static inline int __inflate(z_streamp strm, struct hw_state *s, int flush)
  * FIXME Circumvention for hardware deficiency
  *
  * Our hardware does not continue processing input bytes, once it has
- * no ouput bytes anymore. This causes our hardware missing the FEOB
+ * no output bytes anymore. This causes our hardware missing the FEOB
  * information which can be in empty blocks which follow the regular
  * data. Software would return Z_STREAM_END in those cases and not
  * Z_OK, which is expected by some applications e.g. the MongoDB zlib

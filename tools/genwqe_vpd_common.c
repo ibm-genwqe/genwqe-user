@@ -86,7 +86,7 @@ static uint8_t a2h(char c)
 }
 
 /**
- * Converts BIN to CSV file file
+ * Converts BIN to CSV file
  *
  *  op:     Output File Pointer
  *  fs:     Size of input data in buffer

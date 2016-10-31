@@ -227,7 +227,7 @@ static inline void genwqe_ddcb_cmd_init(struct genwqe_ddcb_cmd *cmd)
  * And the usable data starts after the ATS area which is used to
  * describe the SCB itself.
  *
- * Our first implemenation is limited such that we need to align the
+ * Our first implementation is limited such that we need to align the
  * memory for the SCB to a 4KiB boundary.
  */
 void *genwqe_card_alloc_scb(card_handle_t card, size_t size);

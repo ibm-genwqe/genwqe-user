@@ -61,7 +61,7 @@ else
     fi
     if ! kill -0 $OTHERPID &>/dev/null; then
         # lock is stale, remove it and restart
-        echo "Removing stale lock of nonexistant PID ${OTHERPID}" >&2
+        echo "Removing stale lock of nonexistent PID ${OTHERPID}" >&2
         rm -rf "${LOCKDIR}"
         exit ${ENO_LOCKFAIL}
     else

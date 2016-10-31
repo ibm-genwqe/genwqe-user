@@ -17,9 +17,9 @@
 #
 
 #
-# This testcase proceses significant interrupt stress. Run that for a day
+# This testcase processes significant interrupt stress. Run that for a day
 # and you will know if your device driver and software can surive sudden
-# abborts while running a lot of interrrupt stress.
+# abborts while running a lot of interrupt stress.
 #
 # Start N echos and kill them after a couple of seconds.
 #
