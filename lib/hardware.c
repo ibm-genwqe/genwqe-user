@@ -1295,7 +1295,7 @@ int h_inflate(z_streamp strm, int flush)
 		    (obuf_bytes == 0))		/* no more outp data in buf */
 			return Z_STREAM_END;	/* nothing to do anymore */
 
-		if (strm->avail_out == 0) {	/* need more ouput space */
+		if (strm->avail_out == 0) {	/* need more output space */
 			rc = Z_OK;
 #ifdef CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END /* EXPERIMENTAL for MongoDB PoC */
 			/*
@@ -1392,7 +1392,7 @@ int h_inflate(z_streamp strm, int flush)
 		    (obuf_bytes == 0))		/* no more outp data in buf */
 			return Z_STREAM_END;	/* nothing to do anymore */
 
-		if (strm->avail_out == 0)	/* need more ouput space */
+		if (strm->avail_out == 0)	/* need more output space */
 			return Z_OK;
 		hw_trace("[%p] data_type 0x%x\n", strm, strm->data_type);
 		if (strm->data_type & 0x80) {
