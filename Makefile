@@ -39,7 +39,7 @@ PLATFORM ?= $(shell uname -i)
 
 distro = $(shell lsb_release -d | cut -f2)
 
-subdirs += lib tools
+subdirs += lib tools misc
 
 ifdef WITH_LIBCXL
 subdirs += init
@@ -51,7 +51,7 @@ MODPROBE_D ?= /etc/modprobe.d
 all: $(subdirs)
 
 # Rules for the recursive build
-tools: lib
+tools misc: lib
 
 # z_ prefixed version of libz, intended to be linked statically with
 # our libz version to provide the software zlib functionality.

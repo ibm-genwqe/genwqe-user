@@ -22,6 +22,11 @@ libversion = $(VERSION)
 CFLAGS += -fPIC -fno-strict-aliasing
 LDLIBS += -lpthread -ldl -lrt
 
+# If we use libcxl, we need to reflect that to avoid underlinkage
+ifneq ($(BUNDLE_LIBCXL),1)
+LDLIBS += -lcxl
+endif
+
 ### Accelerated libz implementation (Accelerated Data Compression/ADC)
 libname=libzADC
 projA = $(libname).a \

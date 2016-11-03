@@ -22,7 +22,7 @@
 # test data is not available. Use for automated regression testing.
 #
 
-export PATH=`pwd`/tools:$PATH
+export PATH=`pwd`/tools:`pwd`/misc:$PATH
 export LD_LIBRARY_PATH=`pwd`/lib:$LD_LIBRARY_PATH
 
 # lock dirs/files
@@ -83,6 +83,12 @@ fi
 for accel in GENWQE CAPI ; do
 	for card in `./tools/genwqe_find_card -A${accel}`; do
 		echo "TESTING ${accel} CARD ${card}"
+
+		zlib_test.sh  -A${accel} -C${card}
+		if [ $? -ne 0 ]; then
+			echo "FAILED ${accel} CARD ${card}"
+			exit 1
+		fi
 
 		genwqe_mt_perf -A${accel} -C${card}
 		if [ $? -ne 0 ]; then
