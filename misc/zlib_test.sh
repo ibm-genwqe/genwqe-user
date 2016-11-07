@@ -47,9 +47,9 @@ function usage() {
 
 while getopts "A:C:i:t:v:h" opt; do
     case $opt in
-        A)
-        export ZLIB_ACCELERATOR=$OPTARG;
-        ;;
+	A)
+	export ZLIB_ACCELERATOR=$OPTARG;
+	;;
 	C)
 	card=$OPTARG;
 	;;
@@ -62,13 +62,13 @@ while getopts "A:C:i:t:v:h" opt; do
 	v)
 	verbose=$OPTARG;
 	;;
-        h)
-        usage;
-        exit 0;
-        ;;
-        \?)
-        echo "Invalid option: -$OPTARG" >&2
-        ;;
+	h)
+	usage;
+	exit 0;
+	;;
+	\?)
+	echo "Invalid option: -$OPTARG" >&2
+	;;
     esac
 done
 
@@ -254,7 +254,7 @@ function zlib_hardware_no_buffering ()
 
     test_compress_decompress test_data.bin
     mv test_data.bin.rfc1950 test_data.bin.rfc1950.genwqe
-    
+
     test_compress_decompress empty.bin
     mv empty.bin.rfc1950 empty.bin.rfc1950.genwqe
 }
@@ -269,12 +269,12 @@ function zlib_hardware_buffering ()
 
     export ZLIB_IBUF_TOTAL=${ibuf_size}
     export ZLIB_OBUF_TOTAL=${ibuf_size}
-    
+
     echo "Use HW libz using card ${card} ..."
     echo "  CARD:       ${ZLIB_CARD}"
     echo "  IBUF_TOTAL: ${ZLIB_IBUF_TOTAL}"
     echo "  OBUF_TOTAL: ${ZLIB_OBUF_TOTAL}"
-    
+
     test_compress_decompress test_data.bin
     mv test_data.bin.rfc1950 test_data.bin.rfc1950.genwqe
 
@@ -373,7 +373,7 @@ function zlib_hardware_buffering ()
     dd if=/dev/urandom bs=1 count=100 of=padding.bin
     cat test_data.bin.rfc1950.zlib padding.bin > \
 	test_data.bin.rfc1950.padded.zlib
-    
+
     time zpipe_rnd -s1MiB -d \
 	< test_data.bin.rfc1950.padded.zlib > test_data.bin.out
     if [ $? -ne 0 ]; then
@@ -416,8 +416,8 @@ function zlib_append ()
     echo -n "  zpipe_append -FZLIB -fZ_PARTIAL_FLUSH -i2MiB -o4KiB -s256KiB "
     zpipe_append -FZLIB -fZ_PARTIAL_FLUSH -i2MiB -o4KiB -s256KiB
     if [ $? -ne 0 ]; then
-    	echo "failed"
-    	exit 1
+	echo "failed"
+	exit 1
     fi
     echo "ok"
 
@@ -432,7 +432,7 @@ function zlib_append ()
     for f in ZLIB DEFLATE GZIP ; do
 	for ibuf in 2MiB 1MiB 128KiB 4KiB 1000 100 ; do
 	    for obuf in 1MiB 128KiB 4KiB 1000 100 ; do
-	        # echo "Append feature: format=${f} ib=${ibuf} ob=${obuf} ... "
+		# echo "Append feature: format=${f} ib=${ibuf} ob=${obuf} ... "
 		echo -n "zpipe_append -F${f} -f${flush} -i${ibuf} -o${obuf} -s256KiB ${params} "
 		zpipe_append -F${f} -f${flush} -i${ibuf} -o${obuf} -s256KiB ${params}
 		if [ $? -ne 0 ]; then
@@ -493,11 +493,11 @@ function zlib_append ()
 	    done
 	done
     done
-    
+
     echo "--------------------------------------------------------------------"
     echo "zpipe_append: HW compression/decompression with buffering obuf=1MiB"
     echo "--------------------------------------------------------------------"
-    
+
     export ZLIB_INFLATE_IMPL=1
     export ZLIB_DEFLATE_IMPL=1
     export ZLIB_IBUF_TOTAL=1MiB
