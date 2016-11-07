@@ -516,32 +516,42 @@ static int h_read_ibuf(z_streamp strm)
 }
 
 /**
- * Flush available output bytes
+ * Flush available output bytes to given stream.
+ *
+ * @strm   Compression stream used to push out data.
+ * @return Remaining bytes in internal output buffer.
  */
-static void h_flush_obuf(z_streamp strm)
+static unsigned int h_flush_obuf(z_streamp strm)
 {
 	int tocopy;
 	unsigned int obuf_bytes;
 	struct hw_state *s = (struct hw_state *)strm->state;
 
-	if (strm->avail_out == 0)		/* no output space available */
-		return;
-
 	obuf_bytes = s->obuf - s->obuf_next;    /* remaining bytes in obuf */
+	if (strm->avail_out == 0)		/* no output space available */
+		return obuf_bytes;
+
 	if (obuf_bytes == 0)			/* give out what is there */
-		return;
+		return obuf_bytes;
 
 	tocopy = MIN(strm->avail_out, obuf_bytes);
 
-	hw_trace("[%p] *** giving out %d bytes ...\n", strm, tocopy);
+	hw_trace("[%p] *** giving out %d bytes obuf_bytes %d ...\n",
+		 strm, tocopy, obuf_bytes);
+
 	memcpy(strm->next_out, s->obuf_next, tocopy);
 	s->obuf_next += tocopy;
 	s->obuf_avail += tocopy;  /* bytes were given out / FIXME (+)? */
+
+	obuf_bytes = s->obuf - s->obuf_next;    /* remaining bytes in obuf */
+	hw_trace("[%p] *** new obuf_bytes %d ...\n", strm, obuf_bytes);
 
 	/* book-keeping for output buffer */
 	strm->avail_out -= tocopy;
 	strm->next_out += tocopy;
 	strm->total_out += tocopy;
+
+	return obuf_bytes;
 }
 
 /**
@@ -1084,13 +1094,22 @@ static inline unsigned int __in_hdr_scratch_len(zedc_streamp strm)
 	return (uint32_t)(len / 8ULL);
 }
 
+static inline void __reset_hdr_scratch_len(zedc_streamp strm)
+{
+	strm->hdr_ib = 0;
+	strm->tree_bits = 0;
+	strm->pad_bits = 0;
+	strm->scratch_ib = 0;
+	strm->scratch_bits = 0;
+}
+
 /**
  * NOTES: Missing are reading more data if we run out of space in our
  * temporary buffer, more testing for corner cases, figuring out if we
  * are really at a header-start position (talk to hardware team).
  *
  * Consider moving this code at the end of DDCB processing. This is
- * where it really belongs to mimic the exact zlib software
+ * where it really belongs, to mimic the exact zlib software
  * behavior. It could easily be, that this simplifies testing a lot,
  * since one could use the exact amount of output bytes and insist on
  * seeing Z_STREAM_END as return code. Now we need to call inflate() a
@@ -1135,8 +1154,10 @@ static inline int __check_stream_end(z_streamp strm)
 		/* fprintf(zlib_log, "STATE: %s\n", state_str[e.state]); */
 		switch (e.state) {
 		case READ_HDR:
+			hw_trace("READ_HDR\n");
+
 			rc = get_bits(&e, 3, &d);
-			hw_trace("    d=%llx\n", (long long)d);
+			hw_trace("    d=%08llx rc=%d\n", (long long)d, rc);
 			if (rc)
 				goto go_home;
 			drop_bits(&e, 3);
@@ -1147,6 +1168,8 @@ static inline int __check_stream_end(z_streamp strm)
 				break;
 			case 0x1:
 				e.state = DYN_HUFFMAN;
+				/* we need to stop, since the end
+				   symbol is unknown to us */
 				goto go_home;
 			case 0x2:
 				e.state = FIXED_HUFFMAN;
@@ -1156,19 +1179,21 @@ static inline int __check_stream_end(z_streamp strm)
 				goto go_home;
 			}
 			if (d & 0x4) {
-				hw_trace("  Z_STREAM_END seen!\n");
+				hw_trace("  Z_STREAM_END potentially detected!\n");
 				ret = Z_STREAM_END;
 			}
 			break;
 
 		case FIXED_HUFFMAN:
+			hw_trace("FIXED_HUFFMAN\n");
+
 			rc = get_bits(&e, 7, &d);
-			hw_trace("    d=%llx, 0 is goodness\n",
+			hw_trace("    d=%08llx, 0 indicates empty FIXED_HUFFMAN\n",
 				 (long long)d);
 			if (rc)
 				goto go_home;
-			drop_bits(&e, 7);
 
+			drop_bits(&e, 7);
 			if (d != 0x0)  /* end of stream required here */
 				goto go_home;
 
@@ -1180,15 +1205,17 @@ static inline int __check_stream_end(z_streamp strm)
 			break;
 
 		case COPY_BLOCK:
+			hw_trace("COPY_BLOCK\n");
+
 			sync_to_byte(&e);
 			rc = get_bits(&e, 32, &d);
-			hw_trace("    d=%llx, 0000ffff is goodness\n",
+			hw_trace("    d=%08llx, 0000ffff indicates empty COPY_BLOCK\n",
 				 (long long)d);
 			if (rc)
 				goto go_home;
 			drop_bits(&e, 32);
 
-			if (d != 0x0000ffff)  /* 0000ffff required here */
+			if (d != 0x0000ffff)    /* 0000ffff required here */
 				goto go_home;
 
 			e.state = READ_HDR;
@@ -1206,20 +1233,37 @@ static inline int __check_stream_end(z_streamp strm)
 	}
  sync_avail_in:
 	/*
+	 * Only if we saw Z_STREAM_END and no problems understanding
+	 * the empty HUFFMAND or COPY_BLOCKs arised, we sync up the
+	 * stream.
+	 *
+	 * FIXME For DEFLATE and ZLIB we need to read the adler32 or
+	 * the crc32 and the uncompressed data size to finally say
+	 * that everything is right.
+	 */
+
+	/*
 	 * e.idx:                  number of bytes which were analyzed
 	 * e.in_hdr_scratch_len:   bytes taken from scratch buffer
 	 */
 	if (e.idx <= e.in_hdr_scratch_len)
 		offs = 0;       /* no avail_in adjustment needed */
-	else			/* do not consider bytes from scratch area */
-		offs = e.idx - e.in_hdr_scratch_len;
-
-	hw_trace("    e.idx=%d e.in_hdr_scratch_len=%d offs=%d\n",
-		 e.idx, e.in_hdr_scratch_len, offs);
+	else {			/* do not consider bytes from scratch area */
+		offs = e.idx - e.in_hdr_scratch_len + 1; /* add 1 idx starts at 0 */
+		__reset_hdr_scratch_len(h);
+	}
 	strm->avail_in -= offs;
 	strm->next_in += offs;
+	strm->total_in += offs;
+
+	hw_trace("    e.idx=%d e.in_hdr_scratch_len=%d offs=%d "
+		 "next_in=%02x\n", e.idx, e.in_hdr_scratch_len, offs,
+		 *strm->next_in);
+	return ret;		/* more data or even Z_STREAM_END found */
+
  go_home:
-	return ret;
+	hw_trace("    Aborting search for Z_STREAM_END for now!\n");
+	return Z_OK;		/* more data required */
 }
 
 /**
@@ -1288,16 +1332,17 @@ int h_inflate(z_streamp strm, int flush)
 			 flush_to_str(flush));
 
 		/* Give out what is already there */
-		h_flush_obuf(strm);
+		obuf_bytes = h_flush_obuf(strm);
 
-		obuf_bytes = s->obuf - s->obuf_next;  /* bytes in obuf */
 		if ((s->rc == Z_STREAM_END) &&	/* hardware saw FEOB */
-		    (obuf_bytes == 0))		/* no more outp data in buf */
+		    (obuf_bytes == 0))		/* no more output in buf */
 			return Z_STREAM_END;	/* nothing to do anymore */
 
-		if (strm->avail_out == 0) {	/* need more output space */
+		/* Need more output space */
+		if (strm->avail_out == 0) {
 			rc = Z_OK;
-#ifdef CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END /* EXPERIMENTAL for MongoDB PoC */
+
+#ifdef CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END	/* For MongoDB PoC */
 			/*
 			 * fprintf(zlib_log, "SCRATCH\n");
 			 * ddcb_hexdump(zlib_log, h->wsp->tree,
@@ -1311,11 +1356,10 @@ int h_inflate(z_streamp strm, int flush)
 			 *	__in_hdr_scratch_len(h), h->proc_bits);
 			 */
 			rc = __check_stream_end(strm);
-
-			hw_trace("[%p]            flush=%d %s avail_in=%d "
-				 "avail_out=%d\n", strm, flush,
-				 flush_to_str(flush),
-				 strm->avail_in, strm->avail_out);
+			hw_trace("[%p]            flush=%s avail_in=%d "
+				 "avail_out=%d __check_stream=%s\n", strm,
+				 flush_to_str(flush), strm->avail_in,
+				 strm->avail_out, ret_to_str(rc));
 #endif
 			return rc;
 		}
@@ -1326,7 +1370,10 @@ int h_inflate(z_streamp strm, int flush)
 		}
 
 		/* do not send 0 data to HW */
-		if ((0 == strm->avail_in) && (Z_NO_FLUSH == flush))
+		if ((0 == strm->avail_in) &&
+		    ((Z_NO_FLUSH      == flush) ||
+		     (Z_PARTIAL_FLUSH == flush) ||
+		     (Z_FULL_FLUSH    == flush)))
 			return Z_OK;
 
 		/*

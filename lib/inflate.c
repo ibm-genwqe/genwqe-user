@@ -1217,6 +1217,8 @@ int zedc_inflate(zedc_streamp strm, int flush)
 	   data than offered. */
 	len = strm->inp_data_offs;  /* Just input bytes from next_in,
 				       not repeated tree, hdr, scratch bits */
+	fprintf(stderr, "LEN(%s): len=%d\n", __func__, len);
+
 	if (len > strm->avail_in) {
 		pr_err("consumed=%u/avail_in=%u\n", len, strm->avail_in);
 		goto abort;

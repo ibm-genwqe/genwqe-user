@@ -72,6 +72,8 @@ while getopts "A:C:i:t:v:h" opt; do
     esac
 done
 
+ulimit -c unlimited
+
 function test_compress_decompress() {
     local fname=$1;
 
@@ -185,278 +187,334 @@ function test_compress_decompress_fixed() {
     echo "ok"
 }
 
-echo "------------------------------------------------------------------------"
-echo "Build code ..."
-make || exit 1
+function build_code ()
+{
+    echo "--------------------------------------------------------------------"
+    echo "Build code ..."
+    make || exit 1
 
-echo "------------------------------------------------------------------------"
-if [ -f test_data.bin ]; then
-    echo "test_data.bin is already existing, continue ..."
-else
-    echo "Copy test data ..."
-    cat /usr/bin* /usr/lib/* > test_data.bin 2> /dev/null
-fi
-du -ch test_data.bin
+    echo "--------------------------------------------------------------------"
+    if [ -f test_data.bin ]; then
+	echo "test_data.bin is already existing, continue ..."
+    else
+	echo "Copy test data ..."
+	cat /usr/bin* /usr/lib/* > test_data.bin 2> /dev/null
+    fi
+    du -ch test_data.bin
 
-if [ -f empty.bin ]; then
-    echo "empty.bin is already existing, continue ..."
-else
-    touch empty.bin
-fi
-du -ch empty.bin
+    if [ -f empty.bin ]; then
+	echo "empty.bin is already existing, continue ..."
+    else
+	touch empty.bin
+    fi
+    du -ch empty.bin
+}
 
-echo "------------------------------------------------------------------------"
-echo "- SOFTWARE -------------------------------------------------------------"
-echo "------------------------------------------------------------------------"
+function zlib_software () {
+    echo "--------------------------------------------------------------------"
+    echo "- SOFTWARE ---------------------------------------------------------"
+    echo "--------------------------------------------------------------------"
 
-export ZLIB_INFLATE_IMPL=0
-export ZLIB_DEFLATE_IMPL=0
-export ZLIB_TRACE=${trace}
+    export ZLIB_INFLATE_IMPL=0
+    export ZLIB_DEFLATE_IMPL=0
+    export ZLIB_TRACE=${trace}
 
-echo "Use SW libz zipe with standard 16KiB buffers"
-env | grep ZLIB
+    echo "Use SW libz zipe with standard 16KiB buffers"
+    env | grep ZLIB
 
-test_compress_decompress test_data.bin
-mv test_data.bin.rfc1950 test_data.bin.rfc1950.zlib
+    test_compress_decompress test_data.bin
+    mv test_data.bin.rfc1950 test_data.bin.rfc1950.zlib
 
-test_compress_decompress empty.bin
-mv empty.bin.rfc1950 empty.bin.rfc1950.zlib
+    test_compress_decompress empty.bin
+    mv empty.bin.rfc1950 empty.bin.rfc1950.zlib
+}
 
-echo "------------------------------------------------------------------------"
-echo "- HARDWARE without buffering -------------------------------------------"
-echo "------------------------------------------------------------------------"
+function zlib_hardware_no_buffering ()
+{
+    echo "--------------------------------------------------------------------"
+    echo "- HARDWARE without buffering ---------------------------------------"
+    echo "--------------------------------------------------------------------"
 
-export ZLIB_INFLATE_IMPL=1
-export ZLIB_DEFLATE_IMPL=1
-export ZLIB_TRACE=${trace}
-export ZLIB_CARD=${card}
-export ZLIB_VERBOSE=${verbose}
-# sudo sh -c 'echo 0x04 > /sys/module/genwqe_card/parameters/debug'
+    export ZLIB_INFLATE_IMPL=1
+    export ZLIB_DEFLATE_IMPL=1
+    export ZLIB_TRACE=${trace}
+    export ZLIB_CARD=${card}
+    export ZLIB_VERBOSE=${verbose}
 
-echo "--- zpipe with 16KiB in- and output buffers ----------------------------"
+    echo "--- zpipe with 16KiB in- and output buffers ------------------------"
+    export ZLIB_IBUF_TOTAL=0
+    export ZLIB_OBUF_TOTAL=0
 
-export ZLIB_IBUF_TOTAL=0
-export ZLIB_OBUF_TOTAL=0
+    env | grep ZLIB
 
-env | grep ZLIB
+    echo "Use HW libz using card ${card} ..."
+    echo "  CARD:       ${ZLIB_CARD}"
+    echo "  IBUF_TOTAL: ${ZLIB_IBUF_TOTAL}"
+    echo "  OBUF_TOTAL: ${ZLIB_OBUF_TOTAL}"
 
-echo "Use HW libz using card ${card} ..."
-echo "  CARD:       ${ZLIB_CARD}"
-echo "  IBUF_TOTAL: ${ZLIB_IBUF_TOTAL}"
-echo "  OBUF_TOTAL: ${ZLIB_OBUF_TOTAL}"
-
-test_compress_decompress test_data.bin
-mv test_data.bin.rfc1950 test_data.bin.rfc1950.genwqe
-
-test_compress_decompress empty.bin
-mv empty.bin.rfc1950 empty.bin.rfc1950.genwqe
-
-echo "------------------------------------------------------------------------"
-echo "- HARDWARE with buffering ----------------------------------------------"
-echo "------------------------------------------------------------------------"
-
-echo "--- zpipe with 16KiB in- and output buffers ----------------------------"
-
-export ZLIB_IBUF_TOTAL=${ibuf_size}
-export ZLIB_OBUF_TOTAL=${ibuf_size}
-
-echo "Use HW libz using card ${card} ..."
-echo "  CARD:       ${ZLIB_CARD}"
-echo "  IBUF_TOTAL: ${ZLIB_IBUF_TOTAL}"
-echo "  OBUF_TOTAL: ${ZLIB_OBUF_TOTAL}"
-
-test_compress_decompress test_data.bin
-mv test_data.bin.rfc1950 test_data.bin.rfc1950.genwqe
-
-
-echo "--- zpipe_rnd with buffer size variations ------------------------------"
-
-bufsizes="1023 4095 128KiB 256KiB 4MiB 7MiB 16MiB";
-
-for bufsize in $bufsizes ; do
-    test_compress_decompress_rnd test_data.bin $bufsize
+    test_compress_decompress test_data.bin
     mv test_data.bin.rfc1950 test_data.bin.rfc1950.genwqe
-done
+    
+    test_compress_decompress empty.bin
+    mv empty.bin.rfc1950 empty.bin.rfc1950.genwqe
+}
 
-for bufsize in $bufsizes ; do
-    test_compress_decompress_fixed test_data.bin $bufsize
+function zlib_hardware_buffering ()
+{
+    echo "--------------------------------------------------------------------"
+    echo "- HARDWARE with buffering ------------------------------------------"
+    echo "--------------------------------------------------------------------"
+
+    echo "--- zpipe with 16KiB in- and output buffers ------------------------"
+
+    export ZLIB_IBUF_TOTAL=${ibuf_size}
+    export ZLIB_OBUF_TOTAL=${ibuf_size}
+    
+    echo "Use HW libz using card ${card} ..."
+    echo "  CARD:       ${ZLIB_CARD}"
+    echo "  IBUF_TOTAL: ${ZLIB_IBUF_TOTAL}"
+    echo "  OBUF_TOTAL: ${ZLIB_OBUF_TOTAL}"
+    
+    test_compress_decompress test_data.bin
     mv test_data.bin.rfc1950 test_data.bin.rfc1950.genwqe
-done
 
-echo "------------------------------------------------------------------------"
-echo "- HARDWARE without buffering but using large buffers -------------------"
-echo "------------------------------------------------------------------------"
+    echo "--- zpipe_rnd with buffer size variations --------------------------"
 
-export ZLIB_IBUF_TOTAL=0
-export ZLIB_OBUF_TOTAL=0
+    bufsizes="1023 4095 128KiB 256KiB 4MiB 7MiB 16MiB";
 
-echo "Use HW libz using card ${card} ..."
-echo "  CARD:       ${ZLIB_CARD}"
-echo "  IBUF_TOTAL: ${ZLIB_IBUF_TOTAL}"
-echo "  OBUF_TOTAL: ${ZLIB_OBUF_TOTAL}"
+    for bufsize in $bufsizes ; do
+	test_compress_decompress_rnd test_data.bin $bufsize
+	mv test_data.bin.rfc1950 test_data.bin.rfc1950.genwqe
+    done
 
-for bufsize in 256KiB 512KiB 1MiB 2MiB 4MiB ; do
-    test_compress_decompress_fixed test_data.bin $bufsize
-    mv test_data.bin.rfc1950 test_data.bin.rfc1950.genwqe
-done
+    for bufsize in $bufsizes ; do
+	test_compress_decompress_fixed test_data.bin $bufsize
+	mv test_data.bin.rfc1950 test_data.bin.rfc1950.genwqe
+    done
 
-export ZLIB_IBUF_TOTAL=${ibuf_size}
-export ZLIB_OBUF_TOTAL=${ibuf_size}
+    echo "--------------------------------------------------------------------"
+    echo "- HARDWARE without buffering but using large buffers ---------------"
+    echo "--------------------------------------------------------------------"
 
-echo "------------------------------------------------------------------------"
-echo "Test: Decompress SW compressed data with HW $ibuf_size buffers ..."
-echo "------------------------------------------------------------------------"
+    export ZLIB_IBUF_TOTAL=0
+    export ZLIB_OBUF_TOTAL=0
 
-time zpipe_rnd -s1MiB -d \
-    < test_data.bin.rfc1950.zlib > test_data.bin.out
-if [ $? -ne 0 ]; then
-    echo "zpipe failed!"
-    exit 1
-fi
-echo "ok"
+    echo "Use HW libz using card ${card} ..."
+    echo "  CARD:       ${ZLIB_CARD}"
+    echo "  IBUF_TOTAL: ${ZLIB_IBUF_TOTAL}"
+    echo "  OBUF_TOTAL: ${ZLIB_OBUF_TOTAL}"
 
-echo "Compare data ..."
-diff test_data.bin test_data.bin.out
-if [ $? -ne 0 ]; then
-    echo "test_data.bin and test_data.bin.out are different!"
-    exit 1
-fi
-echo "ok"
+    for bufsize in 256KiB 512KiB 1MiB 2MiB 4MiB ; do
+	test_compress_decompress_fixed test_data.bin $bufsize
+	mv test_data.bin.rfc1950 test_data.bin.rfc1950.genwqe
+    done
 
-echo "------------------------------------------------------------------------"
-echo "Test: Decompress SW data + padding using $ibuf_size buffers ..."
-echo "------------------------------------------------------------------------"
+    export ZLIB_IBUF_TOTAL=${ibuf_size}
+    export ZLIB_OBUF_TOTAL=${ibuf_size}
 
-export ZLIB_INFLATE_IMPL=1
-export ZLIB_DEFLATE_IMPL=1
-export ZLIB_IBUF_TOTAL=${ibuf_size}
-export ZLIB_OBUF_TOTAL=0 # We must not buffer for inflate for this test
-# export ZLIB_TRACE=0xff
+    echo "--------------------------------------------------------------------"
+    echo "Test: Decompress SW compressed data with HW $ibuf_size buffers ..."
+    echo "--------------------------------------------------------------------"
 
-dd if=/dev/urandom bs=1 count=100 of=padding.bin
-cat test_data.bin.rfc1950.zlib padding.bin > \
-    test_data.bin.rfc1950.padded.zlib
+    time zpipe_rnd -s1MiB -d \
+	< test_data.bin.rfc1950.zlib > test_data.bin.out
+    if [ $? -ne 0 ]; then
+	echo "zpipe failed!"
+	exit 1
+    fi
+    echo "ok"
 
-time zpipe_rnd -s1MiB -d \
-    < test_data.bin.rfc1950.padded.zlib > test_data.bin.out
-if [ $? -ne 0 ]; then
-    echo "zpipe failed!"
-    exit 1
-fi
-echo "ok"
+    echo "Compare data ..."
+    diff test_data.bin test_data.bin.out
+    if [ $? -ne 0 ]; then
+	echo "test_data.bin and test_data.bin.out are different!"
+	exit 1
+    fi
+    echo "ok"
 
-echo "Compare data ..."
-diff test_data.bin test_data.bin.out
-if [ $? -ne 0 ]; then
-    echo "test_data.bin and test_data.bin.out are different!"
-    exit 1
-fi
-echo "ok"
+    echo "--------------------------------------------------------------------"
+    echo "Test: Decompress SW data + padding using $ibuf_size buffers ..."
+    echo "--------------------------------------------------------------------"
 
-echo "------------------------------------------------------------------------"
-echo "Test: Decompress SW data + padding using $ibuf_size buffers (fully)"
-echo "------------------------------------------------------------------------"
+    export ZLIB_INFLATE_IMPL=1
+    export ZLIB_DEFLATE_IMPL=1
+    export ZLIB_IBUF_TOTAL=${ibuf_size}
+    export ZLIB_OBUF_TOTAL=0 # We must not buffer for inflate for this test
 
-export ZLIB_INFLATE_IMPL=1
-export ZLIB_DEFLATE_IMPL=1
-export ZLIB_IBUF_TOTAL=${ibuf_size}
-export ZLIB_OBUF_TOTAL=${ibuf_size}
-# export ZLIB_TRACE=0xff
+    dd if=/dev/urandom bs=1 count=100 of=padding.bin
+    cat test_data.bin.rfc1950.zlib padding.bin > \
+	test_data.bin.rfc1950.padded.zlib
 
-dd if=/dev/urandom bs=1 count=100 of=padding.bin
-cat test_data.bin.rfc1950.zlib padding.bin > \
-    test_data.bin.rfc1950.padded.zlib
+    time zpipe_rnd -s1MiB -d \
+	< test_data.bin.rfc1950.padded.zlib > test_data.bin.out
+    if [ $? -ne 0 ]; then
+	echo "zpipe failed!"
+	exit 1
+    fi
+    echo "ok"
 
-time zpipe_rnd -s1MiB -d \
-    < test_data.bin.rfc1950.padded.zlib > test_data.bin.out
-if [ $? -ne 0 ]; then
-    echo "zpipe failed!"
-    exit 1
-fi
-echo "ok"
+    echo "Compare data ..."
+    diff test_data.bin test_data.bin.out
+    if [ $? -ne 0 ]; then
+	echo "test_data.bin and test_data.bin.out are different!"
+	exit 1
+    fi
+    echo "ok"
 
-echo "Compare data ..."
-diff test_data.bin test_data.bin.out
-if [ $? -ne 0 ]; then
-    echo "test_data.bin and test_data.bin.out are different!"
-    exit 1
-fi
-echo "ok"
+    echo "--------------------------------------------------------------------"
+    echo "Test: Decompress SW data + padding using $ibuf_size buffers (fully)"
+    echo "--------------------------------------------------------------------"
 
-echo "--------------------------------------------------------------------"
-echo "zpipe_append: HW compression/decompression without buffering"
-echo "--------------------------------------------------------------------"
+    export ZLIB_INFLATE_IMPL=1
+    export ZLIB_DEFLATE_IMPL=1
+    export ZLIB_IBUF_TOTAL=${ibuf_size}
+    export ZLIB_OBUF_TOTAL=${ibuf_size}
 
-export ZLIB_INFLATE_IMPL=1
-export ZLIB_DEFLATE_IMPL=1
-export ZLIB_IBUF_TOTAL=0
-export ZLIB_OBUF_TOTAL=0
+    dd if=/dev/urandom bs=1 count=100 of=padding.bin
+    cat test_data.bin.rfc1950.zlib padding.bin > \
+	test_data.bin.rfc1950.padded.zlib
+    
+    time zpipe_rnd -s1MiB -d \
+	< test_data.bin.rfc1950.padded.zlib > test_data.bin.out
+    if [ $? -ne 0 ]; then
+	echo "zpipe failed!"
+	exit 1
+    fi
+    echo "ok"
 
-env | grep ZLIB
-for f in ZLIB DEFLATE GZIP ; do
-    for ibuf in 2MiB 1MiB 128KiB 4KiB 1000 100 ; do
-	for obuf in 1MiB 128KiB 4KiB 1000 100 ; do
-	    # echo "Append feature: format=${f} ib=${ibuf} ob=${obuf} ... "
-	    echo -n "zpipe_append -F${f} -i${ibuf} -o${obuf} "
-	    zpipe_append -F${f} -i${ibuf} -o${obuf}
-	    if [ $? -ne 0 ]; then
-		echo "failed"
-		exit 1
-	    fi
-	    echo "ok"
+    echo "Compare data ..."
+    diff test_data.bin test_data.bin.out
+    if [ $? -ne 0 ]; then
+	echo "test_data.bin and test_data.bin.out are different!"
+	exit 1
+    fi
+    echo "ok"
+}
+
+function zlib_append ()
+{
+    local flush=$1
+    local params=$2
+
+    # Use default settings ...
+    # Set size large enough that hardware inflate is realy used
+    #
+    # hhh [0x3ffff1c655d8] loops=0 flush=1 Z_PARTIAL_FLUSH
+    # hhh [0x3ffff1c655d8] *** giving out 100 bytes ...
+    # hhh Accumulated input data:
+    #  00000000: 54 68 69 73 20 69 73 20 74 68 65 20 45 4e 44 21 | This.is.the.END.
+    #
+    # hhh     d=2
+    # hhh     d=50, 0 is goodness
+    # hhh [0x3ffff1c655d8]            flush=1 Z_PARTIAL_FLUSH avail_in=16 avail_out=0
+
+    echo "Special zpipe_append setup, which failed once ... "
+    echo -n "  zpipe_append -FZLIB -fZ_PARTIAL_FLUSH -i2MiB -o4KiB -s256KiB"
+    zpipe_append -FZLIB -fZ_PARTIAL_FLUSH -i2MiB -o4KiB -s256KiB
+    if [ $? -ne 0 ]; then
+    	echo "failed"
+    	exit 1
+    fi
+    echo "ok"
+
+    export ZLIB_INFLATE_IMPL=0x41
+    export ZLIB_DEFLATE_IMPL=0x41
+    #unset ZLIB_INFLATE_IMPL
+    #unset ZLIB_DEFLATE_IMPL
+    unset ZLIB_IBUF_TOTAL
+    unset ZLIB_OBUF_TOTAL
+
+    env | grep ZLIB
+    for f in ZLIB DEFLATE GZIP ; do
+	for ibuf in 2MiB 1MiB 128KiB 4KiB 1000 100 ; do
+	    for obuf in 1MiB 128KiB 4KiB 1000 100 ; do
+	        # echo "Append feature: format=${f} ib=${ibuf} ob=${obuf} ... "
+		echo -n "zpipe_append -F${f} -f${flush} -i${ibuf} -o${obuf} -s256KiB ${params} "
+		zpipe_append -F${f} -f${flush} -i${ibuf} -o${obuf} -s256KiB ${params}
+		if [ $? -ne 0 ]; then
+		    echo "failed"
+		    exit 1
+		fi
+		echo "ok"
+	    done
 	done
     done
-done
 
-echo "--------------------------------------------------------------------"
-echo "zpipe_append: HW compression/decompression with buffering"
-echo "--------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------"
+    echo "zpipe_append: HW compression/decompression without buffering"
+    echo "--------------------------------------------------------------------"
 
-export ZLIB_INFLATE_IMPL=1
-export ZLIB_DEFLATE_IMPL=1
-export ZLIB_IBUF_TOTAL=1MiB
-export ZLIB_OBUF_TOTAL=0 # known to fail
+    export ZLIB_INFLATE_IMPL=1
+    export ZLIB_DEFLATE_IMPL=1
+    export ZLIB_IBUF_TOTAL=0
+    export ZLIB_OBUF_TOTAL=0
 
-env | grep ZLIB
-for f in ZLIB DEFLATE GZIP ; do
-    for ibuf in 2MiB 1MiB 128KiB 4KiB 1000 100 ; do
-	for obuf in 1MiB 128KiB 4KiB 1000 100 ; do
+    env | grep ZLIB
+    for f in ZLIB DEFLATE GZIP ; do
+	for ibuf in 2MiB 1MiB 128KiB 4KiB 1000 100 ; do
+	    for obuf in 1MiB 128KiB 4KiB 1000 100 ; do
 	    # echo "Append feature: format=${f} ib=${ibuf} ob=${obuf} ... "
-	    echo -n "zpipe_append -F${f} -i${ibuf} -o${obuf} "
-	    zpipe_append -F${f} -i${ibuf} -o${obuf}
-	    if [ $? -ne 0 ]; then
-		echo "failed"
-		exit 1
-	    fi
-	    echo "ok"
+		echo -n "zpipe_append -F${f} -f${flush} -i${ibuf} -o${obuf} ${params} "
+		zpipe_append -F${f} -f${flush} -i${ibuf} -o${obuf} ${params}
+		if [ $? -ne 0 ]; then
+		    echo "failed"
+		    exit 1
+		fi
+		echo "ok"
+	    done
 	done
     done
-done
 
-echo "--------------------------------------------------------------------"
-echo "zpipe_append: HW compression/decompression with buffering obuf=1MiB"
-echo "--------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------"
+    echo "zpipe_append: HW compression/decompression with buffering"
+    echo "--------------------------------------------------------------------"
 
-export ZLIB_INFLATE_IMPL=1
-export ZLIB_DEFLATE_IMPL=1
-export ZLIB_IBUF_TOTAL=1MiB
-export ZLIB_OBUF_TOTAL=1MiB
+    export ZLIB_INFLATE_IMPL=1
+    export ZLIB_DEFLATE_IMPL=1
+    export ZLIB_IBUF_TOTAL=1MiB
+    export ZLIB_OBUF_TOTAL=0 # known to fail
 
-env | grep ZLIB
-for f in ZLIB DEFLATE GZIP ; do
-    for ibuf in 2MiB 1MiB 128KiB 4KiB 1000 100 ; do
-	for obuf in 1MiB 128KiB 4KiB 1000 100 ; do
+    env | grep ZLIB
+    for f in ZLIB DEFLATE GZIP ; do
+	for ibuf in 2MiB 1MiB 128KiB 4KiB 1000 100 ; do
+	    for obuf in 1MiB 128KiB 4KiB 1000 100 ; do
 	    # echo "Append feature: format=${f} ib=${ibuf} ob=${obuf} ... "
-	    echo -n "zpipe_append -F${f} -i${ibuf} -o${obuf} "
-	    zpipe_append -F${f} -i${ibuf} -o${obuf}
-	    if [ $? -ne 0 ]; then
-		echo "failed"
-		exit 1
-	    fi
-	    echo "ok"
+		echo -n "zpipe_append -F${f} -f${flush} -i${ibuf} -o${obuf} ${params} "
+		zpipe_append -F${f} -f${flush} -i${ibuf} -o${obuf} ${params}
+		if [ $? -ne 0 ]; then
+		    echo "failed"
+		    exit 1
+		fi
+		echo "ok"
+	    done
 	done
     done
-done
+    
+    echo "--------------------------------------------------------------------"
+    echo "zpipe_append: HW compression/decompression with buffering obuf=1MiB"
+    echo "--------------------------------------------------------------------"
+    
+    export ZLIB_INFLATE_IMPL=1
+    export ZLIB_DEFLATE_IMPL=1
+    export ZLIB_IBUF_TOTAL=1MiB
+    export ZLIB_OBUF_TOTAL=1MiB
+
+    env | grep ZLIB
+    for f in ZLIB DEFLATE GZIP ; do
+	for ibuf in 2MiB 1MiB 128KiB 4KiB 1000 100 ; do
+	    for obuf in 1MiB 128KiB 4KiB 1000 100 ; do
+	    # echo "Append feature: format=${f} ib=${ibuf} ob=${obuf} ... "
+		echo -n "zpipe_append -F${f} -f${flush} -i${ibuf} -o${obuf} ${params} "
+		zpipe_append -F${f} -f${flush} -i${ibuf} -o${obuf} ${params}
+		if [ $? -ne 0 ]; then
+		    echo "failed"
+		    exit 1
+		fi
+		echo "ok"
+	    done
+	done
+    done
+}
 
 function multithreading_quick ()
 {
@@ -550,7 +608,15 @@ function multithreading_buffered ()
     done
 }
 
-ulimit -c unlimited
+build_code
+
+for flush in Z_PARTIAL_FLUSH Z_NO_FLUSH Z_FULL_FLUSH ; do
+    zlib_append ${flush}
+done
+
+zlib_software
+zlib_hardware_no_buffering
+zlib_hardware_buffering
 multithreading_unbuffered_memalign
 multithreading_quick
 multithreading_unbuffered
