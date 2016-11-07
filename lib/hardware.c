@@ -995,7 +995,7 @@ static inline int __inflate(z_streamp strm, struct hw_state *s, int flush)
  * on. Software uses just the latter.
  */
 
-#define CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END
+#undef CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END
 
 enum stream_state {
 	READ_HDR,
@@ -1249,9 +1249,20 @@ static inline int __check_stream_end(z_streamp strm)
 	if (e.idx <= e.in_hdr_scratch_len)
 		offs = 0;       /* no avail_in adjustment needed */
 	else {			/* do not consider bytes from scratch area */
-		offs = e.idx - e.in_hdr_scratch_len + 1; /* add 1 idx starts at 0 */
+		offs = e.idx - e.in_hdr_scratch_len + 1;
+		 /* add 1 idx starts at 0 */
 		__reset_hdr_scratch_len(h);
 	}
+
+	switch (h->format) {
+	case ZEDC_FORMAT_DEFL:
+		offs += 0; break; /* FIXME */
+	case ZEDC_FORMAT_ZLIB:
+		offs += 4; break; /* FIXME ensure avail_in large enough */
+	case ZEDC_FORMAT_GZIP:
+		offs += 8; break; /* FIXME ensure avail_in large enough */
+	}
+
 	strm->avail_in -= offs;
 	strm->next_in += offs;
 	strm->total_in += offs;
@@ -1338,8 +1349,12 @@ int h_inflate(z_streamp strm, int flush)
 		    (obuf_bytes == 0))		/* no more output in buf */
 			return Z_STREAM_END;	/* nothing to do anymore */
 
-		/* Need more output space */
-		if (strm->avail_out == 0) {
+		if ((obuf_bytes != 0) && (strm->avail_out == 0))
+			return Z_OK;		/* need new output buffer */
+
+		/* Need more output space, just useful if Z_STREAM_END
+		   not seen before */
+		if ((s->rc != Z_STREAM_END) && (strm->avail_out == 0)) {
 			rc = Z_OK;
 
 #ifdef CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END	/* For MongoDB PoC */
@@ -1356,6 +1371,12 @@ int h_inflate(z_streamp strm, int flush)
 			 *	__in_hdr_scratch_len(h), h->proc_bits);
 			 */
 			rc = __check_stream_end(strm);
+			if (rc == Z_STREAM_END) {
+				hw_trace("    Suppress Z_STREAM_END\n");
+				s->rc = Z_STREAM_END;
+				rc = Z_OK;
+			}
+
 			hw_trace("[%p]            flush=%s avail_in=%d "
 				 "avail_out=%d __check_stream=%s\n", strm,
 				 flush_to_str(flush), strm->avail_in,
