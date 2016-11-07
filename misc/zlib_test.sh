@@ -407,9 +407,13 @@ function zlib_append ()
     # hhh     d=2
     # hhh     d=50, 0 is goodness
     # hhh [0x3ffff1c655d8]            flush=1 Z_PARTIAL_FLUSH avail_in=16 avail_out=0
+    unset ZLIB_INFLATE_IMPL
+    unset ZLIB_DEFLATE_IMPL
+    unset ZLIB_IBUF_TOTAL
+    unset ZLIB_OBUF_TOTAL
 
     echo "Special zpipe_append setup, which failed once ... "
-    echo -n "  zpipe_append -FZLIB -fZ_PARTIAL_FLUSH -i2MiB -o4KiB -s256KiB"
+    echo -n "  zpipe_append -FZLIB -fZ_PARTIAL_FLUSH -i2MiB -o4KiB -s256KiB "
     zpipe_append -FZLIB -fZ_PARTIAL_FLUSH -i2MiB -o4KiB -s256KiB
     if [ $? -ne 0 ]; then
     	echo "failed"
