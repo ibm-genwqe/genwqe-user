@@ -478,7 +478,7 @@ int main(int argc, char **argv)
 
 	/* Append pattern */
 	rc = fprintf(o_fp, "%s", pattern);
-	fprintf(stderr, "Appending %d bytes\n", rc);
+	/* fprintf(stderr, "Appending %d bytes\n", rc); */
 
 	fclose(o_fp);
 
