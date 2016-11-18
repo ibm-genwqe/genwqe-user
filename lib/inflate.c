@@ -759,41 +759,49 @@ static int inflate_format_rem_trailer(struct zedc_stream_s *strm)
 }
 
 /**
- * @brief	Pre-process for inflate
- *		If data is left from previous task due to insufficent
+ * @brief	Figure out if data is left from previous task due to
+ *		insufficent output buffer space.
+ * @param strm	decompression job context
+ */
+int zedc_inflate_pending_output(struct zedc_stream_s *strm)
+{
+	return strm->obytes_in_dict;
+}
+
+/**
+ * @brief	If data is left from previous task due to insufficent
  *		output buffer space, this data must first be stored
  *		to the new output buffer.
  * @param strm	decompression job context
  */
-static int pre_inflate(struct zedc_stream_s *strm)
+static int inflate_flush_output_buffer(struct zedc_stream_s *strm)
 {
 	uint8_t *pdict;
 	zedc_handle_t zedc = (zedc_handle_t)strm->device;
+
+	if (strm->obytes_in_dict == 0)
+		return ZEDC_OK;
 
 	/*
 	 * Unstored data was temporarily stored by HW at the end of
 	 * dictionary. First restore these bytes if new output buffer
 	 * is available.
 	 */
-	if (strm->obytes_in_dict) {
-		/* rename 'dict_len' to 'out_dict_used' to match spec */
-		if (strm->dict_len < strm->obytes_in_dict) {
-			pr_err("invalid param 'obytes_in_dict'\n");
-			zedc->zedc_rc = ZEDC_ERR_DICT_OVERRUN;
-			return zedc->zedc_rc;
-		}
-		/* obytes at end of dict */
-		pdict = strm->wsp->dict[strm->wsp_page] +
-			strm->out_dict_offs +
-			strm->dict_len -
-			strm->obytes_in_dict;
+	/* FIXME rename 'dict_len' to 'out_dict_used' to match spec */
+	if (strm->dict_len < strm->obytes_in_dict) {
+		pr_err("invalid 'obytes_in_dict' ZEDC_ERR_DICT_OVERRUN\n");
+		zedc->zedc_rc = ZEDC_ERR_DICT_OVERRUN;
+		return zedc->zedc_rc;
+	}
+	/* obytes at end of dict */
+	pdict = strm->wsp->dict[strm->wsp_page] +
+		strm->out_dict_offs + strm->dict_len - strm->obytes_in_dict;
 
-		while (strm->avail_out && strm->obytes_in_dict) {
-			*strm->next_out++ = *pdict++;
-			strm->avail_out--;
-			strm->total_out++;
-			strm->obytes_in_dict--;
-		}
+	while (strm->avail_out && strm->obytes_in_dict) {
+		*strm->next_out++ = *pdict++;
+		strm->avail_out--;
+		strm->total_out++;
+		strm->obytes_in_dict--;
 	}
 	return ZEDC_OK;
 }
@@ -1037,7 +1045,7 @@ int zedc_inflate(zedc_streamp strm, int flush)
 	 * Pre-processing, restore data from previous task and copy
 	 * obytes to output buffer.
 	 */
-	rc = pre_inflate(strm);
+	rc = inflate_flush_output_buffer(strm);
 	if (rc) {
 		pr_err("inflate failed rc=%d\n", rc);
 		return ZEDC_STREAM_ERROR;

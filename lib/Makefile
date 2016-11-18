@@ -210,7 +210,7 @@ uninstall:
 	$(CC) -MM $(CPPFLAGS) $(CFLAGS) $< > $*.d
 
 clean distclean:
-	$(RM) *.o *.d $(projs) *.so
+	$(RM) *.o *.d $(projs) *.so *.so.*
 ifneq ($(CONFIG_LIBCXL_PATH),)
 	$(MAKE) -C $(CONFIG_LIBCXL_PATH) $@
 endif

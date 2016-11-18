@@ -19,9 +19,9 @@
 #include <malloc.h>
 #include <string.h>
 #include <zlib.h>
-
 #include <wrapper.h>
 #include <libzHW.h>
+#include <asm/byteorder.h>
 
 /**
  * Hardware zlib implementation. This code is using the libzHW library
@@ -73,6 +73,22 @@ struct hw_state {
 	unsigned int inflate_req;  /* # of inflates */
 	unsigned int deflate_req;  /* # of deflates */
 };
+
+/**
+ * @return True if output buffer is empty, else False.
+ */
+static int output_buffer_empty(struct hw_state *s)
+{
+	return s->obuf_avail == s->obuf_total;
+}
+
+/**
+ * @return Remaining bytes in obuf.
+ */
+static int output_buffer_bytes(struct hw_state *s)
+{
+	return s->obuf - s->obuf_next;
+}
 
 #define ZEDC_VERBOSE_LIBCARD_MASK 0x0000ff00  /* debug flags for libcard */
 #define ZEDC_VERBOSE_LIBZEDC_MASK 0x000000ff  /* debug flags for libzedc */
@@ -472,16 +488,17 @@ static inline int __deflate(z_streamp strm, struct hw_state *s, int flush)
 	int rc;
 	zedc_stream *h = &s->h;
 
-	hw_trace("[%p] h_deflate (%d): flush=%d next_in=%p avail_in=%d "
-		 "next_out=%p avail_out=%d\n", strm, s->deflate_req, flush,
-		 h->next_in, h->avail_in, h->next_out, h->avail_out);
+	hw_trace("[%p] h_deflate (%d): flush=%s next_in=%p avail_in=%d "
+		 "next_out=%p avail_out=%d\n", strm, s->deflate_req,
+		 flush_to_str(flush), h->next_in, h->avail_in, h->next_out,
+		 h->avail_out);
 
 	rc = zedc_deflate(h, flush);
 	__fixup_crc_or_adler(strm, h);
 	s->deflate_req++;
 
-	hw_trace("[%p]            flush=%d next_in=%p avail_in=%d "
-		 "next_out=%p avail_out=%d rc=%d\n", strm, flush,
+	hw_trace("[%p]            flush=%s next_in=%p avail_in=%d "
+		 "next_out=%p avail_out=%d rc=%d\n", strm, flush_to_str(flush),
 		 h->next_in, h->avail_in, h->next_out, h->avail_out, rc);
 
 	return rc;
@@ -501,8 +518,7 @@ static int h_read_ibuf(z_streamp strm)
 
 	tocopy = MIN(strm->avail_in, s->ibuf_avail);
 
-	hw_trace("[%p] *** collecting %d bytes %p -> %p ...\n", strm, tocopy,
-		 strm->next_in, s->ibuf);
+	hw_trace("[%p]   *** collecting %d bytes ...\n", strm, tocopy);
 	memcpy(s->ibuf, strm->next_in, tocopy);
 	s->ibuf_avail -= tocopy;
 	s->ibuf += tocopy;
@@ -527,7 +543,7 @@ static unsigned int h_flush_obuf(z_streamp strm)
 	unsigned int obuf_bytes;
 	struct hw_state *s = (struct hw_state *)strm->state;
 
-	obuf_bytes = s->obuf - s->obuf_next;    /* remaining bytes in obuf */
+	obuf_bytes = output_buffer_bytes(s);    /* remaining bytes in obuf */
 	if (strm->avail_out == 0)		/* no output space available */
 		return obuf_bytes;
 
@@ -536,15 +552,17 @@ static unsigned int h_flush_obuf(z_streamp strm)
 
 	tocopy = MIN(strm->avail_out, obuf_bytes);
 
-	hw_trace("[%p] *** giving out %d bytes obuf_bytes %d ...\n",
-		 strm, tocopy, obuf_bytes);
+	hw_trace("[%p]   *** giving out %d bytes, "
+		 "remaining %d bytes in temporary, "
+		 "%d in internal buffer\n",
+		 strm, tocopy, obuf_bytes - tocopy,
+		 zedc_inflate_pending_output(&s->h));
 
 	memcpy(strm->next_out, s->obuf_next, tocopy);
 	s->obuf_next += tocopy;
 	s->obuf_avail += tocopy;  /* bytes were given out / FIXME (+)? */
 
-	obuf_bytes = s->obuf - s->obuf_next;    /* remaining bytes in obuf */
-	hw_trace("[%p] *** new obuf_bytes %d ...\n", strm, obuf_bytes);
+	obuf_bytes = output_buffer_bytes(s);    /* remaining bytes in obuf */
 
 	/* book-keeping for output buffer */
 	strm->avail_out -= tocopy;
@@ -590,13 +608,13 @@ int h_deflate(z_streamp strm, int flush)
 		return s->rc;
 	}
 
-	hw_trace("[%p] h_deflate: flush=%d avail_in=%d avail_out=%d "
+	hw_trace("[%p] h_deflate: flush=%s avail_in=%d avail_out=%d "
 		 "ibuf_avail=%d obuf_avail=%d\n",
-		 strm, flush, strm->avail_in, strm->avail_out,
+		 strm, flush_to_str(flush), strm->avail_in, strm->avail_out,
 		 (int)s->ibuf_avail, (int)s->obuf_avail);
 
 	do {
-		hw_trace("[%p]     loops=%d flush=%d %s\n", strm, loops, flush,
+		hw_trace("[%p]   *** loop=%d flush=%s\n", strm, loops,
 			 flush_to_str(flush));
 
 		/* Collect input data ... */
@@ -614,7 +632,7 @@ int h_deflate(z_streamp strm, int flush)
 		if ((flush != Z_NO_FLUSH) || (s->ibuf_avail == 0)) {
 			ibuf_bytes = s->ibuf - s->ibuf_base; /* input bytes */
 
-			hw_trace("[%p] *** sending %d bytes to hardware ...\n",
+			hw_trace("[%p]   *** sending %d bytes to hardware ...\n",
 				 strm, ibuf_bytes);
 
 			s->obuf_next = h->next_out = s->obuf_base;  /* start */
@@ -952,24 +970,24 @@ static inline int __inflate(z_streamp strm, struct hw_state *s, int flush)
 	int rc;
 	zedc_stream *h = &s->h;
 
-	hw_trace("[%p] h_inflate (%d): flush=%d next_in=%p avail_in=%d "
+	hw_trace("[%p] __inflate (%d): flush=%s next_in=%p avail_in=%d "
 		 "next_out=%p avail_out=%d total_in=%ld total_out=%ld "
 		 "crc/adler=%08x/%08x\n",
-		 strm, s->inflate_req, flush, h->next_in, h->avail_in,
-		 h->next_out, h->avail_out, h->total_in, h->total_out,
-		 h->crc32, h->adler32);
+		 strm, s->inflate_req, flush_to_str(flush), h->next_in,
+		 h->avail_in, h->next_out, h->avail_out, h->total_in,
+		 h->total_out, h->crc32, h->adler32);
 
 	rc = zedc_inflate(h, flush);
 	__fixup_crc_or_adler(strm, h);
-	s->inflate_req++;
 
-	hw_trace("[%p]            flush=%d next_in=%p avail_in=%d "
+	hw_trace("[%p] _________ (%d) flush=%s next_in=%p avail_in=%d "
 		 "next_out=%p avail_out=%d total_in=%ld total_out=%ld "
-		 "crc/adler=%08x/%08x rc=%d %s\n",
-		 strm, flush, h->next_in, h->avail_in, h->next_out,
+		 "crc/adler=%08x/%08x rc=%s\n", strm, s->inflate_req,
+		 flush_to_str(flush), h->next_in, h->avail_in, h->next_out,
 		 h->avail_out, h->total_in, h->total_out, h->crc32,
-		 h->adler32, rc, ret_to_str(rc));
+		 h->adler32, ret_to_str(rc));
 
+	s->inflate_req++;
 	return rc;
 }
 
@@ -995,7 +1013,7 @@ static inline int __inflate(z_streamp strm, struct hw_state *s, int flush)
  * on. Software uses just the latter.
  */
 
-#undef CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END
+#define CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END
 
 enum stream_state {
 	READ_HDR,
@@ -1179,7 +1197,8 @@ static inline int __check_stream_end(z_streamp strm)
 				goto go_home;
 			}
 			if (d & 0x4) {
-				hw_trace("  Z_STREAM_END potentially detected!\n");
+				hw_trace("  Z_STREAM_END potentially "
+					 "detected!\n");
 				ret = Z_STREAM_END;
 			}
 			break;
@@ -1188,7 +1207,8 @@ static inline int __check_stream_end(z_streamp strm)
 			hw_trace("FIXED_HUFFMAN\n");
 
 			rc = get_bits(&e, 7, &d);
-			hw_trace("    d=%08llx, 0 indicates empty FIXED_HUFFMAN\n",
+			hw_trace("    d=%08llx, 0 indicates empty "
+				 "FIXED_HUFFMAN\n",
 				 (long long)d);
 			if (rc)
 				goto go_home;
@@ -1209,8 +1229,8 @@ static inline int __check_stream_end(z_streamp strm)
 
 			sync_to_byte(&e);
 			rc = get_bits(&e, 32, &d);
-			hw_trace("    d=%08llx, 0000ffff indicates empty COPY_BLOCK\n",
-				 (long long)d);
+			hw_trace("    d=%08llx, 0000ffff indicates empty "
+				 "COPY_BLOCK\n", (long long)d);
 			if (rc)
 				goto go_home;
 			drop_bits(&e, 32);
@@ -1249,18 +1269,9 @@ static inline int __check_stream_end(z_streamp strm)
 	if (e.idx <= e.in_hdr_scratch_len)
 		offs = 0;       /* no avail_in adjustment needed */
 	else {			/* do not consider bytes from scratch area */
-		offs = e.idx - e.in_hdr_scratch_len + 1;
 		 /* add 1 idx starts at 0 */
+		offs = e.idx - e.in_hdr_scratch_len + 1;
 		__reset_hdr_scratch_len(h);
-	}
-
-	switch (h->format) {
-	case ZEDC_FORMAT_DEFL:
-		offs += 0; break; /* FIXME */
-	case ZEDC_FORMAT_ZLIB:
-		offs += 4; break; /* FIXME ensure avail_in large enough */
-	case ZEDC_FORMAT_GZIP:
-		offs += 8; break; /* FIXME ensure avail_in large enough */
 	}
 
 	strm->avail_in -= offs;
@@ -1310,9 +1321,9 @@ int h_inflate(z_streamp strm, int flush)
 	    DDCB_DMA_TYPE_SGLIST)
 		use_internal_buffer = (s->obuf_total > strm->avail_out);
 
-	hw_trace("[%p] h_inflate: flush=%d %s avail_in=%d avail_out=%d "
+	hw_trace("[%p] h_inflate: flush=%s avail_in=%d avail_out=%d "
 		 "ibuf_avail=%d obuf_avail=%d use_int_buf=%d\n",
-		 strm, flush, flush_to_str(flush), strm->avail_in,
+		 strm, flush_to_str(flush), strm->avail_in,
 		 strm->avail_out, (int)s->ibuf_avail, (int)s->obuf_avail,
 		 use_internal_buffer);
 
@@ -1320,6 +1331,9 @@ int h_inflate(z_streamp strm, int flush)
 	   Z_BUF_ERROR */
 	obuf_bytes = s->obuf - s->obuf_next; /* bytes in obuf */
 	if (obuf_bytes == 0) {
+		hw_trace("[%p] OBYTES_IN_DICT %d bytes\n", strm,
+			 h->obytes_in_dict);
+
 		if (s->rc == Z_STREAM_END)   /* hardware saw FEOB */
 			return Z_STREAM_END; /* nothing to do anymore */
 
@@ -1339,7 +1353,7 @@ int h_inflate(z_streamp strm, int flush)
 	}
 
 	do {
-		hw_trace("[%p] loops=%d flush=%d %s\n", strm, loops, flush,
+		hw_trace("[%p] loops=%d flush=%s\n", strm, loops,
 			 flush_to_str(flush));
 
 		/* Give out what is already there */
@@ -1349,15 +1363,26 @@ int h_inflate(z_streamp strm, int flush)
 		    (obuf_bytes == 0))		/* no more output in buf */
 			return Z_STREAM_END;	/* nothing to do anymore */
 
-		if ((obuf_bytes != 0) && (strm->avail_out == 0))
+		if (((obuf_bytes != 0) || zedc_inflate_pending_output(h)) &&
+		    (strm->avail_out == 0))
 			return Z_OK;		/* need new output buffer */
 
-		/* Need more output space, just useful if Z_STREAM_END
-		   not seen before */
+		/*
+		 * Need more output space, just useful if Z_STREAM_END
+		 * not seen before.
+		 */
 		if ((s->rc != Z_STREAM_END) && (strm->avail_out == 0)) {
 			rc = Z_OK;
 
 #ifdef CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END	/* For MongoDB PoC */
+			/*
+			 * Do not try this ZLIB or GZIP, were we
+			 * expect adler32 or crc32/data_size in the
+			 * stream trailer. We want the lowlevel lib to
+			 * do the checksum processing in this case.
+			 */
+			if (h->format != ZEDC_FORMAT_DEFL)
+				return rc;
 			/*
 			 * fprintf(zlib_log, "SCRATCH\n");
 			 * ddcb_hexdump(zlib_log, h->wsp->tree,
@@ -1372,12 +1397,13 @@ int h_inflate(z_streamp strm, int flush)
 			 */
 			rc = __check_stream_end(strm);
 			if (rc == Z_STREAM_END) {
-				hw_trace("    Suppress Z_STREAM_END\n");
+				hw_trace("    Suppress Z_STREAM_END %ld %ld\n",
+					 s->obuf_avail, s->obuf_total);
 				s->rc = Z_STREAM_END;
 				rc = Z_OK;
 			}
 
-			hw_trace("[%p]            flush=%s avail_in=%d "
+			hw_trace("[%p] .......... flush=%s avail_in=%d "
 				 "avail_out=%d __check_stream=%s\n", strm,
 				 flush_to_str(flush), strm->avail_in,
 				 strm->avail_out, ret_to_str(rc));
@@ -1385,17 +1411,27 @@ int h_inflate(z_streamp strm, int flush)
 			return rc;
 		}
 
-		if (s->obuf_avail != s->obuf_total) {
-			pr_err("[%p] obuf should be empty here!\n", strm);
-			return Z_DATA_ERROR;
-		}
-
-		/* do not send 0 data to HW */
+		/*
+		 * Original idea: Do not send 0 data to HW
+		 *
+		 * Thought why it might be needed regardless:
+		 *
+		 *   If the underlying code buffers output data, we
+		 *   might need to call it anyways to get this. We
+		 *   need to trust the lowlevel code not to call
+		 *   hardware if not needed, since that would impact
+		 *   performance.
+		 */
 		if ((0 == strm->avail_in) &&
 		    ((Z_NO_FLUSH      == flush) ||
 		     (Z_PARTIAL_FLUSH == flush) ||
 		     (Z_FULL_FLUSH    == flush)))
 			return Z_OK;
+
+		if (!output_buffer_empty(s)) {
+			pr_err("[%p] obuf should be empty here!\n", strm);
+			return Z_DATA_ERROR;
+		}
 
 		/*
 		 * Here we start the hardware to do the decompression
@@ -1408,7 +1444,7 @@ int h_inflate(z_streamp strm, int flush)
 			 (int)s->obuf_total);
 
 		h->next_in = strm->next_in;	/* use stream input buffer */
-		h->avail_in = strm->avail_in;	/* use stream input buffer */
+		h->avail_in = strm->avail_in;
 		h->total_in = strm->total_in;
 
 		if (use_internal_buffer) {	/* entire buffer */
@@ -1419,13 +1455,6 @@ int h_inflate(z_streamp strm, int flush)
 			h->avail_out = strm->avail_out;
 		}
 		h->total_out = strm->total_out;
-
-		/* FIXME HACK to limit the output buffer mapping effort! */
-		//if (flush == Z_FINISH)
-		//	h->avail_out =
-		//		((h->avail_in * 4) + s->page_size - 1) &
-		//		~(s->page_size - 1);
-		// Does not work yet.
 
 		/* Call hardware to perform the decompression task. */
 		s->rc = rc_zedc_to_libz(__inflate(strm, s, flush));
@@ -1455,13 +1484,13 @@ int h_inflate(z_streamp strm, int flush)
 		    (s->rc == Z_BUF_ERROR))
 			return s->rc;
 
-		obuf_bytes = s->obuf - s->obuf_next;  /* bytes in obuf */
-		if ((s->rc == Z_STREAM_END) &&	/* hardware saw FEOB */
-		    (obuf_bytes == 0))		/* no more outp data in buf */
+		/* Hardware saw FEOB and output buffer is empty */
+		if ((s->rc == Z_STREAM_END) && output_buffer_empty(s))
 			return Z_STREAM_END;	/* nothing to do anymore */
 
 		if (strm->avail_out == 0)	/* need more output space */
 			return Z_OK;
+
 		hw_trace("[%p] data_type 0x%x\n", strm, strm->data_type);
 		if (strm->data_type & 0x80) {
 			hw_trace("[%p] Z_DO_BLOCK_EXIT\n", strm);
@@ -1471,8 +1500,8 @@ int h_inflate(z_streamp strm, int flush)
 		loops++;
 	} while (strm->avail_in != 0); /* strm->avail_out == 0 handled above */
 
-	hw_trace("[%p]            flush=%d %s avail_in=%d avail_out=%d\n",
-		 strm, flush, flush_to_str(flush), strm->avail_in,
+	hw_trace("[%p] __________ flush=%s avail_in=%d avail_out=%d\n",
+		 strm, flush_to_str(flush), strm->avail_in,
 		 strm->avail_out);
 
 	return rc_zedc_to_libz(rc);

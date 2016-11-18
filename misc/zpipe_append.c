@@ -338,7 +338,7 @@ static void usage(char *prog)
 	fprintf(stderr, "%s usage: %s [-h] [-v]\n"
 		"    [-F, --format <ZLIB|DEFLATE|GZIP>]\n"
 		"    [-e, --excact-input]  input matches size of data\n"
-		"    [-E, --excact-output] output matches size of data\n "
+		"    [-E, --excact-output] output matches size of data\n"
 		"    [-f, --fush <Z_NO_FLUSH|Z_PARTIAL_FLUSH|Z_FULL_FLUSH>]\n"
 		"    [-i, --i_bufsize <i_bufsize>]\n"
 		"    [-o, --o_bufsize <o_bufsize>]\n"
@@ -492,14 +492,26 @@ int main(int argc, char **argv)
 
 	/*
 	 * Test this special case: fully load the input data and
-	 * decompress in one shot.
+	 * decompress in one shot. We can barely get into this
+	 * sitatation because of the codes internal buffering, which
+	 * provides a buffer of larger size to the decompressor. We
+	 * need to set ZLIB_OBUF_TOTAL=0 to disable this.
+	 *
+	 * Even with that we had trouble to see the circumvention for
+	 * the Z_STREAM_END detection to kick in. Which is not good,
+	 * since it requires coverage to get it right.
 	 */
 	if (exact_input)
-		CHUNK_i = expected_bytes;
+		CHUNK_i = expected_bytes + strlen(pattern);
 
 	if (exact_output)
 		CHUNK_o = decompressed_bytes;
 
+	/*
+	 * fprintf(stderr, "info: expected_bytes=%ld decompressed_bytes=%ld "
+	 *	"strlen(pattern)=%ld\n",
+	 *	expected_bytes, decompressed_bytes, strlen(pattern));
+	 */
 	rc = inf(o_fp, n_fp, window_bits, flush, &decompressed_bytes);
 	if (expected_bytes != decompressed_bytes) {
 		fprintf(stderr, "err: compressed size mismatch "

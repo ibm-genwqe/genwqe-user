@@ -413,14 +413,27 @@ function zlib_append ()
     unset ZLIB_OBUF_TOTAL
 
     echo "Special zpipe_append setup, which failed once ... "
-    echo -n "  zpipe_append -FZLIB -fZ_PARTIAL_FLUSH -i2MiB -o4KiB -s256KiB "
-    zpipe_append -FZLIB -fZ_PARTIAL_FLUSH -i2MiB -o4KiB -s256KiB
+    echo -n "  zpipe_append -FZLIB -fZ_PARTIAL_FLUSH -i2MiB -o4KiB -s256KiB -p122846 -t122846 "
+    zpipe_append -FZLIB -fZ_PARTIAL_FLUSH -i2MiB -o4KiB -s256KiB -p122846 -t122846
     if [ $? -ne 0 ]; then
 	echo "failed"
 	exit 1
     fi
     echo "ok"
 
+    for f in ZLIB DEFLATE GZIP ; do
+	for ibuf in 2MiB 1MiB 128KiB 4KiB 1000 100 ; do
+	    for obuf in 1MiB 128KiB 4KiB 1000 100 ; do
+		echo -n "zpipe_append -F${f} -f${flush} -i${ibuf} -o${obuf} -s256KiB -e -E ${params} "
+		zpipe_append -F${f} -f${flush} -i${ibuf} -o${obuf} -s256KiB -e -E ${params}
+		if [ $? -ne 0 ]; then
+		    echo "failed"
+		    exit 1
+		fi
+		echo "ok"
+	    done
+	done
+    done
     export ZLIB_INFLATE_IMPL=0x41
     export ZLIB_DEFLATE_IMPL=0x41
     #unset ZLIB_INFLATE_IMPL

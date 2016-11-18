@@ -176,3 +176,4 @@ clean:
 	fi
 	@find . -depth -name '*~'  -exec rm -rf '{}' \; -print
 	@find . -depth -name '.#*' -exec rm -rf '{}' \; -print
+	@$(RM) *.bin *.log
