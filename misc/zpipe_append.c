@@ -261,7 +261,7 @@ static int inf(FILE *source, FILE *dest, int window_bits, int _flush,
 					"rc=%d pattern=%d\n", ret, _pattern);
 				abort();
 			}
-			fprintf(stderr, "AAA inflate() rc=%d\n", ret);
+			/* fprintf(stderr, "AAA inflate() rc=%d\n", ret); */
 
 			/* assert(ret != Z_STREAM_ERROR); *//* not clobbered */
 			if (ret == Z_STREAM_ERROR) {
@@ -289,7 +289,7 @@ static int inf(FILE *source, FILE *dest, int window_bits, int _flush,
 				free(out);
 				return Z_ERRNO;
 			}
-			fprintf(stderr, "AAA avail_out=%d\n", strm.avail_out);
+			/* fprintf(stderr, "AAA avail_out=%d\n", strm.avail_out); */
 			if (ret == Z_STREAM_END)
 				break;
 
@@ -469,7 +469,7 @@ int main(int argc, char **argv)
 
 	window_bits = figure_out_window_bits(format);
 
-	fprintf(stderr, "AAA _pattern=%d\n", _pattern);
+	/* fprintf(stderr, "AAA _pattern=%d\n", _pattern); */
 	sprintf(i_fname, "i_%d_%d.bin", _pattern, _pattern);
 	sprintf(o_fname, "o_%d_%d.bin", _pattern, _pattern);
 	sprintf(n_fname, "n_%d_%d.bin", _pattern, _pattern);
@@ -539,11 +539,11 @@ int main(int argc, char **argv)
 		expect_z_stream_end = 1;
 	}
 
-	fprintf(stderr,
-		"AAA Compressed: %d bytes and %d bytes padding\n"
-		"AAA Decompressed: %d bytes\n",
-		(int)expected_bytes, (int)strlen(pattern),
-		(int)decompressed_bytes);
+	/* fprintf(stderr,
+	   "AAA Compressed: %d bytes and %d bytes padding\n"
+	   "AAA Decompressed: %d bytes\n",
+	   (int)expected_bytes, (int)strlen(pattern),
+	   (int)decompressed_bytes); */
 
 	/*
 	 * fprintf(stderr, "info: expected_bytes=%ld decompressed_bytes=%ld "
