@@ -126,7 +126,9 @@ static int def(FILE *source, FILE *dest, int window_bits, int _flush,
 			free(out);
 			return Z_ERRNO;
 		}
-		flush = _flush;
+
+		/* flush = _flush; */
+		flush = feof(source) ? Z_FINISH : _flush;
 		strm.next_in = in;
 
 		/* run deflate() on input until output buffer not full, finish
@@ -151,8 +153,9 @@ static int def(FILE *source, FILE *dest, int window_bits, int _flush,
 		assert(strm.avail_in == 0);	/* all input will be used */
 
 		/* done when last data in file processed */
-	} while (!feof(source));
+	} while (flush != Z_FINISH /* !feof(source) */);
 
+#if 0				/* Experimental, does not work in all cases */
 	/* Put Z_FINISH as last step ... */
 	flush = Z_FINISH;
 	chunk_o = CHUNK_o;
@@ -170,7 +173,7 @@ static int def(FILE *source, FILE *dest, int window_bits, int _flush,
 		free(out);
 		return Z_ERRNO;
 	}
-
+#endif
 	assert(ret == Z_STREAM_END);	    /* stream will be complete */
 
 	if (compressed_size)
