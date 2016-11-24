@@ -59,10 +59,9 @@
 static int verbose = 0;
 static unsigned int CHUNK_i = 16 * 1024; /* 16384; */
 static unsigned int CHUNK_o = 16 * 1024; /* 16384; */
-static int _pid = 0;
-static int _tid = 0;
+static int _pattern = 0;
 
-static pid_t gettid(void)
+static inline pid_t gettid(void)
 {
 	return (pid_t)syscall(SYS_gettid);
 }
@@ -127,7 +126,7 @@ static int def(FILE *source, FILE *dest, int window_bits, int _flush,
 			free(out);
 			return Z_ERRNO;
 		}
-		flush = feof(source) ? Z_FINISH : _flush;
+		flush = _flush;
 		strm.next_in = in;
 
 		/* run deflate() on input until output buffer not full, finish
@@ -152,7 +151,26 @@ static int def(FILE *source, FILE *dest, int window_bits, int _flush,
 		assert(strm.avail_in == 0);	/* all input will be used */
 
 		/* done when last data in file processed */
-	} while (flush != Z_FINISH);
+	} while (!feof(source));
+
+	/* Put Z_FINISH as last step ... */
+	flush = Z_FINISH;
+	chunk_o = CHUNK_o;
+	strm.avail_out = chunk_o;
+	strm.next_out = out;
+
+	ret = deflate(&strm, flush);	/* no bad ret value */
+	assert(ret != Z_STREAM_ERROR);	/* not clobbered */
+
+	have = chunk_o - strm.avail_out;
+	if (fwrite(out, 1, have, dest) != have ||
+	    ferror(dest)) {
+		(void)deflateEnd(&strm);
+		free(in);
+		free(out);
+		return Z_ERRNO;
+	}
+
 	assert(ret == Z_STREAM_END);	    /* stream will be complete */
 
 	if (compressed_size)
@@ -174,7 +192,7 @@ static int def(FILE *source, FILE *dest, int window_bits, int _flush,
    the version of the library linked do not match, or Z_ERRNO if there
    is an error reading or writing the files. */
 static int inf(FILE *source, FILE *dest, int window_bits, int _flush,
-	       size_t *decompressed_bytes)
+	       size_t *decompressed_bytes, int expect_z_stream_end)
 {
 	int ret;
 	unsigned have;
@@ -236,10 +254,20 @@ static int inf(FILE *source, FILE *dest, int window_bits, int _flush,
 							 Z_SYNC_FLUSH,
 							 Z_FULL_FLUSH */
 
+			/* Expect in some cases that we see Z_STREAM_END */
+			if (expect_z_stream_end && (ret != Z_STREAM_END)) {
+				fprintf(stderr,
+					"inflate did not return Z_STREAM_END "
+					"rc=%d pattern=%d\n", ret, _pattern);
+				abort();
+			}
+			fprintf(stderr, "AAA inflate() rc=%d\n", ret);
+
 			/* assert(ret != Z_STREAM_ERROR); *//* not clobbered */
 			if (ret == Z_STREAM_ERROR) {
-				fprintf(stderr, "inflate failed rc=%d %d.%d\n",
-					ret, _pid, _tid);
+				fprintf(stderr,
+					"inflate failed rc=%d pattern=%d\n",
+					ret, _pattern);
 				abort();
 			}
 
@@ -261,6 +289,10 @@ static int inf(FILE *source, FILE *dest, int window_bits, int _flush,
 				free(out);
 				return Z_ERRNO;
 			}
+			fprintf(stderr, "AAA avail_out=%d\n", strm.avail_out);
+			if (ret == Z_STREAM_END)
+				break;
+
 		} while (strm.avail_out == 0);
 
 		/* done when inflate() says it's done */
@@ -342,8 +374,7 @@ static void usage(char *prog)
 		"    [-f, --fush <Z_NO_FLUSH|Z_PARTIAL_FLUSH|Z_FULL_FLUSH>]\n"
 		"    [-i, --i_bufsize <i_bufsize>]\n"
 		"    [-o, --o_bufsize <o_bufsize>]\n"
-		"    [-p, --pid <pid>] pattern0 to generate test-data\n"
-		"    [-t, --tid <tid>] pattern1 to generate test-data\n"
+		"    [-p, --pattern <pattern>] pattern to generate test-data\n"
 		"    [-s, --size <data-size>]\n",
 		b, b);
 }
@@ -362,9 +393,9 @@ int main(int argc, char **argv)
 	int flush = Z_NO_FLUSH;
 	int exact_input = 0, exact_output = 0;
 	size_t size = 256 * 1024;
+	int expect_z_stream_end = 0;
 
-	_tid = gettid();
-	_pid = getpid();
+	_pattern = getpid();
 
 	/* avoid end-of-line conversions */
 	SET_BINARY_MODE(stdin);
@@ -381,14 +412,13 @@ int main(int argc, char **argv)
 			{ "i_bufsize",	 required_argument, NULL, 'i' },
 			{ "o_bufsize",	 required_argument, NULL, 'o' },
 			{ "size",	 required_argument, NULL, 's' },
-			{ "pid",	 required_argument, NULL, 'p' },
-			{ "tid",	 required_argument, NULL, 't' },
+			{ "pattern",	 required_argument, NULL, 'p' },
 			{ "verbose",	 no_argument,	    NULL, 'v' },
 			{ "help",	 no_argument,	    NULL, 'h' },
 			{ 0,		 no_argument,	    NULL, 0   },
 		};
 
-		ch = getopt_long(argc, argv, "F:f:Eei:o:s:p:t:vh?",
+		ch = getopt_long(argc, argv, "F:f:Eei:o:s:p:vh?",
 				 long_options, &option_index);
 		if (ch == -1)    /* all params processed ? */
 			break;
@@ -403,6 +433,8 @@ int main(int argc, char **argv)
 				flush = Z_NO_FLUSH;
 			else if (strcmp(optarg, "Z_PARTIAL_FLUSH") == 0)
 				flush = Z_PARTIAL_FLUSH;
+			else if (strcmp(optarg, "Z_SYNC_FLUSH") == 0)
+				flush = Z_SYNC_FLUSH;
 			else if (strcmp(optarg, "Z_FULL_FLUSH") == 0)
 				flush = Z_FULL_FLUSH;
 			break;
@@ -425,10 +457,7 @@ int main(int argc, char **argv)
 			size = str_to_num(optarg);
 			break;
 		case 'p':
-			_pid = str_to_num(optarg);
-			break;
-		case 't':
-			_tid = str_to_num(optarg);
+			_pattern = str_to_num(optarg);
 			break;
 		case 'h':
 		case '?':
@@ -440,9 +469,10 @@ int main(int argc, char **argv)
 
 	window_bits = figure_out_window_bits(format);
 
-	sprintf(i_fname, "i_%d_%d.bin", _pid, _tid);
-	sprintf(o_fname, "o_%d_%d.bin", _pid, _tid);
-	sprintf(n_fname, "n_%d_%d.bin", _pid, _tid);
+	fprintf(stderr, "AAA _pattern=%d\n", _pattern);
+	sprintf(i_fname, "i_%d_%d.bin", _pattern, _pattern);
+	sprintf(o_fname, "o_%d_%d.bin", _pattern, _pattern);
+	sprintf(n_fname, "n_%d_%d.bin", _pattern, _pattern);
 
 	/* Write output data */
 	i_fp = fopen(i_fname, "w+");
@@ -504,15 +534,24 @@ int main(int argc, char **argv)
 	if (exact_input)
 		CHUNK_i = expected_bytes + strlen(pattern);
 
-	if (exact_output)
+	if (exact_output) {
 		CHUNK_o = decompressed_bytes;
+		expect_z_stream_end = 1;
+	}
+
+	fprintf(stderr,
+		"AAA Compressed: %d bytes and %d bytes padding\n"
+		"AAA Decompressed: %d bytes\n",
+		(int)expected_bytes, (int)strlen(pattern),
+		(int)decompressed_bytes);
 
 	/*
 	 * fprintf(stderr, "info: expected_bytes=%ld decompressed_bytes=%ld "
 	 *	"strlen(pattern)=%ld\n",
 	 *	expected_bytes, decompressed_bytes, strlen(pattern));
 	 */
-	rc = inf(o_fp, n_fp, window_bits, flush, &decompressed_bytes);
+	rc = inf(o_fp, n_fp, window_bits, flush, &decompressed_bytes,
+		 expect_z_stream_end);
 	if (expected_bytes != decompressed_bytes) {
 		fprintf(stderr, "err: compressed size mismatch "
 			"%lld (expected) != %lld (absorbed). "

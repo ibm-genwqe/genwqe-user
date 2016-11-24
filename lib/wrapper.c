@@ -778,9 +778,9 @@ int deflate(z_streamp strm, int flush)
 
 	pr_trace("[%p]            flush=%s next_in=%p avail_in=%d "
 		 "next_out=%p avail_out=%d total_out=%ld crc/adler=%08lx "
-		 "rc=%d\n", strm, flush_to_str(flush), strm->next_in,
+		 "rc=%s\n", strm, flush_to_str(flush), strm->next_in,
 		 strm->avail_in, strm->next_out, strm->avail_out,
-		 strm->total_out, strm->adler, rc);
+		 strm->total_out, strm->adler, ret_to_str(rc));
 
 	return rc;
 }
@@ -1189,7 +1189,7 @@ int inflateGetDictionary(z_streamp strm, Bytef *dictionary, uInt *dictLength)
 	}
 	strm->state = (void *)w;
 
-	pr_trace("[%p] inflateGetDictionary: dictionary=%p dictLength=%p "
+	pr_trace("[%p] inflateGetDictionary: dictionary=%p &dictLength=%p "
 		 "rc=%d\n", strm, dictionary, dictLength, rc);
 
 	return rc;

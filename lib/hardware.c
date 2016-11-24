@@ -925,7 +925,7 @@ int h_inflateGetDictionary(z_streamp strm, uint8_t *dictionary,
 	zedc_stream *h;
 	struct hw_state *s;
 
-	hw_trace("[%p] h_inflateGetDictionary dictionary=%p dictLength=%p\n",
+	hw_trace("[%p] h_inflateGetDictionary dictionary=%p &dictLength=%p\n",
 		 strm, dictionary, dictLength);
 
 	if (strm == NULL)
@@ -980,7 +980,7 @@ static inline int __inflate(z_streamp strm, struct hw_state *s, int flush)
 	rc = zedc_inflate(h, flush);
 	__fixup_crc_or_adler(strm, h);
 
-	hw_trace("[%p] _________ (%d) flush=%s next_in=%p avail_in=%d "
+	hw_trace("[%p] ________h (%d) flush=%s next_in=%p avail_in=%d "
 		 "next_out=%p avail_out=%d total_in=%ld total_out=%ld "
 		 "crc/adler=%08x/%08x rc=%s\n", strm, s->inflate_req,
 		 flush_to_str(flush), h->next_in, h->avail_in, h->next_out,

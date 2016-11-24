@@ -414,7 +414,7 @@ function zlib_append ()
 
     echo "Special zpipe_append setup, which failed once ... "
     echo -n "  zpipe_append -FZLIB -fZ_PARTIAL_FLUSH -i2MiB -o4KiB -s256KiB -p122846 -t122846 "
-    zpipe_append -FZLIB -fZ_PARTIAL_FLUSH -i2MiB -o4KiB -s256KiB -p122846 -t122846
+    zpipe_append -FZLIB -fZ_PARTIAL_FLUSH -i2MiB -o4KiB -s256KiB -p122846
     if [ $? -ne 0 ]; then
 	echo "failed"
 	exit 1
