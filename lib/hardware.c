@@ -1121,18 +1121,27 @@ static inline unsigned int __in_hdr_scratch_len(zedc_streamp strm)
  * of block symbol, which prevents software parsing the information in
  * the remaining bytes. Do not apply the BFINAL dectection
  * circumvention in this case.
+ *
+ *        BTYPE specifies how the data are compressed, as follows:
+ *           00 - no compression
+ *           01 - compressed with fixed Huffman codes
+ *           10 - compressed with dynamic Huffman codes
+ *           11 - reserved (error)
  */
 static inline int __in_hdr_bits(zedc_streamp strm)
 {
 	unsigned int headerarea_size =
 		((strm->tree_bits + strm->hdr_ib + 63)/64) * 8;
+	uint8_t btype = (strm->infl_stat & INFL_STAT_HDR_TYPE) >> 5;
+	const char *btype_str[] = { "NO_COMPRESSION", "FIXED_HUFFMAN",
+				    "DYNAMIC_HUFFMAN", "RESERVED" };
 
 	hw_trace("SCRATCH BITS: headerarea_size=%d hdr_ib=%d tree_bits=%d "
 		 "pad_bits=%d scratch_ib=%d scratch_bits=%d "
-		 "infl_stat.hdr_type=%x\n",
+		 "infl_stat.hdr_type=%s\n",
 		 headerarea_size, strm->hdr_ib, strm->tree_bits,
 		 strm->pad_bits, strm->scratch_ib, strm->scratch_bits,
-		 (strm->infl_stat & INFL_STAT_HDR_TYPE >> 5));
+		 btype_str[btype]);
 
 	return strm->tree_bits;
 }
@@ -1235,7 +1244,7 @@ static inline int __check_stream_end(z_streamp strm)
 			hw_trace("FIXED_HUFFMAN\n");
 
 			rc = get_bits(&e, 7, &d);
-			hw_trace("    d=%08llx, 0 indicates empty "
+			hw_trace("    d=%08llx, 00000000 indicates empty "
 				 "FIXED_HUFFMAN\n",
 				 (long long)d);
 			if (rc)
@@ -1407,10 +1416,13 @@ int h_inflate(z_streamp strm, int flush)
 			if (zlib_inflate_flags &
 			    ZLIB_FLAG_DISABLE_CV_FOR_Z_STREAM_END) {
 				hw_trace("[%p] ZLIB_FLAG_DISABLE_"
-					 "CIRCUMVENTION_FOR_Z_STREAM_END\n",
+					 "CV_FOR_Z_STREAM_END\n",
 					 strm);
 				goto skip_circumvention;
 			}
+
+			hw_trace("[%p] CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END\n",
+				 strm);
 			/*
 			 * Do not try this ZLIB or GZIP, were we
 			 * expect adler32 or crc32/data_size in the
