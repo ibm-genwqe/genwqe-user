@@ -1113,11 +1113,14 @@ static inline unsigned int __in_hdr_scratch_len(zedc_streamp strm)
 }
 
 /**
- * If there are tree bits defined, we are in a dynamic huffman block,
- * this causes that we do not know the dynamic huffman end of block
- * symbol, which prevents software parsing the information in the
- * remaining bytes. Do not applythe BFINAL dectection circumvention in
- * this case.
+ * I think we should be able to derive the info if we are in a dynamic
+ * huffman block via the 3 header bits. But anyways ...
+ *
+ * If there are tree bits defined, we are for sure in a dynamic
+ * huffman block. In this case we do not know the dynamic huffman end
+ * of block symbol, which prevents software parsing the information in
+ * the remaining bytes. Do not apply the BFINAL dectection
+ * circumvention in this case.
  */
 static inline int __in_hdr_bits(zedc_streamp strm)
 {
@@ -1279,12 +1282,13 @@ static inline int __check_stream_end(z_streamp strm)
  sync_avail_in:
 	/*
 	 * Only if we saw Z_STREAM_END and no problems understanding
-	 * the empty HUFFMAND or COPY_BLOCKs arised, we sync up the
+	 * the empty HUFFMAN or COPY_BLOCKs arised, we sync up the
 	 * stream.
 	 *
-	 * FIXME For DEFLATE and ZLIB we need to read the adler32 or
+	 * For DEFLATE and ZLIB we need to read the adler32 or
 	 * the crc32 and the uncompressed data size to finally say
-	 * that everything is right.
+	 * that everything is right. So let us not use the circumvention
+	 * in this case.
 	 */
 
 	/*
@@ -1400,6 +1404,13 @@ int h_inflate(z_streamp strm, int flush)
 			rc = Z_OK;
 
 #ifdef CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END	/* For MongoDB PoC */
+			if (zlib_inflate_flags &
+			    ZLIB_FLAG_DISABLE_CIRCUMVENTION_FOR_Z_STREAM_END) {
+				hw_trace("[%p] ZLIB_FLAG_DISABLE_"
+					 "CIRCUMVENTION_FOR_Z_STREAM_END\n",
+					 strm);
+				goto skip_circumvention;
+			}
 			/*
 			 * Do not try this ZLIB or GZIP, were we
 			 * expect adler32 or crc32/data_size in the
@@ -1440,6 +1451,7 @@ int h_inflate(z_streamp strm, int flush)
 				 "avail_out=%d __check_stream=%s\n", strm,
 				 flush_to_str(flush), strm->avail_in,
 				 strm->avail_out, ret_to_str(rc));
+		skip_circumvention:
 #endif
 			return rc;
 		}
@@ -1447,13 +1459,11 @@ int h_inflate(z_streamp strm, int flush)
 		/*
 		 * Original idea: Do not send 0 data to HW
 		 *
-		 * Thought why it might be needed regardless:
-		 *
+		 * Why it is needed regardless:
 		 *   If the underlying code buffers output data, we
-		 *   might need to call it anyways to get this. We
-		 *   need to trust the lowlevel code not to call
-		 *   hardware if not needed, since that would impact
-		 *   performance.
+		 *   need to call it to get this data. We need to trust
+		 *   the lowlevel code not to call hardware if not needed,
+		 *   since that would impact performance.
 		 */
 		if ((0 == strm->avail_in) &&
 		    ((Z_NO_FLUSH      == flush) ||
