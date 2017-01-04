@@ -1008,7 +1008,7 @@ static inline int __inflate(z_streamp strm, struct hw_state *s, int flush)
  *
  * Empty blocks are added by hardware support code and the software
  * implementation in different fashions. Z_SYNC_FLUSH does similar
- * things too. Hardware support code adds an embly fixed huffman block
+ * things too. Hardware support code adds an empty fixed huffman block
  * followed by another empty fixed huffman block with the BFINAL bit
  * on. Software uses just the latter.
  */
@@ -1112,6 +1112,28 @@ static inline unsigned int __in_hdr_scratch_len(zedc_streamp strm)
 	return (uint32_t)(len / 8ULL);
 }
 
+/**
+ * If there are tree bits defined, we are in a dynamic huffman block,
+ * this causes that we do not know the dynamic huffman end of block
+ * symbol, which prevents software parsing the information in the
+ * remaining bytes. Do not applythe BFINAL dectection circumvention in
+ * this case.
+ */
+static inline int __in_hdr_bits(zedc_streamp strm)
+{
+	unsigned int headerarea_size =
+		((strm->tree_bits + strm->hdr_ib + 63)/64) * 8;
+
+	hw_trace("SCRATCH BITS: headerarea_size=%d hdr_ib=%d tree_bits=%d "
+		 "pad_bits=%d scratch_ib=%d scratch_bits=%d "
+		 "infl_stat.hdr_type=%x\n",
+		 headerarea_size, strm->hdr_ib, strm->tree_bits,
+		 strm->pad_bits, strm->scratch_ib, strm->scratch_bits,
+		 (strm->infl_stat & INFL_STAT_HDR_TYPE >> 5));
+
+	return strm->tree_bits;
+}
+
 static inline void __reset_hdr_scratch_len(zedc_streamp strm)
 {
 	strm->hdr_ib = 0;
@@ -1163,7 +1185,10 @@ static inline int __check_stream_end(z_streamp strm)
 	e.remaining_bytes -= len;
 	e.avail_in += len;
 
-	hw_trace("Accumulated input data:\n");
+	hw_trace("Accumulated input data (__in_hdr_scratch_len=%d "
+		 "strm->avail_in=%d):\n",
+		 e.in_hdr_scratch_len, strm->avail_in);
+
 	if (zlib_hw_trace_enabled())
 		ddcb_hexdump(zlib_log, e.d, e.avail_in);
 
@@ -1197,7 +1222,7 @@ static inline int __check_stream_end(z_streamp strm)
 				goto go_home;
 			}
 			if (d & 0x4) {
-				hw_trace("  Z_STREAM_END potentially "
+				hw_trace("  Z_STREAM_END/BFINAL potentially "
 					 "detected!\n");
 				ret = Z_STREAM_END;
 			}
@@ -1395,6 +1420,14 @@ int h_inflate(z_streamp strm, int flush)
 			 *	"  proc_bits = %d\n",
 			 *	__in_hdr_scratch_len(h), h->proc_bits);
 			 */
+			rc = __in_hdr_bits(h);
+			if (rc != 0) {
+				hw_trace("    __in_hdr_bits %d: cannot parse "
+					 "dynamic huffman block, returning\n",
+					 rc);
+				return Z_OK;
+			}
+
 			rc = __check_stream_end(strm);
 			if (rc == Z_STREAM_END) {
 				hw_trace("    Suppress Z_STREAM_END %ld %ld\n",
