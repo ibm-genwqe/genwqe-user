@@ -34,7 +34,7 @@ enum zlib_impl {
 	ZLIB_FLAG_CACHE_HANDLES = 0x20,	   /* GenWQE only, fails for CAPI */
 	ZLIB_FLAG_OMIT_LAST_DICT = 0x40,   /* Useful for cases like Genomics */
 	ZLIB_FLAG_USE_POLLING = 0x80,  /* Use polling mode only for CAPI */
-	ZLIB_FLAG_DISABLE_CIRCUMVENTION_FOR_Z_STREAM_END = 0x100,
+	ZLIB_FLAG_DISABLE_CV_FOR_Z_STREAM_END = 0x100,
 };
 
 /**

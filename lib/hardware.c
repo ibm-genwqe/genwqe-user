@@ -1405,7 +1405,7 @@ int h_inflate(z_streamp strm, int flush)
 
 #ifdef CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END	/* For MongoDB PoC */
 			if (zlib_inflate_flags &
-			    ZLIB_FLAG_DISABLE_CIRCUMVENTION_FOR_Z_STREAM_END) {
+			    ZLIB_FLAG_DISABLE_CV_FOR_Z_STREAM_END) {
 				hw_trace("[%p] ZLIB_FLAG_DISABLE_"
 					 "CIRCUMVENTION_FOR_Z_STREAM_END\n",
 					 strm);
