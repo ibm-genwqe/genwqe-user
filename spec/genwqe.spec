@@ -22,7 +22,7 @@
 
 Summary: GenWQE userspace tools
 Name:    genwqe-tools
-Version: 4.0.17
+Version: 4.0.18
 Release: 1%{?dist}
 License: Apache-2.0
 Group: Development/Tools
@@ -156,6 +156,10 @@ ln -sf %{_bindir}/genwqe_gzip   %{buildroot}/%{_libdir}/genwqe/gzip
 %{_libdir}/genwqe/*.a
 
 %changelog
+* Thu Jan 05 2017 Frank Haverkamp <haver@linux.vnet.ibm.com> - 4.0.17
+- Make Z_STREAM_END detection circumvention configurable
+- Improve debug output
+- Improve Z_STREAM_END detection and add testcases (most likely not final yet)
 * Wed Apr 06 2016 Gabriel Krisman Bertazi <krisman@linux.vnet.ibm.com> - 4.0.16
 - dlopen uses SONAME when opening libz.
 - Support CAPI version.
