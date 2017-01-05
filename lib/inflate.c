@@ -281,7 +281,8 @@ static int post_scratch_upd(zedc_streamp strm)
 	/* if no input data processed copy input-data to tree area */
 	if ((strm->inp_processed == 0) && (strm->proc_bits == 0)) {
 		/* Special CASE: empty Input */
-		if (strm->avail_in > (ZEDC_TREE_LEN - strm->in_hdr_scratch_len)) {
+		if (strm->avail_in >
+		    (ZEDC_TREE_LEN - strm->in_hdr_scratch_len)) {
 
 			pr_err("scratch buffer too small\n");
 			zedc->zedc_rc = ZEDC_ERR_TREE_OVERRUN;
@@ -355,7 +356,7 @@ static int post_scratch_upd(zedc_streamp strm)
 static int inflate_rem_zlib_header(struct zedc_stream_s *strm)
 {
 	uint16_t val16;
-	head_state	next_state = strm->header_state;	/* Current State */
+	head_state	next_state = strm->header_state; /* Current State */
 	bool more_data = false;
 	int	rc  = INFLATE_HDR_OK;
 
@@ -368,7 +369,8 @@ static int inflate_rem_zlib_header(struct zedc_stream_s *strm)
 		switch (next_state) {
 		case HEADER_START:
 			if (strm->prefx_idx == 1) {
-				val16 = ((uint16_t)strm->prefx[0] << 8) + strm->prefx[1];
+				val16 = ((uint16_t)strm->prefx[0] << 8) +
+					strm->prefx[1];
 				if ((val16 % 31) != 0) {
 					pr_err("ZLIB header invalid (FCHECK)\n");
 					return INFLATE_HDR_ERROR;
@@ -379,7 +381,7 @@ static int inflate_rem_zlib_header(struct zedc_stream_s *strm)
 					pr_err("ZLIB header invalid (CMF)\n");
 					return INFLATE_HDR_ERROR;
 				}
-				if (val16 & 0x0020) {		/* bit 5 of FLG = FDICT */
+				if (val16 & 0x0020) { /* bit 5 of FLG = FDICT */
 					next_state = ZLIB_ADLER;
 					more_data = true;
 				} else next_state = HEADER_DONE;
@@ -388,7 +390,8 @@ static int inflate_rem_zlib_header(struct zedc_stream_s *strm)
 		case ZLIB_ADLER:
 			if (strm->prefx_idx == 5) {
 				/* zlib header with adler32 data ... */
-				strm->dict_adler32 = ((uint32_t)strm->prefx[2] << 24 |
+				strm->dict_adler32 =
+					((uint32_t)strm->prefx[2] << 24 |
 					(uint32_t)strm->prefx[3] << 16 |
 					(uint32_t)strm->prefx[4] << 8  |
 					(uint32_t)strm->prefx[5]);
@@ -407,7 +410,7 @@ static int inflate_rem_zlib_header(struct zedc_stream_s *strm)
 	strm->header_state = next_state;
 	if (more_data)
 		rc =  INFLATE_HDR_NEED_MORE_DATA;
-	return rc;	/* can be INFLATE_HDR_OK or INFLATE_HDR_ZLIB_NEED_DICT */
+	return rc; /* can be INFLATE_HDR_OK or INFLATE_HDR_ZLIB_NEED_DICT */
 }
 
 /**
@@ -427,7 +430,7 @@ static int inflate_rem_gzip_header(struct zedc_stream_s *strm)
 	uint8_t	flg;				/* GZIP FLG Byte */
 	struct gzedc_header_s	*gz_h;
 	int my_idx = 0;
-	head_state	next_state = strm->header_state;	/* Current State */
+	head_state	next_state = strm->header_state; /* Current State */
 	bool more_data = false;
 
 	if (strm->prefx_idx < 9)	/* min header bytes collected ? */
@@ -435,17 +438,17 @@ static int inflate_rem_gzip_header(struct zedc_stream_s *strm)
 
 	gz_h = strm->gzip_head;
 	if (strm->prefx_idx == 9)
-		strm->header_state = HEADER_START;	/* Current State  = Start */
+		strm->header_state = HEADER_START; /* Current State  = Start */
 
-	flg = strm->prefx[3];				/* Get FLG Byte */
+	flg = strm->prefx[3];			   /* Get FLG Byte */
 
 	while ((next_state != HEADER_DONE) && (false == more_data)) {
 		switch (next_state) {
 		case HEADER_START:
-			if ((strm->prefx[0] != 0x1f) ||			/* ID1 */
-			    (strm->prefx[1] != 0x8b) ||			/* ID2 */
-			    (strm->prefx[2] != 0x08)) {			/* CM */
-				return INFLATE_HDR_ERROR;		/* Fault */
+			if ((strm->prefx[0] != 0x1f) ||		/* ID1 */
+			    (strm->prefx[1] != 0x8b) ||		/* ID2 */
+			    (strm->prefx[2] != 0x08)) {		/* CM */
+				return INFLATE_HDR_ERROR;	/* Fault */
 			}
 			if (gz_h) {
 				/* Get time, xflags and os */
@@ -455,7 +458,8 @@ static int inflate_rem_gzip_header(struct zedc_stream_s *strm)
 				gz_h->xflags = strm->prefx[8];
 				gz_h->os     = strm->prefx[9];
 			}
-			next_state = FLAGS_CHECK_EMPTY;			/* next is check flag */
+			/* next is check flag */
+			next_state = FLAGS_CHECK_EMPTY;
 			break;
 		case FLAGS_CHECK_EMPTY:
 			if (flg == 0)
@@ -463,103 +467,125 @@ static int inflate_rem_gzip_header(struct zedc_stream_s *strm)
 			else next_state = FLAGS_CHECK_EXTRA;
 			break;
 		case FLAGS_CHECK_EXTRA:
-			if (flg & 0x04) {				/* FEXTRA bit set ? */
+			if (flg & 0x04) { /* FEXTRA bit set ? */
 				more_data = true;
 				next_state = FLAGS_GET_EXTRA_LEN1;
-			} else next_state = FLAGS_CHECK_FNAME;		/* FNAME is next */
+				/* FNAME is next */
+			} else next_state = FLAGS_CHECK_FNAME;
 			break;
 		case FLAGS_GET_EXTRA_LEN1:
 			strm->xlen  = (uint16_t)*strm->next_in;
-			strm->gzip_header_idx = 0;			/* Reset Index to get extra data */
+			/* Reset Index to get extra data */
+			strm->gzip_header_idx = 0;
 			more_data = true;
-			next_state = FLAGS_GET_EXTRA_LEN2;		/* Next State */
+			next_state = FLAGS_GET_EXTRA_LEN2; /* Next State */
 			break;
 		case FLAGS_GET_EXTRA_LEN2:
 			strm->xlen |= (uint16_t)*strm->next_in << 8;
-			if (gz_h)
-				gz_h->extra_len = strm->xlen;		/* Save for get Header */
-			next_state = FLAGS_GET_EXTRA;			/* Next State */
+			if (gz_h)		      /* Save for get Header */
+				gz_h->extra_len = strm->xlen;
+			next_state = FLAGS_GET_EXTRA; /* Next State */
 			more_data = true;
 			break;
 		case FLAGS_GET_EXTRA:
 			/* get Extra binary data */
 			if (1 == strm->xlen) {
-				next_state = FLAGS_CHECK_FNAME;		/* FNAME is Next State */
+				/* FNAME is Next State */
+				next_state = FLAGS_CHECK_FNAME;
 				more_data = false;
 			} else {
 				strm->xlen--;
 				more_data = true;
 			}
 			if (gz_h) {
-				my_idx = strm->gzip_header_idx;		/* Get index */
+				my_idx = strm->gzip_header_idx; /* Get index */
 				if (my_idx < (int)gz_h->extra_max) {
 					gz_h->extra[my_idx++] = *strm->next_in;
-					strm->gzip_header_idx = my_idx; /* and save back */
-				} else return INFLATE_HDR_ERROR;	/* Fault */
+					strm->gzip_header_idx = my_idx;
+					/* and save back */
+				} else return INFLATE_HDR_ERROR;/* Fault */
 			}
 			break;
 		case FLAGS_CHECK_FNAME:
-			if (flg & 0x08) {				/* FNAME bit set ? */
+			if (flg & 0x08) { /* FNAME bit set ? */
 				next_state = FLAGS_GET_FNAME;
 				more_data = true;
-				strm->gzip_header_idx = 0;		/* Reset index */
+				strm->gzip_header_idx = 0; /* Reset index */
 			} else next_state = FLAGS_CHECK_FCOMMENT;
 			break;
 		case FLAGS_GET_FNAME:
 			if (gz_h) {
-				my_idx = strm->gzip_header_idx;		/* Get index */
+				my_idx = strm->gzip_header_idx;	/* Get index */
 				if (my_idx < (int)gz_h->name_max) {
 					gz_h->name[my_idx++] = *strm->next_in;
-					strm->gzip_header_idx = my_idx; /* and save back */
-				} else return INFLATE_HDR_ERROR;	/* Fault */
+					strm->gzip_header_idx = my_idx;
+					/* and save back */
+				} else return INFLATE_HDR_ERROR; /* Fault */
 			}
 			if (*strm->next_in == 0)
-				next_state = FLAGS_CHECK_FCOMMENT;	/* check FCOMMENT */
+				next_state = FLAGS_CHECK_FCOMMENT;
+			/* check FCOMMENT */
 			else more_data = true;
 			break;
 		case FLAGS_CHECK_FCOMMENT:
-			if (flg & 0x10) {				/* FCOMMENT bit set ? */
+			if (flg & 0x10) {
+				/* FCOMMENT bit set ? */
 				more_data = true;
-				next_state = FLAGS_GET_FCOMMENT;	/* get FCOMMENT */
-				strm->gzip_header_idx = 0;		/* Reset index */
+				/* get FCOMMENT */
+				next_state = FLAGS_GET_FCOMMENT;
+				/* Reset index */
+				strm->gzip_header_idx = 0;
 			} else next_state = FLAGS_CHECK_FHCRC;
 			break;
 		case FLAGS_GET_FCOMMENT:
 			if (gz_h) {
-				my_idx = strm->gzip_header_idx;		/* Get index */
+				my_idx = strm->gzip_header_idx;
+				/* Get index */
 				if (my_idx < (int)gz_h->comm_max) {
-					gz_h->comment[my_idx++] = *strm->next_in;
-					strm->gzip_header_idx = my_idx;	/* and save back */
-				} else return INFLATE_HDR_ERROR;	/* Fault */
+					gz_h->comment[my_idx++] =
+						*strm->next_in;
+					strm->gzip_header_idx = my_idx;
+					/* and save back */
+				} else return INFLATE_HDR_ERROR; /* Fault */
 			}
 			if (*strm->next_in == 0)
-				next_state = FLAGS_CHECK_FHCRC;		/* FHCRC is Next State */
-			else more_data = true;				/* Get more data */
+				next_state = FLAGS_CHECK_FHCRC;
+			/* FHCRC is Next State */
+			else more_data = true;
+			/* Get more data */
 			break;
 		case FLAGS_CHECK_FHCRC:
-			if (flg & 0x02) {				/* FHCRC bit set ? */
+			if (flg & 0x02) { /* FHCRC bit set ? */
 				more_data = true;
 				next_state = FLAGS_GET_FHCRC1;
 			} else next_state = FLAGS_CHECK_FTEXT;
 			break;
 		case FLAGS_GET_FHCRC1:
-			strm->gzip_hcrc = (uint16_t)*strm->next_in;	/* Get 1st Byte */
-			next_state = FLAGS_GET_FHCRC2;			/* Next is 2nd byte */
+			strm->gzip_hcrc = (uint16_t)*strm->next_in;
+			/* Get 1st Byte */
+			next_state = FLAGS_GET_FHCRC2;
+			/* Next is 2nd byte */
 			more_data = true;
 			break;
-		case FLAGS_GET_FHCRC2:					/* 2nd byte of FHCRC */
+		case FLAGS_GET_FHCRC2:
+			/* 2nd byte of FHCRC */
 			strm->gzip_hcrc |= (uint16_t)*strm->next_in << 8;
-			/* Need more work here to compare deflate and inflate */
-			next_state = FLAGS_CHECK_FTEXT;			/* Check FTEXT */
+			/* Need more work here to compare deflate and
+			   inflate */
+			next_state = FLAGS_CHECK_FTEXT;
+			/* Check FTEXT */
 			break;
 		case FLAGS_CHECK_FTEXT:
-			if (flg & 0x01) {				/* FTEXT bit set ? */
-				if (gz_h) gz_h->text = 1;		/* Set Text flag */
+			if (flg & 0x01) {
+				/* FTEXT bit set ? */
+				if (gz_h) gz_h->text = 1;
+				/* Set Text flag */
 			}
-			next_state = HEADER_DONE;			/* Exit while */
+			next_state = HEADER_DONE; /* Exit while */
 			break;
-		case HEADER_DONE:					/* never reach this */
-		default:						/* only to make gcc happy */
+		case HEADER_DONE: /* never reach this */
+		default:
+			/* only to make gcc happy */
 			break;
 		}
 	}
@@ -733,41 +759,49 @@ static int inflate_format_rem_trailer(struct zedc_stream_s *strm)
 }
 
 /**
- * @brief	Pre-process for inflate
- *		If data is left from previous task due to insufficent
+ * @brief	Figure out if data is left from previous task due to
+ *		insufficent output buffer space.
+ * @param strm	decompression job context
+ */
+int zedc_inflate_pending_output(struct zedc_stream_s *strm)
+{
+	return strm->obytes_in_dict;
+}
+
+/**
+ * @brief	If data is left from previous task due to insufficent
  *		output buffer space, this data must first be stored
  *		to the new output buffer.
  * @param strm	decompression job context
  */
-static int pre_inflate(struct zedc_stream_s *strm)
+static int inflate_flush_output_buffer(struct zedc_stream_s *strm)
 {
 	uint8_t *pdict;
 	zedc_handle_t zedc = (zedc_handle_t)strm->device;
+
+	if (strm->obytes_in_dict == 0)
+		return ZEDC_OK;
 
 	/*
 	 * Unstored data was temporarily stored by HW at the end of
 	 * dictionary. First restore these bytes if new output buffer
 	 * is available.
 	 */
-	if (strm->obytes_in_dict) {
-		/* rename 'dict_len' to 'out_dict_used' to match spec */
-		if (strm->dict_len < strm->obytes_in_dict) {
-			pr_err("invalid param 'obytes_in_dict'\n");
-			zedc->zedc_rc = ZEDC_ERR_DICT_OVERRUN;
-			return zedc->zedc_rc;
-		}
-		/* obytes at end of dict */
-		pdict = strm->wsp->dict[strm->wsp_page] +
-			strm->out_dict_offs +
-			strm->dict_len -
-			strm->obytes_in_dict;
+	/* FIXME rename 'dict_len' to 'out_dict_used' to match spec */
+	if (strm->dict_len < strm->obytes_in_dict) {
+		pr_err("invalid 'obytes_in_dict' ZEDC_ERR_DICT_OVERRUN\n");
+		zedc->zedc_rc = ZEDC_ERR_DICT_OVERRUN;
+		return zedc->zedc_rc;
+	}
+	/* obytes at end of dict */
+	pdict = strm->wsp->dict[strm->wsp_page] +
+		strm->out_dict_offs + strm->dict_len - strm->obytes_in_dict;
 
-		while (strm->avail_out && strm->obytes_in_dict) {
-			*strm->next_out++ = *pdict++;
-			strm->avail_out--;
-			strm->total_out++;
-			strm->obytes_in_dict--;
-		}
+	while (strm->avail_out && strm->obytes_in_dict) {
+		*strm->next_out++ = *pdict++;
+		strm->avail_out--;
+		strm->total_out++;
+		strm->obytes_in_dict--;
 	}
 	return ZEDC_OK;
 }
@@ -1011,7 +1045,7 @@ int zedc_inflate(zedc_streamp strm, int flush)
 	 * Pre-processing, restore data from previous task and copy
 	 * obytes to output buffer.
 	 */
-	rc = pre_inflate(strm);
+	rc = inflate_flush_output_buffer(strm);
 	if (rc) {
 		pr_err("inflate failed rc=%d\n", rc);
 		return ZEDC_STREAM_ERROR;
@@ -1217,6 +1251,8 @@ int zedc_inflate(zedc_streamp strm, int flush)
 	   data than offered. */
 	len = strm->inp_data_offs;  /* Just input bytes from next_in,
 				       not repeated tree, hdr, scratch bits */
+	/* fprintf(stderr, "LEN(%s): len=%d\n", __func__, len); */
+
 	if (len > strm->avail_in) {
 		pr_err("consumed=%u/avail_in=%u\n", len, strm->avail_in);
 		goto abort;

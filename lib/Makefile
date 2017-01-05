@@ -22,6 +22,13 @@ libversion = $(VERSION)
 CFLAGS += -fPIC -fno-strict-aliasing
 LDLIBS += -lpthread -ldl -lrt
 
+# If we use libcxl, we need to reflect that to avoid underlinkage
+ifeq ($(WITH_LIBCXL),1)
+ifneq ($(BUNDLE_LIBCXL),1)
+LDLIBS += -lcxl
+endif
+endif
+
 ### Accelerated libz implementation (Accelerated Data Compression/ADC)
 libname=libzADC
 projA = $(libname).a \
@@ -203,7 +210,7 @@ uninstall:
 	$(CC) -MM $(CPPFLAGS) $(CFLAGS) $< > $*.d
 
 clean distclean:
-	$(RM) *.o *.d $(projs) *.so
+	$(RM) *.o *.d $(projs) *.so *.so.*
 ifneq ($(CONFIG_LIBCXL_PATH),)
 	$(MAKE) -C $(CONFIG_LIBCXL_PATH) $@
 endif

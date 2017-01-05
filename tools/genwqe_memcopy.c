@@ -141,7 +141,7 @@ static void usage(const char *prog)
 	       "  -s, --bufsize <bufsize>  default is 4KiB\n"
 	       "  -i, --pgoffs_i <offs>    byte offset for input buffer\n"
 	       "  -o, --pgoffs_o <offs>    byte offset for output buffer\n"
-	       "  -F, --force-compare <ouput_data.bin>\n"
+	       "  -F, --force-compare <output_data.bin>\n"
 	       "  -t, --threads <num>      run <num> threads, default is 1\n"
 	       "  -Y, --inject-error <err> IN:0x1, OUT:0x2, SIZE:0x4, DDCB:0x8\n"
 	       "\n"

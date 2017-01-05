@@ -754,9 +754,9 @@ int deflate(z_streamp strm, int flush)
 		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 
-	pr_trace("[%p] deflate:   flush=%d %s next_in=%p avail_in=%d "
+	pr_trace("[%p] deflate:   flush=%s next_in=%p avail_in=%d "
 		 "next_out=%p avail_out=%d total_out=%ld crc/adler=%08lx "
-		 "impl=%d\n", strm, flush, flush_to_str(flush), strm->next_in,
+		 "impl=%d\n", strm, flush_to_str(flush), strm->next_in,
 		 strm->avail_in, strm->next_out, strm->avail_out,
 		 strm->total_out, strm->adler, w->impl);
 
@@ -776,11 +776,11 @@ int deflate(z_streamp strm, int flush)
 	}
 	strm->state = (void *)w;
 
-	pr_trace("[%p]            flush=%d %s next_in=%p avail_in=%d "
+	pr_trace("[%p]            flush=%s next_in=%p avail_in=%d "
 		 "next_out=%p avail_out=%d total_out=%ld crc/adler=%08lx "
-		 "rc=%d\n", strm, flush, flush_to_str(flush), strm->next_in,
+		 "rc=%s\n", strm, flush_to_str(flush), strm->next_in,
 		 strm->avail_in, strm->next_out, strm->avail_out,
-		 strm->total_out, strm->adler, rc);
+		 strm->total_out, strm->adler, ret_to_str(rc));
 
 	return rc;
 }
@@ -962,7 +962,6 @@ static int __inflateInit2_(z_streamp strm, struct _internal_state *w)
 		goto err;
 
 	w->priv_data = strm->state;		/* backup sublevel state */
-	pr_trace("[%p]    w=%p strm->state=%p\n", strm, w, strm->state);
  err:
 	return rc;
 }
@@ -1190,7 +1189,7 @@ int inflateGetDictionary(z_streamp strm, Bytef *dictionary, uInt *dictLength)
 	}
 	strm->state = (void *)w;
 
-	pr_trace("[%p] inflateGetDictionary: dictionary=%p dictLength=%p "
+	pr_trace("[%p] inflateGetDictionary: dictionary=%p &dictLength=%p "
 		 "rc=%d\n", strm, dictionary, dictLength, rc);
 
 	return rc;
@@ -1428,10 +1427,10 @@ int inflate(z_streamp strm, int flush)
 		pthread_mutex_unlock(&zlib_stats_mutex);
 	}
 
-	pr_trace("[%p] inflate:   flush=%d %s next_in=%p avail_in=%d "
+	pr_trace("[%p] inflate:   flush=%s next_in=%p avail_in=%d "
 		 "next_out=%p avail_out=%d total_in=%ld total_out=%ld "
 		 "crc/adler=%08lx\n",
-		 strm, flush, flush_to_str(flush), strm->next_in,
+		 strm, flush_to_str(flush), strm->next_in,
 		 strm->avail_in, strm->next_out, strm->avail_out,
 		 strm->total_in, strm->total_out, strm->adler);
 
@@ -1443,13 +1442,12 @@ int inflate(z_streamp strm, int flush)
 	w->allow_switching = false;
 	strm->state = (void *)w;
 
-	pr_trace("[%p]            flush=%d %s next_in=%p avail_in=%d "
+	pr_trace("[%p]            flush=%s next_in=%p avail_in=%d "
 		 "next_out=%p avail_out=%d total_in=%ld total_out=%ld "
-		 "crc/adler=%08lx rc=%d %s\n",
-		 strm, flush, flush_to_str(flush), strm->next_in,
+		 "crc/adler=%08lx rc=%s\n",
+		 strm, flush_to_str(flush), strm->next_in,
 		 strm->avail_in, strm->next_out, strm->avail_out,
-		 strm->total_in, strm->total_out, strm->adler, rc,
-		 ret_to_str(rc));
+		 strm->total_in, strm->total_out, strm->adler, ret_to_str(rc));
 
  err:
 	return rc;
