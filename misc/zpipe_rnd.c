@@ -64,8 +64,10 @@ static int def(FILE *source, FILE *dest, int level, int windowBits,
 		return Z_ERRNO;
 
 	out = malloc(CHUNK_o);
-	if (out == NULL)
+	if (out == NULL) {
+		free(in);
 		return Z_ERRNO;
+	}
 
 	/* allocate deflate state */
 	strm.zalloc = Z_NULL;
@@ -73,13 +75,19 @@ static int def(FILE *source, FILE *dest, int level, int windowBits,
 	strm.opaque = Z_NULL;
 	ret = deflateInit2(&strm, level, Z_DEFLATED, windowBits, 8,
 			   Z_DEFAULT_STRATEGY);
-	if (ret != Z_OK)
+	if (ret != Z_OK) {
+		free(in);
+		free(out);
 		return ret;
+	}
 
 	if (dictLength > 0) {
 		ret = deflateSetDictionary(&strm, dictionary, dictLength);
-		if (ret != Z_OK)
+		if (ret != Z_OK) {
+			free(in);
+			free(out);
 			return ret;
+		}
 	}
 
 	/* compress until end of file */
@@ -152,8 +160,10 @@ static int inf(FILE *source, FILE *dest, int windowBits,
 		return Z_ERRNO;
 
 	out = malloc(CHUNK_o);
-	if (out == NULL)
+	if (out == NULL) {
+		free(in);
 		return Z_ERRNO;
+	}
 
 	/* allocate inflate state */
 	strm.zalloc = Z_NULL;
@@ -163,14 +173,20 @@ static int inf(FILE *source, FILE *dest, int windowBits,
 	strm.next_in = Z_NULL;
 
 	ret = inflateInit2(&strm, windowBits);
-	if (ret != Z_OK)
+	if (ret != Z_OK) {
+		free(in);
+		free(out);
 		return ret;
+	}
 
 	if (!((windowBits >= 8) && (windowBits <= 15)) &&  /* !ZLIB */
 	    (dictLength > 0)) {
 		ret = inflateSetDictionary(&strm, dictionary, dictLength);
-		if (ret != Z_OK)
+		if (ret != Z_OK) {
+			free(in);
+			free(out);
 			return ret;
+		}
 	}
 
 	/* decompress until deflate stream ends or end of file */

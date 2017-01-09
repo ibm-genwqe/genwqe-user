@@ -534,7 +534,7 @@ int ddcb_register_accelerator(struct ddcb_accel_funcs *accel)
 	if (accel == NULL)
 		return DDCB_ERR_INVAL;
 
-	if ddcb_gather_statistics() {
+	if (ddcb_gather_statistics()) {
 		rc = pthread_mutex_init(&accel->slock, NULL);
 		if (rc != 0)
 			return DDCB_ERRNO;

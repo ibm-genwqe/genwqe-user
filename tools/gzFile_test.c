@@ -557,6 +557,11 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
+	if ((i_fname == NULL) || (o_fname == NULL)) {
+		pr_err("No input or output file name provided.");
+		return -1;
+        }
+
 	fprintf(stderr, "%sCompress %s to %s in %ld bytes, "
 		"out %ld bytes chunks with level %d (size=%lld, offs=%lld)\n",
 		use_compress ? "" : "De",

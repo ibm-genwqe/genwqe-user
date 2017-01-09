@@ -62,7 +62,9 @@ $(projs): $(libs)
 
 objs = force_cpu.o genwqe_vpd_common.o $(projs:=.o)
 
-manpages = $(projs:=.1.gz)
+test_scripts = genwqe_mt_perf genwqe_test_gz
+
+manpages = $(projs:=.1.gz) $(test_scripts:=.1.gz)
 
 manpages: all $(manpages)
 
@@ -83,6 +85,7 @@ genwqe_gunzip.o: genwqe_gzip.c
 ### Setting LD_LIBRARY_PATH helps to try tools with dynamic linkage
 %.1: %
 	LD_LIBRARY_PATH=../lib $(HELP2MAN) -N --output=$@ \
+		--help-option='-h' --version-option='-V' \
 		--name "IBM Hardware Accelerator Tool." ./$<
 
 %.1.gz: %.1

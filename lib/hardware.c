@@ -1291,7 +1291,7 @@ static inline int __check_stream_end(z_streamp strm)
  sync_avail_in:
 	/*
 	 * Only if we saw Z_STREAM_END and no problems understanding
-	 * the empty HUFFMAN or COPY_BLOCKs arised, we sync up the
+	 * the empty HUFFMAN or COPY_BLOCKs arose, we sync up the
 	 * stream.
 	 *
 	 * For DEFLATE and ZLIB we need to read the adler32 or

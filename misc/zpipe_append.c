@@ -100,7 +100,7 @@ static int def(FILE *source, FILE *dest, int window_bits, int _flush,
 		return Z_ERRNO;
 
 	out = malloc(CHUNK_o);
-	if (in == NULL) {
+	if (out == NULL) {
 		free(in);
 		return Z_ERRNO;
 	}
@@ -113,8 +113,11 @@ static int def(FILE *source, FILE *dest, int window_bits, int _flush,
 
 	ret = deflateInit2(&strm, level, Z_DEFLATED, window_bits, 8,
 			   Z_DEFAULT_STRATEGY);
-	if (ret != Z_OK)
+	if (ret != Z_OK) {
+		free(in);
+		free(out);
 		return ret;
+	}
 
 	/* compress until end of file */
 	do {
@@ -210,7 +213,7 @@ static int inf(FILE *source, FILE *dest, int window_bits, int _flush,
 		return Z_ERRNO;
 
 	out = malloc(CHUNK_o);
-	if (in == NULL) {
+	if (out == NULL) {
 		free(in);
 		return Z_ERRNO;
 	}
@@ -503,6 +506,8 @@ int main(int argc, char **argv)
 	rc = def(i_fp, o_fp, window_bits, flush, Z_DEFAULT_COMPRESSION,
 		 &expected_bytes, &decompressed_bytes);
 	if (rc != Z_OK) {
+		fclose(o_fp);
+		fclose(i_fp);
 		fprintf(stderr, "err: compression failed.\n");
 		zerr(rc);
 		return rc;
@@ -566,6 +571,8 @@ int main(int argc, char **argv)
 	}
 
 	if (rc != Z_OK) {
+		fclose(o_fp);
+		fclose(n_fp);
 		fprintf(stderr, "err: decompression failed.\n");
 		zerr(rc);
 		return rc;
