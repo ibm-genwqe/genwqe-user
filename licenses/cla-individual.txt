@@ -1,6 +1,6 @@
         International Business Machines, Inc. (IBM)
      Individual Contributor License Agreement ("Agreement")
-        http://www.github.org/ibm-genwqe/licenses/
+        http://www.github.com/ibm-genwqe/licenses/
 
 Thank you for your interest in the ibm-genwqe project ("Hardware
 acceleration of deflate/zlib compression with IBM FPGA accelerators").
