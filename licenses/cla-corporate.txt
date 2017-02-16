@@ -1,6 +1,6 @@
         International Business machines, Inc.
   Software Grant and Corporate Contributor License Agreement ("Agreement")
-        http://www.github.org/ibm-genwqe/licenses/
+        http://www.github.com/ibm-genwqe/licenses/
 
 
 Thank you for your interest in IBM’s ibm-genwqe project (“Hardware
