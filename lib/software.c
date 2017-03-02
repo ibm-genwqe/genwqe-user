@@ -533,8 +533,8 @@ z_off64_t gztell64(gzFile file)
 	return (* p_gztell64)(file);
 }
 
-static z_off_t (* p_gzseek64)(gzFile file, z_off64_t offset, int whence);
-z_off_t gzseek64(gzFile file, z_off64_t offset, int whence)
+static z_off64_t (* p_gzseek64)(gzFile file, z_off64_t offset, int whence);
+z_off64_t gzseek64(gzFile file, z_off64_t offset, int whence)
 {
 	zlib_stats_inc(&zlib_stats.gzseek64);
 	check_sym(p_gzseek64, -1ll);
@@ -550,7 +550,7 @@ z_off_t gzoffset(gzFile file)
 }
 
 static z_off64_t (* p_gzoffset64)(gzFile file);
-z_off_t gzoffset64(gzFile file)
+z_off64_t gzoffset64(gzFile file)
 {
 	zlib_stats_inc(&zlib_stats.gzoffset64);
 	check_sym(p_gzoffset64, -1ll);
