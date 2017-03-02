@@ -1453,7 +1453,7 @@ int h_inflate(z_streamp strm, int flush)
 
 			rc = __check_stream_end(strm);
 			if (rc == Z_STREAM_END) {
-				hw_trace("    Suppress Z_STREAM_END %ld %ld\n",
+				hw_trace("    Suppress Z_STREAM_END %zd %zd\n",
 					 s->obuf_avail, s->obuf_total);
 				s->rc = Z_STREAM_END;
 				rc = Z_OK;
