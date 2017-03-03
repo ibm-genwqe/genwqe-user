@@ -3,9 +3,10 @@ dist: trusty
 language: c
 compiler: gcc
 before_install:
+  - sudo dpkg --add-architecture i386
   - sudo apt-get -qq update
   - sudo apt-cache search zlib
-  - sudo apt-get --assume-yes install gcc help2man git make zlib1g-dev libc6-dev-i386
+  - sudo apt-get --assume-yes install gcc help2man git make zlib1g-dev libc6-dev-i386 libz1g-dev:i386
   - ls -l /usr/include/z*.h
 script:
   - make FORCE_32BIT=1 V=2
