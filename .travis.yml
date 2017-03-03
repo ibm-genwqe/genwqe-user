@@ -4,10 +4,11 @@ language: c
 compiler: gcc
 before_install:
   - sudo apt-get -qq update
-  - sudo apt-cache search zlib1g
-  - sudo apt-get --assume-yes install gcc help2man git make zlib1g-dev libc6-dev-i386 zlib1g-i386-dev
+  - sudo apt-cache search zlib
+  - sudo apt-get --assume-yes install gcc help2man git make zlib1g-dev libc6-dev-i386
 script:
+  - make FORCE_32BIT=1
+  - make clean
   - make
   - make test_software
   - make clean
-  - make FORCE_32BIT=1
