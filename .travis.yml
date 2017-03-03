@@ -4,7 +4,8 @@ language: c
 compiler: gcc
 before_install:
   - sudo apt-get -qq update
-  - sudo apt-get --assume-yes install gcc help2man git make zlib1g-dev libc6-dev-i386 zlib1g-dev-i386
+  - sudo apt-cache search zlib1g
+  - sudo apt-get --assume-yes install gcc help2man git make zlib1g-dev libc6-dev-i386 zlib1g-i386-dev
 script:
   - make
   - make test_software
