@@ -8,3 +8,5 @@ before_install:
 script:
   - make
   - make test_software
+  - make clean
+  - make FORCE_32BIT=1
