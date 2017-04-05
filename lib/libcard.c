@@ -1364,9 +1364,9 @@ int genwqe_pin_memory(card_handle_t dev, const void *addr, size_t size,
 			if (0 == rc)
 				return GENWQE_OK;
 		}
+		pr_err("Dev: %p Fault: %d addr=%p size=%lld dir=%d\n", dev,
+				dev->drv_errno, addr, (long long)size, direction);
 	}
-	pr_err("Dev: %p Fault: %d addr=%p size=%lld dir=%d\n", dev,
-	       dev->drv_errno, addr, (long long)size, direction);
 	return GENWQE_ERR_PINNING;
 }
 
@@ -1390,9 +1390,9 @@ int genwqe_unpin_memory(card_handle_t dev, const void *addr, size_t size)
 			if (0 == rc)
 				return GENWQE_OK;
 		}
+		pr_err("Dev: %p Fault: %d addr=%p size=%lld\n", dev,
+				dev->drv_errno, addr, (long long)size);
 	}
-	pr_err("Dev: %p Fault: %d addr=%p size=%lld\n", dev,
-	       dev->drv_errno, addr, (long long)size);
 	return GENWQE_ERR_PINNING;
 }
 
