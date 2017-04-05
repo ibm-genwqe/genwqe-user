@@ -845,9 +845,10 @@ int deflateEnd(z_streamp strm)
 	}
 
 	rc = __deflateEnd(strm, w);
-	free(w);
 
 	pr_trace("[%p] deflateEnd w=%p rc=%d\n", strm, w, rc);
+	free(w);
+
 	return rc;
 }
 
@@ -1302,9 +1303,10 @@ int inflateEnd(z_streamp strm)
 		free(w->dictionary);
 		w->dictionary = NULL;
 	}
-	free(w);
 
 	pr_trace("[%p] inflateEnd w=%p rc=%d\n", strm, w, rc);
+	free(w);
+
 	return rc;
 }
 
