@@ -25,6 +25,14 @@
 
 export accel=UNKNOWN
 
+# Print usage message helper function
+function usage() {
+	echo "Usage of $PROGRAM:"
+	echo "    [-A] <accelerator> use either GENWQE for the PCIe "
+	echo "         and CAPI for CAPI based solution available "
+	echo "         only on System p"
+}
+
 # Parse any options given on the command line
 while getopts "A:C:t:PvVhl" opt; do
 	case ${opt} in
@@ -45,14 +53,6 @@ while getopts "A:C:t:PvVhl" opt; do
 		;;
 	esac
 done
-
-# Print usage message helper function
-function usage() {
-	echo "Usage of $PROGRAM:"
-	echo "    [-A] <accelerator> use either GENWQE for the PCIe "
-	echo "         and CAPI for CAPI based solution available "
-	echo "         only on System p"
-}
 
 #
 # We need to take into account that there might be other CAPI cards
