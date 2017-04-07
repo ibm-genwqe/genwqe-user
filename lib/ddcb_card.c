@@ -109,7 +109,7 @@ static uint64_t _card_get_frequency(void *card_data)
 	if (speed >= ARRAY_SIZE(speed_grade))
 		return 0;       /* illegal value */
 
-	return speed_grade[speed] * 1000000;  /* in Hz */
+	return speed_grade[speed] * (uint64_t)1000000;  /* in Hz */
 }
 
 static void card_dump_hardware_version(void *card_data, FILE *fp)
