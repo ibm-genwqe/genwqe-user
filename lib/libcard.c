@@ -1733,8 +1733,10 @@ int genwqe_flash_read(card_handle_t dev, struct card_upd_params *upd)
 	rc = __genwqe_flash_read(dev, upd->partition, buf, buflen,
 				 &upd->retc, &upd->attn,
 				 &upd->progress);
-	if (rc < 0)
+	if (rc < 0) {
+		close(fd);
 		goto err_exit;
+	}
 
 	rc = (int)write(fd, buf, (size_t)upd->flength);
 	close(fd);
