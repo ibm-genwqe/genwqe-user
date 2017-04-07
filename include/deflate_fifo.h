@@ -115,7 +115,7 @@ static inline int fifo_pop16(struct zedc_fifo *fifo, uint16_t *data)
 	if (fifo_used(fifo) < 2)
 		return 0;
 
-	for (i = 0; i < 4; i++)
+	for (i = 0; i < 2; i++)
 		fifo_pop(fifo, &d.u8[i]);
 
 	*data = d.u16;
