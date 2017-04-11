@@ -1062,10 +1062,10 @@ void genwqe_card_lib_debug(int onoff)
  */
 static void ddcb_setup_crc32(struct lib_data_t *d)
 {
-	int i, j;
+	unsigned int i, j;
 	uint32_t crc;
 
-	for (i = 0;  i < 256;  i++) {
+	for (i = 0;  i < ARRAY_SIZE(d->crc32_tab);  i++) {
 		crc = i << 24;
 		for (j = 0;  j < 8;  j++) {
 			if (crc & 0x80000000)
