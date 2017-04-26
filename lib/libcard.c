@@ -1062,10 +1062,10 @@ void genwqe_card_lib_debug(int onoff)
  */
 static void ddcb_setup_crc32(struct lib_data_t *d)
 {
-	int i, j;
+	unsigned int i, j;
 	uint32_t crc;
 
-	for (i = 0;  i < 256;  i++) {
+	for (i = 0;  i < ARRAY_SIZE(d->crc32_tab);  i++) {
 		crc = i << 24;
 		for (j = 0;  j < 8;  j++) {
 			if (crc & 0x80000000)
@@ -1364,9 +1364,9 @@ int genwqe_pin_memory(card_handle_t dev, const void *addr, size_t size,
 			if (0 == rc)
 				return GENWQE_OK;
 		}
+		pr_err("Dev: %p Fault: %d addr=%p size=%lld dir=%d\n", dev,
+				dev->drv_errno, addr, (long long)size, direction);
 	}
-	pr_err("Dev: %p Fault: %d addr=%p size=%lld dir=%d\n", dev,
-	       dev->drv_errno, addr, (long long)size, direction);
 	return GENWQE_ERR_PINNING;
 }
 
@@ -1390,9 +1390,9 @@ int genwqe_unpin_memory(card_handle_t dev, const void *addr, size_t size)
 			if (0 == rc)
 				return GENWQE_OK;
 		}
+		pr_err("Dev: %p Fault: %d addr=%p size=%lld\n", dev,
+				dev->drv_errno, addr, (long long)size);
 	}
-	pr_err("Dev: %p Fault: %d addr=%p size=%lld\n", dev,
-	       dev->drv_errno, addr, (long long)size);
 	return GENWQE_ERR_PINNING;
 }
 
@@ -1642,20 +1642,18 @@ static void __hexdump(FILE *fp, const void *buff, unsigned int size)
  */
 void genwqe_hexdump(FILE *fp, const void *buff, unsigned int size)
 {
-	unsigned int i;
+	unsigned int i, j = 0;
 	const uint8_t *b = (uint8_t *)buff;
 	char ascii[17];
-	char str[2] = { 0x0, };
 
 	for (i = 0; i < size; i++) {
 		if ((i & 0x0f) == 0x00) {
 			fprintf(fp, " %08x:", i);
-			memset(ascii, 0, sizeof(ascii));
+			memset(ascii, '\0', sizeof(ascii));
+			j = 0;
 		}
 		fprintf(fp, " %02x", b[i]);
-		str[0] = isalnum(b[i]) ? b[i] : '.';
-		str[1] = '\0';
-		strncat(ascii, str, sizeof(ascii) - 1);
+		ascii[j++] = isalnum(b[i]) ? b[i] : '.';
 
 		if ((i & 0x0f) == 0x0f)
 			fprintf(fp, " | %s\n", ascii);
@@ -1664,9 +1662,7 @@ void genwqe_hexdump(FILE *fp, const void *buff, unsigned int size)
 	/* print trailing up to a 16 byte boundary. */
 	for (; i < ((size + 0xf) & ~0xf); i++) {
 		fprintf(fp, "   ");
-		str[0] = ' ';
-		str[1] = '\0';
-		strncat(ascii, str, sizeof(ascii) - 1);
+		ascii[j++] = ' ';
 
 		if ((i & 0x0f) == 0x0f)
 			fprintf(fp, " | %s\n", ascii);
@@ -1737,8 +1733,10 @@ int genwqe_flash_read(card_handle_t dev, struct card_upd_params *upd)
 	rc = __genwqe_flash_read(dev, upd->partition, buf, buflen,
 				 &upd->retc, &upd->attn,
 				 &upd->progress);
-	if (rc < 0)
+	if (rc < 0) {
+		close(fd);
 		goto err_exit;
+	}
 
 	rc = (int)write(fd, buf, (size_t)upd->flength);
 	close(fd);

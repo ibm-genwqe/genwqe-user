@@ -746,7 +746,7 @@ int main(int argc, char *argv[])
 				break;
 			}
 			ip.card_type = strtol(optarg, (char **)NULL, 0);
-			if ((DDCB_TYPE_GENWQE != ip.card_type) ||
+			if ((DDCB_TYPE_GENWQE != ip.card_type) &&
 				(DDCB_TYPE_CAPI != ip.card_type)) {
 				usage(argv[0]);
 				exit(EXIT_FAILURE);

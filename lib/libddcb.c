@@ -150,10 +150,9 @@ const char *ddcb_strerror(int errnum)
 
 void ddcb_hexdump(FILE *fp, const void *buff, unsigned int size)
 {
-	unsigned int i;
+	unsigned int i, j = 0;
 	const uint8_t *b = (uint8_t *)buff;
 	char ascii[17];
-	char str[2] = { 0x0, };
 
 	if (fp == NULL)
 		return;
@@ -161,12 +160,11 @@ void ddcb_hexdump(FILE *fp, const void *buff, unsigned int size)
 	for (i = 0; i < size; i++) {
 		if ((i & 0x0f) == 0x00) {
 			fprintf(fp, " %08x:", i);
-			memset(ascii, 0, sizeof(ascii));
+			memset(ascii, '\0', sizeof(ascii));
+			j = 0;
 		}
 		fprintf(fp, " %02x", b[i]);
-		str[0] = isalnum(b[i]) ? b[i] : '.';
-		str[1] = '\0';
-		strncat(ascii, str, sizeof(ascii) - 1);
+		ascii[j++] = isalnum(b[i]) ? b[i] : '.';
 
 		if ((i & 0x0f) == 0x0f)
 			fprintf(fp, " | %s\n", ascii);
@@ -175,9 +173,7 @@ void ddcb_hexdump(FILE *fp, const void *buff, unsigned int size)
 	/* print trailing up to a 16 byte boundary. */
 	for (; i < ((size + 0xf) & ~0xf); i++) {
 		fprintf(fp, "   ");
-		str[0] = ' ';
-		str[1] = '\0';
-		strncat(ascii, str, sizeof(ascii) - 1);
+		ascii[j++] = ' ';
 
 		if ((i & 0x0f) == 0x0f)
 			fprintf(fp, " | %s\n", ascii);

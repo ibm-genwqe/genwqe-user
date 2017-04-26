@@ -99,8 +99,10 @@ static int zlib_xcheck = 1;
 static unsigned int zlib_ibuf_total = CONFIG_DEFLATE_BUF_SIZE;
 static unsigned int zlib_obuf_total = CONFIG_INFLATE_BUF_SIZE;
 
+#define ZEDC_CARDS_LENGTH 128
+
 /* Try to cache filehandles for faster access. Do not close them. */
-static zedc_handle_t zedc_cards[128 + 1];
+static zedc_handle_t zedc_cards[ZEDC_CARDS_LENGTH + 1];
 
 static zedc_handle_t __zedc_open(int card_no, int card_type, int mode,
 				 int *err_code)
@@ -112,15 +114,15 @@ static zedc_handle_t __zedc_open(int card_no, int card_type, int mode,
 				 err_code);
 
 	if (card_no == -1) {
-		if (zedc_cards[128])
-			return zedc_cards[128];
+		if (zedc_cards[ZEDC_CARDS_LENGTH])
+			return zedc_cards[ZEDC_CARDS_LENGTH];
 
-		zedc_cards[128] = zedc_open(card_no, card_type, mode,
+		zedc_cards[ZEDC_CARDS_LENGTH] = zedc_open(card_no, card_type, mode,
 					    err_code);
-		return zedc_cards[128];
+		return zedc_cards[ZEDC_CARDS_LENGTH];
 	}
 
-	if (card_no < 0 || card_no >= 128)
+	if (card_no < 0 || card_no >= ZEDC_CARDS_LENGTH)
 		return NULL;
 
 	if (zedc_cards[card_no] != NULL) {
@@ -1671,7 +1673,7 @@ void zedc_hw_done(void)
 	if ((flags & ZLIB_FLAG_CACHE_HANDLES) == 0x0)
 		return;
 
-	for (card_no = 0; card_no <= 128; card_no++) {
+	for (card_no = 0; card_no <= ZEDC_CARDS_LENGTH; card_no++) {
 		if (zedc_cards[card_no] == NULL)
 			continue;
 		zedc_close(zedc_cards[card_no]);

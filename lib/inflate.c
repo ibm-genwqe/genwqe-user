@@ -965,30 +965,30 @@ int zedc_inflateSaveBuffers(zedc_streamp strm, const char *prefix)
 		return rc;
 
 	snprintf(fname, sizeof(fname) - 1, "%s_out_buf.bin", prefix);
-	__save_buf_to_file(fname, (void *)(unsigned long)
-			   __be64_to_cpu(asiv->out_buff),
-			   __be32_to_cpu(asiv->out_buff_len));
+	rc = __save_buf_to_file(fname, (void *)(unsigned long)
+				__be64_to_cpu(asiv->out_buff),
+				__be32_to_cpu(asiv->out_buff_len));
 	if (rc != ZEDC_OK)
 		return rc;
 
 	snprintf(fname, sizeof(fname) - 1, "%s_in_dict.bin", prefix);
-	__save_buf_to_file(fname, (void *)(unsigned long)
-			   __be64_to_cpu(asiv->in_dict),
-			   __be32_to_cpu(asiv->in_dict_len));
+	rc = __save_buf_to_file(fname, (void *)(unsigned long)
+				__be64_to_cpu(asiv->in_dict),
+				__be32_to_cpu(asiv->in_dict_len));
 	if (rc != ZEDC_OK)
 		return rc;
 
 	snprintf(fname, sizeof(fname) - 1, "%s_out_dict.bin", prefix);
-	__save_buf_to_file(fname, (void *)(unsigned long)
-			   __be64_to_cpu(asiv->out_dict),
-			   __be32_to_cpu(asiv->out_dict_len));
+	rc = __save_buf_to_file(fname, (void *)(unsigned long)
+				__be64_to_cpu(asiv->out_dict),
+				__be32_to_cpu(asiv->out_dict_len));
 	if (rc != ZEDC_OK)
 		return rc;
 
 	snprintf(fname, sizeof(fname) - 1, "%s_inp_scratch.bin", prefix);
-	__save_buf_to_file(fname, (void *)(unsigned long)
-			   __be64_to_cpu(asiv->inp_scratch),
-			   __be32_to_cpu(asiv->in_scratch_len));
+	rc = __save_buf_to_file(fname, (void *)(unsigned long)
+				__be64_to_cpu(asiv->inp_scratch),
+				__be32_to_cpu(asiv->in_scratch_len));
 	if (rc != ZEDC_OK)
 		return rc;
 

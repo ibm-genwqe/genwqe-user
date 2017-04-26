@@ -38,6 +38,10 @@
 #define ZEDC_FIFO_SIZE		256
 #define ZEDC_FIFO_MASK		(ZEDC_FIFO_SIZE - 1)
 
+#ifndef ARRAY_SIZE
+#  define ARRAY_SIZE(a)		(sizeof((a)) / sizeof((a)[0]))
+#endif
+
 struct zedc_fifo {
 	unsigned int	push;	/* push into FIFO here */
 	unsigned int	pop;	/* pop from FIFO here */
@@ -83,11 +87,11 @@ static inline int fifo_push32(struct zedc_fifo *fifo, uint32_t data)
 		uint8_t u8[4];
 	} d;
 
-	if (fifo_free(fifo) < 4)
+	if (fifo_free(fifo) < ARRAY_SIZE(d.u8))
 		return 0;
 
 	d.u32 = data;
-	for (i = 0; i < 4; i++) {
+	for (i = 0; i < ARRAY_SIZE(d.u8); i++) {
 		fifo->fifo[fifo->push] = d.u8[i];
 		fifo->push = (fifo->push + 1) & ZEDC_FIFO_MASK;
 	}
@@ -112,10 +116,10 @@ static inline int fifo_pop16(struct zedc_fifo *fifo, uint16_t *data)
 		uint8_t u8[2];
 	} d;
 
-	if (fifo_used(fifo) < 2)
+	if (fifo_used(fifo) < ARRAY_SIZE(d.u8))
 		return 0;
 
-	for (i = 0; i < 4; i++)
+	for (i = 0; i < ARRAY_SIZE(d.u8); i++)
 		fifo_pop(fifo, &d.u8[i]);
 
 	*data = d.u16;

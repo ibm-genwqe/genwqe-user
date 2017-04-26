@@ -49,10 +49,10 @@ static char crc_token[]={"CS"};
 
 void genwqe_crc32_setup_lut(void)
 {
-	int i, j;
+	unsigned int i, j;
 	uint32_t crc;
 
-	for (i = 0;  i < 256;  i++) {
+	for (i = 0;  i < ARRAY_SIZE(genwqe_crc32_lut);  i++) {
 		crc = i << 24;
 		for ( j = 0;  j < 8;  j++ ) {
 			if (crc & 0x80000000)

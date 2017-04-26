@@ -218,8 +218,10 @@ static int defl(struct thread_data *d, FILE *source, int level)
 		return Z_ERRNO;
 
 	out = __malloc(CHUNK_o);
-	if (out == NULL)
+	if (out == NULL) {
+		__free(in);
 		return Z_ERRNO;
+	}
 
 	/* allocate deflate state */
 	strm.zalloc = Z_NULL;
@@ -319,8 +321,10 @@ static int infl(struct thread_data *d, FILE *source)
 		return Z_ERRNO;
 
 	out = __malloc(CHUNK_o);
-	if (out == NULL)
+	if (out == NULL) {
+		__free(in);
 		return Z_ERRNO;
+	}
 
 	/* allocate inflate state */
 	strm.zalloc = Z_NULL;
