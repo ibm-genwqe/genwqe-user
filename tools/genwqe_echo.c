@@ -60,7 +60,6 @@ static void usage(const char *prog)
 	       "  -C, --card=CARDNO|RED  Note: RED is for Card Redundant mode\n"
 	       "  -A, --accelerator-type=GENWQE|CAPI CAPI is only available "
 	       "for System p\n"
-	       "  -q, --quiet            quiece output\n"
 	       "  -V, --version\n"
 	       "  -H, --hardware-version\n"
 	       "  -c, --count=COUNT\n"
@@ -444,16 +443,14 @@ int main(int argc, char *argv[])
 		printf("\n");
 
  err_out:
-	if (!quiet) {
-		printf("--- UNIT #%x echo statistics ---\n"
-		       "%ld packets transmitted, %ld received, %ld lost, "
-		       "%ld%% packet loss, queue %lld usec\n",
-		       unit, packets_send,
-		       packets_received, (packets_send - packets_received),
-		       !packets_send ? 100 :
-		       100 * (packets_send - packets_received)/packets_send,
-		       wtime_usec);
-	}
+	printf("--- UNIT #%x echo statistics ---\n"
+	       "%ld packets transmitted, %ld received, %ld lost, "
+	       "%ld%% packet loss, queue %lld usec\n",
+	       unit, packets_send,
+	       packets_received, (packets_send - packets_received),
+	       !packets_send ? 100 :
+	       100 * (packets_send - packets_received)/packets_send,
+	       wtime_usec);
 
 	if (rc != DDCB_OK)
 		exit(EXIT_FAILURE);
