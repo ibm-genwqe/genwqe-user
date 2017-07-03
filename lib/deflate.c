@@ -292,6 +292,9 @@ int zedc_deflateSetDictionary(zedc_streamp strm,
 	if (dictLength > ZEDC_DICT_LEN)
 		return ZEDC_STREAM_ERROR;
 
+	if (dictionary == NULL)
+		return ZEDC_STREAM_ERROR;
+
 	memcpy(&strm->wsp->dict[0], dictionary, dictLength);
 	strm->dict_len = dictLength;
 	strm->dict_adler32 = __adler32(1, dictionary, dictLength);
