@@ -75,7 +75,6 @@ static void usage(const char *prog)
 	       "  -i, --interval=INTERVAL_USEC\n"
 	       "  -s, --string=TESTSTRING\n"
 	       "  -p, --polling          use DDCB polling mode.\n"
-	       "  -q, --quiet            only summary output\n"
 	       "\n"
 	       "This utility sends echo DDCBs either to the service layer\n"
 	       "or other chip units. It can be used to check the cards\n"
