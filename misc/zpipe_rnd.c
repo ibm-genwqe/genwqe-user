@@ -470,7 +470,6 @@ int main(int argc, char **argv)
 
 	/* do compression if no arguments */
 	if (compress == 1) {
-		fprintf(stderr, "level: %d strategy: %d\n", level, strategy);
 		ret = def(stdin, stdout, level, strategy,
 			  windowBits, dictionary, dictLength);
 		if (ret != Z_OK)
