@@ -432,8 +432,9 @@ static int __afu_open(struct dev_ctx *ctx)
 	rc = cxl_get_cr_device(ctx->afu_h, 0, &ctx->cr_device);
 	if (rc == 0) {
 		if (ctx->cr_device != CGZIP_CR_DEVICE) {
-			VERBOSE0(" [%s] ERR: device_id: %ld/%d\n",
-				 __func__, (unsigned long)ctx->cr_device,
+			VERBOSE1(" [%s] WARNING: device_id: %ld/%d "
+				 "skipping, no CGZIP card\n", __func__,
+				 (unsigned long)ctx->cr_device,
 				 CGZIP_CR_VENDOR);
 			rc = DDCB_ERR_CARD;
 			goto err_afu_free;
