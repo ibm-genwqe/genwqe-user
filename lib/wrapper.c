@@ -626,6 +626,9 @@ int deflateSetDictionary(z_streamp strm,
 	strm->state = w->priv_data;
 	rc = w->impl ? h_deflateSetDictionary(strm, dictionary, dictLength) :
 		       z_deflateSetDictionary(strm, dictionary, dictLength);
+	
+	pr_trace("[%p]    calculated adler32=%08x\n", strm,
+		 (unsigned int)strm->adler);
 	strm->state = (void *)w;
 
 	return rc;
