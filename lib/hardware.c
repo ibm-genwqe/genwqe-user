@@ -171,9 +171,27 @@ static void stream_zlib_to_zedc(zedc_streamp h, z_streamp s)
 /**
  * Take care CRC/ADLER is correctly reported to the upper levels.
  */
-static void __fixup_crc_or_adler( z_streamp s, zedc_streamp h)
+static void __fixup_crc_or_adler(z_streamp s, zedc_streamp h)
 {
 	s->adler = (h->format == ZEDC_FORMAT_GZIP) ? h->crc32 : h->adler32;
+}
+
+/**
+ * See #152 The adler32 start value is 1 according to the specification.
+ * If there was a call to deflateSetDictionary() the adler field in s
+ * will be set to the adler32 value of the passed in dictionary.
+ * Nevertheless the data processing needs to start with a 1. This
+ * function takes are that on the 1st call of deflate when total_in
+ * is still 0, we set the start value always to 1.
+ */
+static void __prep_crc_or_adler(z_streamp s, zedc_streamp h)
+{
+	if (s->total_in == 0) {
+		if (h->format == ZEDC_FORMAT_ZLIB)
+			s->adler = 1;
+		else
+			s->adler = 0;
+	}
 }
 
 static void __free(void *ptr)
@@ -458,7 +476,10 @@ int h_deflateSetDictionary(z_streamp strm, const uint8_t *dictionary,
 	h = &s->h;
 
 	rc = zedc_deflateSetDictionary(h, dictionary, dictLength);
+	hw_trace("[%p]    adler32=%08x  dict_adler32=%08x\n", strm,
+		 h->adler32, h->dict_adler32);
 
+	strm->adler = h->dict_adler32; /* See #152 */
 	return rc_zedc_to_libz(rc);
 }
 
@@ -610,10 +631,11 @@ int h_deflate(z_streamp strm, int flush)
 		return s->rc;
 	}
 
+	__prep_crc_or_adler(strm, h);
 	hw_trace("[%p] h_deflate: flush=%s avail_in=%d avail_out=%d "
-		 "ibuf_avail=%d obuf_avail=%d\n",
+		 "ibuf_avail=%d obuf_avail=%d adler32/cr32=%08x/%08x\n",
 		 strm, flush_to_str(flush), strm->avail_in, strm->avail_out,
-		 (int)s->ibuf_avail, (int)s->obuf_avail);
+		 (int)s->ibuf_avail, (int)s->obuf_avail, h->adler32, h->crc32);
 
 	do {
 		hw_trace("[%p]   *** loop=%d flush=%s\n", strm, loops,
