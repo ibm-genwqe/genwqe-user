@@ -62,7 +62,7 @@ ifeq (${HAS_GIT},y)
 VERSION ?= $(shell git describe --abbrev=4 --always --tags | sed -e 's/v//g')
 RPMVERSION ?= $(shell git describe --abbrev=0 --tags | cut -c 2-7)
 else
-VERSION=4.0.18
+VERSION=4.0.19
 RPMVERSION=$(VERSION)
 endif
 MAJOR_VERS=$(shell echo $(VERSION) | cut -d'.' -f1)
