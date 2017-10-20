@@ -189,9 +189,13 @@ function test_compress_decompress_fixed() {
 
 function build_code ()
 {
-    echo "--------------------------------------------------------------------"
-    echo "Build code ..."
-    make || exit 1
+	# Do not build the code, there might be some options e.g. not
+	# using libcxl, which must be set such that the build can
+	# Succeed on some special test-systems we have.
+
+    #echo "--------------------------------------------------------------------"
+    #echo "Build code ..."
+    #make || exit 1
 
     echo "--------------------------------------------------------------------"
     if [ -f test_data.bin ]; then

@@ -84,6 +84,12 @@ for accel in GENWQE CAPI ; do
 	for card in `./tools/genwqe_find_card -A${accel}`; do
 		echo "TESTING ${accel} CARD ${card}"
 
+		zlib_git.sh  -A${accel} -C${card}
+		if [ $? -ne 0 ]; then
+			echo "FAILED ${accel} CARD ${card}"
+			exit 1
+		fi
+
 		zlib_test.sh  -A${accel} -C${card}
 		if [ $? -ne 0 ]; then
 			echo "FAILED ${accel} CARD ${card}"
