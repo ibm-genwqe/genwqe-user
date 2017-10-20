@@ -4,6 +4,7 @@ dist: xenial
 language: c
 compiler: gcc
 before_install:
+  - sudo apt-get remove oracle-java9-installer
   - sudo dpkg --add-architecture i386
   - sudo apt-get -qq update
   - sudo apt-cache search zlib
