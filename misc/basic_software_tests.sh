@@ -22,7 +22,7 @@
 # test data is not available. Use for automated regression testing.
 #
 
-export PATH=`pwd`/tools:$PATH
+export PATH=`pwd`/tools:`pwd`/misc:$PATH
 export LD_LIBRARY_PATH=`pwd`/lib:$LD_LIBRARY_PATH
 
 # Checks
@@ -38,6 +38,12 @@ card=0
 
 echo "Testing fallback to software if there is no card available"
 echo "TESTING ${accel} CARD ${card}"
+
+zlib_git.sh  -A${accel} -C${card}
+if [ $? -ne 0 ]; then
+	echo "FAILED ${accel} CARD ${card}"
+	exit 1
+fi
 
 genwqe_mt_perf -A${accel} -C${card} -M4
 if [ $? -ne 0 ]; then
