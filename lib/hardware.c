@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, International Business Machines
+ * Copyright 2015, 2017 International Business Machines
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1606,7 +1606,7 @@ int h_inflateEnd(z_streamp strm)
 	ibuf_bytes = s->ibuf - s->ibuf_base;  /* accumulated input */
 	obuf_bytes = s->obuf - s->obuf_next;  /* bytes in obuf */
 	if (ibuf_bytes || obuf_bytes)
-		pr_err("[%p] In/Out buffer not empty! ibuf_bytes=%d "
+		hw_trace("[%p] In/Out buffer not empty! ibuf_bytes=%d "
 		       "obuf_bytes=%d\n", strm, ibuf_bytes, obuf_bytes);
 
 	rc = zedc_inflateEnd(h);
