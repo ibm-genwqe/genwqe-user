@@ -1461,6 +1461,13 @@ int h_inflate(z_streamp strm, int flush)
 		    (strm->avail_out == 0))
 			return Z_OK;		/* need new output buffer */
 
+#if 0
+/*
+ *  FIXME We have put this now behind the hardware decompression, where
+ * it should have been already from the beginning. Wonder if that
+ * is passing all the testcases. If it does, we can hopefully remove
+ * this.
+ */
 		/*
 		 * Need more output space, just useful if Z_STREAM_END
 		 * not seen before.
@@ -1485,6 +1492,7 @@ int h_inflate(z_streamp strm, int flush)
 #endif
 			return rc;
 		}
+#endif
 
 		/*
 		 * Original idea: Do not send 0 data to HW
