@@ -811,8 +811,10 @@ uLong deflateBound(z_streamp strm, uLong sourceLen)
 	int rc;
 	struct _internal_state *w;
 
-	if (strm == NULL)
-		return Z_STREAM_ERROR;
+	if (strm == NULL) {
+		return MAX(h_deflateBound(NULL, sourceLen),
+			   z_deflateBound(NULL, sourceLen));
+	}
 
 	w = (struct _internal_state *)strm->state;
 	if (w == NULL)
