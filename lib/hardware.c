@@ -1202,6 +1202,38 @@ static inline int __check_stream_end(z_streamp strm)
 	unsigned int len;
 	uint8_t offs;
 
+	if (zlib_inflate_flags & ZLIB_FLAG_DISABLE_CV_FOR_Z_STREAM_END) {
+		hw_trace("[%p] ZLIB_FLAG_DISABLE_CV_FOR_Z_STREAM_END\n", strm);
+		return Z_OK;	/* No circumvention desired */
+	}
+
+	/*
+	 * Do not try this ZLIB or GZIP, were we
+	 * expect adler32 or crc32/data_size in the
+	 * stream trailer. We want the lowlevel lib to
+	 * do the checksum processing in this case.
+	 */
+	if (h->format != ZEDC_FORMAT_DEFL)
+		return Z_OK;	/* No circumvention needed */
+
+	hw_trace("[%p] CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END\n", strm);
+
+	/*
+	 * fprintf(zlib_log, "SCRATCH\n");
+	 * ddcb_hexdump(zlib_log, h->wsp->tree, __in_hdr_scratch_len(h));
+	 * fprintf(zlib_log, "NEXT_IN\n");
+	 * ddcb_hexdump(zlib_log, strm->next_in, MIN(strm->avail_in,
+	 * 		(unsigned int)0x20));
+	 * fprintf(zlib_log, "in_hdr_scratch_len=%d proc_bits=%d\n",
+	 *	__in_hdr_scratch_len(h), h->proc_bits);
+	 */
+	rc = __in_hdr_bits(h);
+	if (rc != 0) {
+		hw_trace("    __in_hdr_bits %d: cannot parse "
+			 "dynamic huffman block, returning\n", rc);
+		return Z_OK;
+	}
+
 	/* Copy input data in one contignous buffer before analyzing it */
 	memset(&e, 0, sizeof(e));
 	e.state = READ_HDR;
@@ -1437,57 +1469,19 @@ int h_inflate(z_streamp strm, int flush)
 			rc = Z_OK;
 
 #ifdef CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END	/* For MongoDB PoC */
-			if (zlib_inflate_flags &
-			    ZLIB_FLAG_DISABLE_CV_FOR_Z_STREAM_END) {
-				hw_trace("[%p] ZLIB_FLAG_DISABLE_"
-					 "CV_FOR_Z_STREAM_END\n",
-					 strm);
-				goto skip_circumvention;
-			}
-
-			hw_trace("[%p] CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END\n",
-				 strm);
-			/*
-			 * Do not try this ZLIB or GZIP, were we
-			 * expect adler32 or crc32/data_size in the
-			 * stream trailer. We want the lowlevel lib to
-			 * do the checksum processing in this case.
-			 */
-			if (h->format != ZEDC_FORMAT_DEFL)
-				return rc;
-			/*
-			 * fprintf(zlib_log, "SCRATCH\n");
-			 * ddcb_hexdump(zlib_log, h->wsp->tree,
-			 *	     __in_hdr_scratch_len(h));
-			 * fprintf(zlib_log, "NEXT_IN\n");
-			 * ddcb_hexdump(zlib_log, strm->next_in,
-			 *	     MIN(strm->avail_in, (unsigned int)0x20));
-			 * fprintf(zlib_log,
-			 *	"  in_hdr_scratch_len = %d\n"
-			 *	"  proc_bits = %d\n",
-			 *	__in_hdr_scratch_len(h), h->proc_bits);
-			 */
-			rc = __in_hdr_bits(h);
-			if (rc != 0) {
-				hw_trace("    __in_hdr_bits %d: cannot parse "
-					 "dynamic huffman block, returning\n",
-					 rc);
-				return Z_OK;
-			}
 
 			rc = __check_stream_end(strm);
 			if (rc == Z_STREAM_END) {
-				hw_trace("    Suppress Z_STREAM_END %zd %zd\n",
+				hw_trace("    Suppress Z_STREAM_END %zd %zd (1)\n",
 					 s->obuf_avail, s->obuf_total);
 				s->rc = Z_STREAM_END;
 				rc = Z_OK;
 			}
 
 			hw_trace("[%p] .......... flush=%s avail_in=%d "
-				 "avail_out=%d __check_stream=%s\n", strm,
+				 "avail_out=%d __check_stream=%s (1)\n", strm,
 				 flush_to_str(flush), strm->avail_in,
 				 strm->avail_out, ret_to_str(rc));
-		skip_circumvention:
 #endif
 			return rc;
 		}
@@ -1563,6 +1557,21 @@ int h_inflate(z_streamp strm, int flush)
 		    (s->rc == Z_BUF_ERROR))
 			return s->rc;
 
+#ifdef CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END	/* For MongoDB PoC */
+		/* FIXME Experimental check for Z_STREAM_END here */
+		if ((s->rc != Z_STREAM_END) && (strm->avail_out == 0)) {
+			rc = __check_stream_end(strm);
+			if (rc == Z_STREAM_END) {
+				hw_trace("    Suppress Z_STREAM_END %zd %zd (2)\n",
+					 s->obuf_avail, s->obuf_total);
+				s->rc = Z_STREAM_END;
+			}
+			hw_trace("[%p] .......... flush=%s avail_in=%d "
+				 "avail_out=%d __check_stream=%s (2)\n", strm,
+				 flush_to_str(flush), strm->avail_in,
+				 strm->avail_out, ret_to_str(rc));
+		}
+#endif
 		/* Hardware saw FEOB and output buffer is empty */
 		if ((s->rc == Z_STREAM_END) && output_buffer_empty(s))
 			return Z_STREAM_END;	/* nothing to do anymore */
