@@ -769,6 +769,37 @@ int zedc_inflate_pending_output(struct zedc_stream_s *strm)
 }
 
 /**
+ * @brief	Enable wrapper code to access internal buffer.
+ * 		If data is left from previous task due to insufficent
+ *		output buffer space, this data must first be stored
+ *		to the new output buffer.
+ * @param strm	decompression job context
+ */
+int zedc_read_pending_output(struct zedc_stream_s *strm,
+			uint8_t *buf, unsigned int len)
+{
+	uint8_t *pdict;
+	unsigned int _len = 0;
+
+	if (strm->obytes_in_dict == 0)
+		return ZEDC_OK;
+	if (strm->dict_len < strm->obytes_in_dict)
+		return ZEDC_ERR_DICT_OVERRUN;
+
+	/* obytes at end of dict */
+	pdict = strm->wsp->dict[strm->wsp_page] +
+		strm->out_dict_offs + strm->dict_len - strm->obytes_in_dict;
+
+	while (len && strm->obytes_in_dict) {
+		*buf++ = *pdict++;
+		strm->obytes_in_dict--;
+		len--;
+		_len++;
+	}
+	return _len;
+}
+
+/**
  * @brief	If data is left from previous task due to insufficent
  *		output buffer space, this data must first be stored
  *		to the new output buffer.
