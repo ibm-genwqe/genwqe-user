@@ -3,7 +3,7 @@
    Version 1.4	11 December 2005  Mark Adler */
 
 /*
- * Copyright 2016, International Business Machines
+ * Copyright 2016, 2017 International Business Machines
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -375,13 +375,14 @@ static void usage(char *prog)
 
 	fprintf(stderr, "%s usage: %s [-h] [-v]\n"
 		"    [-F, --format <ZLIB|DEFLATE|GZIP>]\n"
-		"    [-e, --excact-input]  input matches size of data\n"
+		"    [-e, --excact-input] input matches size of data\n"
 		"    [-E, --excact-output] output matches size of data\n"
 		"    [-f, --fush <Z_NO_FLUSH|Z_PARTIAL_FLUSH|Z_FULL_FLUSH>]\n"
 		"    [-i, --i_bufsize <i_bufsize>]\n"
 		"    [-o, --o_bufsize <o_bufsize>]\n"
 		"    [-p, --pattern <pattern>] pattern to generate test-data\n"
-		"    [-s, --size <data-size>]\n",
+		"    [-s, --size <data-size>]\n"
+		"    [-k, --keep] do not delete resulting files\n",
 		b, b);
 }
 
@@ -400,6 +401,7 @@ int main(int argc, char **argv)
 	int exact_input = 0, exact_output = 0;
 	size_t size = 256 * 1024;
 	int expect_z_stream_end = 0;
+	int keep = 0;
 
 	_pattern = getpid();
 
@@ -419,12 +421,13 @@ int main(int argc, char **argv)
 			{ "o_bufsize",	 required_argument, NULL, 'o' },
 			{ "size",	 required_argument, NULL, 's' },
 			{ "pattern",	 required_argument, NULL, 'p' },
+			{ "keep",	 no_argument,       NULL, 'k' },
 			{ "verbose",	 no_argument,	    NULL, 'v' },
 			{ "help",	 no_argument,	    NULL, 'h' },
 			{ 0,		 no_argument,	    NULL, 0   },
 		};
 
-		ch = getopt_long(argc, argv, "F:f:Eei:o:s:p:vh?",
+		ch = getopt_long(argc, argv, "kF:f:Eei:o:s:p:vh?",
 				 long_options, &option_index);
 		if (ch == -1)    /* all params processed ? */
 			break;
@@ -449,6 +452,9 @@ int main(int argc, char **argv)
 			break;
 		case 'E':
 			exact_output = 1;
+			break;
+		case 'k':
+			keep = 1;
 			break;
 		case 'v':
 			verbose++;
@@ -589,9 +595,11 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
-	unlink(i_fname);
-	unlink(n_fname);
-	unlink(o_fname);
+	if (!keep) {
+		unlink(i_fname);
+		unlink(n_fname);
+		unlink(o_fname);
+	}
 
 	exit(EXIT_SUCCESS);
 }

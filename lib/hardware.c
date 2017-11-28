@@ -79,7 +79,7 @@ struct hw_state {
  */
 static int output_buffer_empty(struct hw_state *s)
 {
-	return s->obuf_avail == s->obuf_total;
+	return (s->obuf_avail == s->obuf_total);
 }
 
 /**
@@ -1424,9 +1424,9 @@ int h_inflate(z_streamp strm, int flush)
 	/* No progress possible (no more input and no buffered output):
 	   Z_BUF_ERROR */
 	obuf_bytes = s->obuf - s->obuf_next; /* bytes in obuf */
-	if (obuf_bytes == 0) {
-		hw_trace("[%p] OBYTES_IN_DICT %d bytes\n", strm,
-			 h->obytes_in_dict);
+	if ((obuf_bytes == 0) && (zedc_inflate_pending_output(h) == 0)) {
+		hw_trace("[%p] OBYTES_IN_DICT %d bytes (1) This must be 0!\n",
+			strm, h->obytes_in_dict);
 
 		if (s->rc == Z_STREAM_END)   /* hardware saw FEOB */
 			return Z_STREAM_END; /* nothing to do anymore */
@@ -1453,46 +1453,33 @@ int h_inflate(z_streamp strm, int flush)
 		/* Give out what is already there */
 		obuf_bytes = h_flush_obuf(strm);
 
-		if ((s->rc == Z_STREAM_END) &&	/* hardware saw FEOB */
-		    (obuf_bytes == 0))		/* no more output in buf */
-			return Z_STREAM_END;	/* nothing to do anymore */
+		if ((s->rc == Z_STREAM_END) &&	/* hardware/sw saw FEOB */
+		    (obuf_bytes == 0)) {	/* no more output in buf */
+			unsigned int rem_bytes;
 
+			/* no more output in temp? */
+			rc = zedc_read_pending_output(h, strm->next_out,
+						strm->avail_out);
+			if (rc < 0) {
+				hw_trace("[%s] err: Read temp buffer rc=%d!\n",
+					__func__, rc);
+				return rc;
+			}
+
+			hw_trace("[%s] collected %d bytes from dict buffer\n",
+				__func__, rc);
+			strm->avail_out -= rc;
+			strm->total_out += rc;
+
+			rem_bytes = zedc_inflate_pending_output(h);
+			if (rem_bytes != 0)
+				return Z_OK;	/* call me again */
+
+			return Z_STREAM_END;	/* nothing to do anymore */
+		}
 		if (((obuf_bytes != 0) || zedc_inflate_pending_output(h)) &&
 		    (strm->avail_out == 0))
 			return Z_OK;		/* need new output buffer */
-
-#if 0
-/*
- *  FIXME We have put this now behind the hardware decompression, where
- * it should have been already from the beginning. Wonder if that
- * is passing all the testcases. If it does, we can hopefully remove
- * this.
- */
-		/*
-		 * Need more output space, just useful if Z_STREAM_END
-		 * not seen before.
-		 */
-		if ((s->rc != Z_STREAM_END) && (strm->avail_out == 0)) {
-			rc = Z_OK;
-
-#ifdef CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END	/* For MongoDB PoC */
-
-			rc = __check_stream_end(strm);
-			if (rc == Z_STREAM_END) {
-				hw_trace("    Suppress Z_STREAM_END %zd %zd (1)\n",
-					 s->obuf_avail, s->obuf_total);
-				s->rc = Z_STREAM_END;
-				rc = Z_OK;
-			}
-
-			hw_trace("[%p] .......... flush=%s avail_in=%d "
-				 "avail_out=%d __check_stream=%s (1)\n", strm,
-				 flush_to_str(flush), strm->avail_in,
-				 strm->avail_out, ret_to_str(rc));
-#endif
-			return rc;
-		}
-#endif
 
 		/*
 		 * Original idea: Do not send 0 data to HW
@@ -1568,8 +1555,10 @@ int h_inflate(z_streamp strm, int flush)
 #ifdef CONFIG_CIRCUMVENTION_FOR_Z_STREAM_END	/* For MongoDB PoC */
 		/* FIXME Experimental check for Z_STREAM_END here */
 		if ((s->rc != Z_STREAM_END) && (strm->avail_out == 0)) {
-			rc = __check_stream_end(strm);
-			if (rc == Z_STREAM_END) {
+			int _rc;
+
+			_rc = __check_stream_end(strm);
+			if (_rc == Z_STREAM_END) {
 				hw_trace("    Suppress Z_STREAM_END %zd %zd (2)\n",
 					 s->obuf_avail, s->obuf_total);
 				s->rc = Z_STREAM_END;
@@ -1581,8 +1570,12 @@ int h_inflate(z_streamp strm, int flush)
 		}
 #endif
 		/* Hardware saw FEOB and output buffer is empty */
-		if ((s->rc == Z_STREAM_END) && output_buffer_empty(s))
+		if ((s->rc == Z_STREAM_END) &&  output_buffer_empty(s) &&
+		    (zedc_inflate_pending_output(h) == 0)) {
+			hw_trace("[%p] OBYTES_IN_DICT %d bytes (2) Must be 0!\n",
+				strm, h->obytes_in_dict);
 			return Z_STREAM_END;	/* nothing to do anymore */
+		}
 
 		if (strm->avail_out == 0)	/* need more output space */
 			return Z_OK;
