@@ -150,6 +150,9 @@ help:
 	@echo "  CONFIG_DLOPEN_MECHANISM=0 statically link against private"
 	@echo "      software zlib, 1 use dlopen to include software zlib"
 	@echo "      (default)"
+	@echo "  BUILD_AGZIP_TOOLS=1 Set flag to build extra CAPI Gzip tools."
+	@echo "      This tools require json-c package installed."
+	@echo "      (default = 0)"
 	@echo
 
 # Automatically perform tests - card selected automatically
