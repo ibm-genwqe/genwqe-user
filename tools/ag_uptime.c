@@ -154,9 +154,10 @@ static struct cxl_afu_h *card_open(int card)
 		__func__, card, device);
 	afu_h = cxl_afu_open_dev(device);
 	if (NULL == afu_h) {
-		rc = -1;
-		VERBOSE0("[%s] Card: %d Error rc: %d\n",
+		perror("cxl_afu_open_dev()");
+		VERBOSE0("[%s] Card: %d cxl_afu_open Error rc: %d\n",
 			__func__, card, rc);
+		rc = -1;
 		goto card_open_exit;
 	}
 
@@ -172,36 +173,43 @@ static struct cxl_afu_h *card_open(int card)
 
 	/* Check vendor id */
 	rc = cxl_get_cr_vendor(afu_h, 0, &cr_vendor);
-	if ((rc != 0) || (cr_vendor != CGZIP_CR_VENDOR)) {
-		VERBOSE0(" [%s] Card: %d ERR: vendor_id: %ld/%d rc=%d\n",
-			 __func__, card, (unsigned long)cr_vendor,
-			 CGZIP_CR_VENDOR, rc);
+	if (rc != 0) {
+		perror("cxl_get_cr_vendor()");
+		goto card_open_exit1;
+	}
+	if (cr_vendor != CGZIP_CR_VENDOR) {
+		VERBOSE0(" [%s] Card: %d ERR: Vendor_id: 0x%lx Expect: 0x%x\n",
+			 __func__, card, (unsigned long)cr_vendor, CGZIP_CR_VENDOR);
 		rc = -3;
 		goto card_open_exit1;
 	}
 
 	/* Check device id */
 	rc = cxl_get_cr_device(afu_h, 0, &cr_device);
-	if ((rc != 0) || (cr_device != CGZIP_CR_DEVICE)) {
-		VERBOSE0(" [%s] Card: %d ERR: device_id: %ld/%d rc=%d\n",
-			 __func__, card, (unsigned long)cr_device,
-			 CGZIP_CR_VENDOR, rc);
+	if (rc != 0) {
+		perror("cxl_get_cr_device()");
+		goto card_open_exit1;
+	}
+	if (cr_device != CGZIP_CR_DEVICE) {
+		VERBOSE0(" [%s] Card: %d ERR: Device_id: 0x%lx Expect: 0x%x\n",
+			 __func__, card, (unsigned long)cr_device, CGZIP_CR_DEVICE);
 		rc = -4;
 		goto card_open_exit1;
 	}
 
-	if (0 != cxl_afu_attach(afu_h,
-		(__u64)(unsigned long)(void *)&wed)) {
+	if (0 != cxl_afu_attach(afu_h, (__u64)(unsigned long)(void *)&wed)) {
+		perror("cxl_afu_attach()");
 		rc = -6;
 		goto card_open_exit1;
 	}
 
 	if (0 != cxl_mmio_map(afu_h, CXL_MMIO_BIG_ENDIAN)) {
+		perror("cxl_mmio_map()");
 		rc = -7;
  		goto card_open_exit1;
 	}
 	if (false == check_app(afu_h, MIN_REL_VERSION)) {
-		VERBOSE0("[%s] Card: %d Err: Wrong Card Release. Need >= 0x%02x\n",
+		VERBOSE0("[%s] Card: %d Err: Card Release Need >= 0x%02x\n",
 			__func__, card, MIN_REL_VERSION);
 		cxl_mmio_unmap(afu_h);
 		rc = -8;
@@ -209,12 +217,14 @@ static struct cxl_afu_h *card_open(int card)
 
  card_open_exit1:
 	if (0 != rc) {
-		cxl_afu_free(afu_h);
-		afu_h = NULL;
+		if (afu_h) {
+			cxl_afu_free(afu_h);
+			afu_h = NULL;
+		}
 	}
  card_open_exit:
-	VERBOSE1("[%s] Card: %d Exit rc: %d\n",
-		__func__, card, rc);
+	VERBOSE1("[%s] Card: %d Exit rc: %d handle: %p\n",
+		__func__, card, rc, afu_h);
 	return afu_h;
 }
 
@@ -384,7 +394,7 @@ int main(int argc, char *argv[])
 		if (reset_flag)
 			reset_counters(afu_h);
 		get_load(card, afu_h);
-	}
+	} else rc = EINVAL;
   main_exit:
 	if (afu_h)
 		card_close(card, afu_h);

@@ -212,6 +212,7 @@ static int card_open(struct card_data_s *cd)
 		__func__, cd->card, device);
 	cd->afu_h = cxl_afu_open_dev(device);
 	if (NULL == cd->afu_h) {
+		perror("cxl_afu_open_dev()");
 		rc = -1;
 		VERBOSE0("[%s] Card: %d Error rc: %d\n",
 			__func__, cd->card, rc);
@@ -221,29 +222,44 @@ static int card_open(struct card_data_s *cd)
 	/* Check if the compiled in API version is compatible with the
 	   one reported by the kernel driver */
 	rc = cxl_get_api_version_compatible(cd->afu_h, &api_version);
-	if ((rc != 0) || (api_version != CXL_KERNEL_API_VERSION)) {
-		VERBOSE0(" [%s] Card: %d ERR: incompatible API version: %ld/%d rc=%d\n",
-			 __func__, cd->card, api_version, CXL_KERNEL_API_VERSION, rc);
+	if (rc != 0) {
+		perror("cxl_get_api_version_compatible()");
+		rc = -2;
+		goto err_afu_free;
+	}
+	if (api_version != CXL_KERNEL_API_VERSION) {
+		VERBOSE0(" [%s] Card: %d ERR: incompatible API version: %ld/%d\n",
+			 __func__, cd->card, api_version, CXL_KERNEL_API_VERSION);
 		rc = -2;
 		goto err_afu_free;
 	}
 
 	/* Check vendor id */
 	rc = cxl_get_cr_vendor(cd->afu_h, 0, &cr_vendor);
-	if ((rc != 0) || (cr_vendor != CGZIP_CR_VENDOR)) {
-		VERBOSE0(" [%s] Card: %d ERR: vendor_id: %ld/%d rc=%d\n",
+	if (rc != 0) {
+		perror("cxl_get_cr_vendor()");
+		rc = -3;
+		goto err_afu_free;
+	}
+	if (cr_vendor != CGZIP_CR_VENDOR) {
+		VERBOSE0(" [%s] Card: %d ERR: vendor_id: %ld/%dn",
 			 __func__, cd->card, (unsigned long)cr_vendor,
-			 CGZIP_CR_VENDOR, rc);
+			 CGZIP_CR_VENDOR);
 		rc = -3;
 		goto err_afu_free;
 	}
 
 	/* Check device id */
 	rc = cxl_get_cr_device(cd->afu_h, 0, &cr_device);
-	if ((rc != 0) || (cr_device != CGZIP_CR_DEVICE)) {
-		VERBOSE0(" [%s] Card: %d ERR: device_id: %ld/%d rc=%d\n",
+	if (rc != 0) {
+		perror("cxl_get_cr_device()");
+		rc = -4;
+		goto err_afu_free;
+	}
+	if (cr_device != CGZIP_CR_DEVICE) {
+		VERBOSE0(" [%s] Card: %d ERR: device_id: %ld/%d\n",
 			 __func__, cd->card, (unsigned long)cr_device,
-			 CGZIP_CR_VENDOR, rc);
+			 CGZIP_CR_VENDOR);
 		rc = -4;
 		goto err_afu_free;
 	}
@@ -251,12 +267,14 @@ static int card_open(struct card_data_s *cd)
 	rc = cxl_afu_attach(cd->afu_h,
 		(__u64)(unsigned long)(void *)&wed);
 	if (0 != rc) {
+		perror("cxl_afu_attach()");
 		rc = -6;
 		goto err_afu_free;
 	}
 
 	rc = cxl_mmio_map(cd->afu_h, CXL_MMIO_BIG_ENDIAN);
 	if (rc != 0) {
+		perror("cxl_mmio_map()");
 		cxl_afu_free(cd->afu_h);
 		rc = -7;
 		goto err_afu_free;
@@ -272,8 +290,8 @@ static int card_open(struct card_data_s *cd)
  err_afu_free:
 	if (0 != rc)
 		cd->afu_h = NULL;
-	VERBOSE1("[%s] Card: %d Exit rc: %d\n",
-		__func__, cd->card, rc);
+	VERBOSE1("[%s] Card: %d Exit rc: %d handle: %p\n",
+		__func__, cd->card, rc, cd->afu_h);
 	return rc;
 }
 
@@ -719,8 +737,11 @@ __exit_server_thread1:
 
 static void help(char *prog)
 {
-	printf("Usage: %s [-vhVd] [-p port] [-f file] [-i delay]\n"
-	       "\t-p, --port <num>	tcp port to listen (default is 6000)\n"
+	printf("NAME\n\n");
+	printf("SYNOPSIS\n      %s [OPTION]\n\n", prog);
+	printf("DESCRIPTION\n");
+	printf("       Debug Tool to gather informations for CAPI Gzip Cards.\n");
+	printf("\t-p, --port <num>	tcp port to listen (default is 6000)\n"
 	       "\t-V, --version         Print Version number\n"
 	       "\t-h, --help		This help message\n"
 	       "\t-q, --quiet		No output at all\n"
@@ -728,7 +749,23 @@ static void help(char *prog)
 	       "\t-i, --interval <num>	Poll Interval in msec (default 1000 msec)\n"
 	       "\t-d, --daemon		Start in Daemon mode (forked)\n"
 	       "\t-f, --log-file <file> Log File name when running in -d "
-	       "(daemon)\n", prog);
+	       "(daemon)\n");
+	printf("Example how to use:\n");
+	printf("\tStart: <%s -vv> in a terminal 1\n", prog);
+	printf("\tStart: <telnet localhost 6000> in terminal 2.\n");
+	printf("\tThe Terminal window will print a JSON string with following informations\n\n");
+	printf("\t host: <the hostname where <%s> is running\n", prog);
+	printf("\t ts:    Host time stamp in msec (now)\n");
+	printf("\t card0: Info for CAPI Gzip Card 0\n");
+	printf("\t   ctx: <MEIRW...> for all context ids (up to 512) for this card\n");
+	printf("\t         M=Master. E=Error, I=IDLE, R=Running, W=Waiting\n");
+	printf("\t   status:          5=error, 2=normal\n");
+	printf("\t   fpga-build:      string for build number\n");
+	printf("\t   fpga-build-date: string for build date\n");
+	printf("\t   attached: Number of howm nay context id are in ctx list\n");
+	printf("\t   load:     Average load for GZIP Card.\n");
+	printf("\t card1: Info for CAPI Gzip Card 1\n");
+	printf("\t        Same data as for Card 0\n");
 }
 
 /**
