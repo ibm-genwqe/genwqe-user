@@ -46,8 +46,6 @@ extern "C" {
 /** Version Information and Error Codes					     */
 /*****************************************************************************/
 
-#define GENWQE_LIB_VERS_STRING		"3.0.23"
-
 /**< library error codes */
 #define GENWQE_OK			0
 #define GENWQE_ERRNO			(-201)
