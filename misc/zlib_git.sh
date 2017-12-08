@@ -79,6 +79,13 @@ while getopts "A:C:TB:Gt:h" opt; do
     esac
 done
 
+# Turn accelerator off
+if [ "$ZLIB_ACCELERATOR" == "SW" ]; then
+        export ZLIB_DEFLATE_IMPL=0x0
+        export ZLIB_INFLATE_IMPL=0x0
+fi
+
+rm -f $ZLIB_LOGFILE
 ulimit -c unlimited
 
 if [ ! -f `pwd`/lib/libzADC.so ]; then
