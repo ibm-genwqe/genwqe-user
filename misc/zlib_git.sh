@@ -25,6 +25,7 @@
 #
 
 card=0
+tokudb=0
 
 export ZLIB_ACCELERATOR=GENWQE
 export ZLIB_LOGFILE=zlib.log
@@ -42,13 +43,17 @@ function usage() {
     echo "    [-t <trace_level>]"
 }
 
-while getopts "A:C:t:h" opt; do
+while getopts "A:C:B:t:h" opt; do
     case $opt in
 	A)
 	export ZLIB_ACCELERATOR=$OPTARG;
 	;;
 	C)
 	card=$OPTARG;
+	;;
+	B)
+	tokudb=1
+    TOKUDB_DIR=$OPTARG;
 	;;
 	t)
 	export ZLIB_TRACE=$OPTARG;
@@ -79,5 +84,36 @@ fi
 echo "OK"
 
 # FIXME Add more stuff here to ensure that it fully works ...
+if [ $tokudb -ne 0 ]; then
+	echo "Trying to test TokuDB compression with GenWQE..."
+	if [ -f $TOKUDB_DIR/build/ft/tests/compress-test ]; then
+		echo "Percona compression test..."
+		LD_PRELOAD=`pwd`/lib/libzADC.so $TOKUDB_DIR/build/ft/tests/compress-test >tokudb.log 2>&1
+		if [ $? -ne 0 ]; then
+			echo "err: compression test failed."
+			exit 1
+		fi
+		echo "OK"
+	else
+		## Please compile the Percona using PerconaBuild.sh. And then try the test again.
+		echo "compress-test not exists in $TOKUDB_DIR/build/ft/tests. Please check the environment."
+		exit 1
+	fi
+
+	if [ -f $TOKUDB_DIR/build/ft/tests/subblock-test-compression ]; then
+		echo "Percona subblock compression test..."
+		LD_PRELOAD=`pwd`/lib/libzADC.so $TOKUDB_DIR/build/ft/tests/subblock-test-compression >tokudb.log 2>&1
+		if [ $? -ne 0 ]; then
+			echo "subblock compression test failed."
+			exit 1
+		fi
+		echo "OK"
+	else 
+		echo "subblock-test-compression not exist in $TOKUDB_DIR/build/ft/tests. Please check the environment."
+		exit 1
+	fi
+
+fi
+
 
 exit 0
