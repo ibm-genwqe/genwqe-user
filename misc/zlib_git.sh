@@ -26,6 +26,8 @@
 
 card=0
 tokudb=0
+TOKUDB_DIR=PerconaFT
+git=0
 
 export ZLIB_ACCELERATOR=GENWQE
 export ZLIB_LOGFILE=zlib.log
@@ -39,11 +41,14 @@ function usage() {
     echo "  zlib_git.sh"
     echo "    [-A] <accelerator> use either GENWQE for the PCIe and CAPI for"
     echo "         CAPI based solution available only on System p"
-    echo "    [-C <card>]        card to be used for the test"
+    echo "    [-C <card>]          card to be used for the test"
+    echo "    [-T]                 enable tokudb test"
+    echo "      [-B <tokudb_dir]   tokudb directory"
+    echo "    [-G]                 enable git test"
     echo "    [-t <trace_level>]"
 }
 
-while getopts "A:C:B:t:h" opt; do
+while getopts "A:C:TB:Gt:h" opt; do
     case $opt in
 	A)
 	export ZLIB_ACCELERATOR=$OPTARG;
@@ -51,9 +56,15 @@ while getopts "A:C:B:t:h" opt; do
 	C)
 	card=$OPTARG;
 	;;
+	G)
+	git=1
+	;;
+	T)
+	tokudb=1
+	;;
 	B)
 	tokudb=1
-    TOKUDB_DIR=$OPTARG;
+	TOKUDB_DIR=$OPTARG;
 	;;
 	t)
 	export ZLIB_TRACE=$OPTARG;
@@ -68,6 +79,13 @@ while getopts "A:C:B:t:h" opt; do
     esac
 done
 
+# Turn accelerator off
+if [ "$ZLIB_ACCELERATOR" == "SW" ]; then
+        export ZLIB_DEFLATE_IMPL=0x0
+        export ZLIB_INFLATE_IMPL=0x0
+fi
+
+rm -f $ZLIB_LOGFILE
 ulimit -c unlimited
 
 if [ ! -f `pwd`/lib/libzADC.so ]; then
@@ -75,16 +93,20 @@ if [ ! -f `pwd`/lib/libzADC.so ]; then
 	exit -1
 fi
 
-echo -n "Trying out git log ... "
-LD_PRELOAD=`pwd`/lib/libzADC.so git log > git.log
-if [ $? -ne 0 ]; then
-	echo "err: git log failed!"
-	exit 1
-fi
-echo "OK"
+function git_test ()
+{
+	echo -n "Trying out git log ... "
+	LD_PRELOAD=`pwd`/lib/libzADC.so git log > git.log
+	if [ $? -ne 0 ]; then
+		echo "err: git log failed!"
+		exit 1
+	fi
+	echo "OK"
+}
 
 # FIXME Add more stuff here to ensure that it fully works ...
-if [ $tokudb -ne 0 ]; then
+function tokudb_test ()
+{
 	echo "Trying to test TokuDB compression with GenWQE..."
 	if [ -f $TOKUDB_DIR/build/ft/tests/compress-test ]; then
 		echo "Percona compression test..."
@@ -112,8 +134,13 @@ if [ $tokudb -ne 0 ]; then
 		echo "subblock-test-compression not exist in $TOKUDB_DIR/build/ft/tests. Please check the environment."
 		exit 1
 	fi
+}
 
+if [ $tokudb -ne 0 ]; then
+	tokudb_test
 fi
-
+if [ $git -ne 0 ]; then
+	git_test
+fi
 
 exit 0

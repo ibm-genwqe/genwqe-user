@@ -1,14 +1,19 @@
-#!/bin/sh
+#!/bin/bash
 
 TOPDIR=`pwd`/PerconaFT
 
-function build() {
+function cleanup() {
+    rm -rf $TOPDIR/build $TOPDIR/install
+}
 
-    git clone --branch ppc64 https://github.com/davidzengxhsh/PerconaFT.git $TOPDIR
-    if [ $? -ne 0 ]; then
-        echo "Clone PerconaFT source failed."
-        return 1
-    fi    
+function build() {
+    if [ ! -d $TOPDIR ]; then
+        git clone --branch ppc64 https://github.com/davidzengxhsh/PerconaFT.git $TOPDIR
+        if [ $? -ne 0 ]; then
+            echo "Clone PerconaFT source failed."
+	    return 1
+	fi    
+    fi
 
     cd $TOPDIR
     BRANCH=`git branch | awk '{print $2}'`
@@ -33,6 +38,40 @@ function build() {
     fi
     return 0
 }
+
+function usage() {
+    echo "Usage:"
+    echo "  PerconaBuild.sh [OPTIONS]"
+    echo "     -R        cleanup"
+    echo "     -h        help"
+    echo
+}
+
+# output formatting
+bold=$(tput bold)
+normal=$(tput sgr0)
+
+while getopts "Rh" opt; do
+	case $opt in
+	R)
+	cleanup;
+	exit 0;
+	;;
+	h)
+	usage;
+	exit 0;
+	;;
+	\?)
+	printf "${bold}ERROR:${normal} Invalid option: -${OPTARG}\n" >&2
+	exit 1
+	;;
+	:)
+	printf "${bold}ERROR:${normal} Option -$OPTARG requires an argument.\n" >&2
+	exit 1
+	;;
+	esac
+done
+
 
 if [ ! -f $TOPDIR/install/lib/libtokuportability.so ]; then
     echo "Build Percona..."
