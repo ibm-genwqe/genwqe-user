@@ -321,13 +321,15 @@ static void print_args(FILE *fp, int argc, char **argv)
 	fprintf(fp, "Called with:\n");
 	for (i = 0; i < argc; i++)
 		fprintf(fp, "  ARGV[%d]: \"%s\"\n", i, argv[i]);
+	fprintf(fp, "\n");
 }
 
 static void print_version(FILE *fp)
 {
-	fprintf(fp, "Code: zlibVersion()=%s Header: ZLIB_VERSION=%s %s\n",
+	fprintf(fp, "Code: zlibVersion()=%s Header: ZLIB_VERSION=%s %s\n\n",
 		zlibVersion(), ZLIB_VERSION,
-		strcmp(zlibVersion(), ZLIB_VERSION) == 0 ? "consistent" : "inconsistent");
+		strcmp(zlibVersion(), ZLIB_VERSION) == 0 ?
+		"consistent" : "inconsistent");
 }
 
 static void usage(FILE *fp, char *prog, int argc, char *argv[])
