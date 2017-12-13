@@ -11,8 +11,8 @@ function build() {
         git clone --branch ppc64 https://github.com/davidzengxhsh/PerconaFT.git $TOPDIR
         if [ $? -ne 0 ]; then
             echo "Clone PerconaFT source failed."
-	    return 1
-	fi    
+            return 1
+        fi    
     fi
 
     cd $TOPDIR
@@ -22,6 +22,9 @@ function build() {
         echo "Please get the correct PerconaFT branch..."
         return 1
     fi
+
+	#hack the code to use ZLIB compression method
+    sed -i 's/TOKU_DEFAULT_COMPRESSION_METHOD/TOKU_ZLIB_METHOD/g' ft/tests/ft-serialize-benchmark.cc
 
     mkdir -p $TOPDIR/build $TOPDIR/install
     cd $TOPDIR/build
@@ -36,6 +39,10 @@ function build() {
         echo "Build PerconaFT Failed. Please make sure all the require package are installed."
         return 1
     fi
+
+    #delete the hack code here
+	cd $TOPDIR
+    git checkout -- ft/tests/ft-serialize-benchmark.cc
     return 0
 }
 
@@ -52,24 +59,24 @@ bold=$(tput bold)
 normal=$(tput sgr0)
 
 while getopts "Rh" opt; do
-	case $opt in
-	R)
-	cleanup;
-	exit 0;
-	;;
-	h)
-	usage;
-	exit 0;
-	;;
-	\?)
-	printf "${bold}ERROR:${normal} Invalid option: -${OPTARG}\n" >&2
-	exit 1
-	;;
-	:)
-	printf "${bold}ERROR:${normal} Option -$OPTARG requires an argument.\n" >&2
-	exit 1
-	;;
-	esac
+    case $opt in
+    R)
+    cleanup;
+    exit 0;
+    ;;
+    h)
+    usage;
+    exit 0;
+    ;;
+    \?)
+    printf "${bold}ERROR:${normal} Invalid option: -${OPTARG}\n" >&2
+    exit 1
+    ;;
+    :)
+    printf "${bold}ERROR:${normal} Option -$OPTARG requires an argument.\n" >&2
+    exit 1
+    ;;
+    esac
 done
 
 
