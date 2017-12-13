@@ -476,9 +476,8 @@ int compress2(Bytef *dest, uLongf *destLen, const Bytef *source,
 }
 
 static uLong (* p_compressBound)(uLong sourceLen);
-uLong compressBound(uLong sourceLen)
+uLong z_compressBound(uLong sourceLen)
 {
-	zlib_stats_inc(&zlib_stats.compressBound);
 	check_sym(p_compressBound, Z_STREAM_ERROR);
 	return (* p_compressBound)(sourceLen);
 }

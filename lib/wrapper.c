@@ -1493,6 +1493,13 @@ uLong zlibCompileFlags(void)
 	return z_zlibCompileFlags();
 }
 
+uLong compressBound(uLong sourceLen)
+{
+	zlib_stats_inc(&zlib_stats.compressBound);
+	return MAX(h_deflateBound(NULL, sourceLen),
+			   z_deflateBound(NULL, sourceLen));
+}
+
 /*
  * adler32: Returns the value of the result of the z_ prefixed adler32 function
  *

@@ -273,6 +273,7 @@ uLong z_crc32(uLong crc, const Bytef *buf, uInt len);
 uLong z_crc32_combine(uLong crc1, uLong crc2, z_off_t len2);
 
 const char *z_zError(int err);
+uLong z_compressBound(uLong sourceLen);
 
 /* PCIe trigger function. Writes to register 0x0 which normally non-sense. */
 void error_trigger(void);
