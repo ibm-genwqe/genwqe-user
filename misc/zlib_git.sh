@@ -110,7 +110,7 @@ function tokudb_test ()
 	echo "Trying to test TokuDB compression with GenWQE..."
 	if [ -f $TOKUDB_DIR/build/ft/tests/compress-test ]; then
 		echo "Percona compression test..."
-		LD_PRELOAD=`pwd`/lib/libzADC.so $TOKUDB_DIR/build/ft/tests/compress-test >tokudb.log 2>&1
+		LD_PRELOAD=`pwd`/lib/libzADC.so $TOKUDB_DIR/build/ft/tests/compress-test > tokudb.log 2>&1
 		if [ $? -ne 0 ]; then
 			echo "err: compression test failed."
 			exit 1
@@ -124,7 +124,7 @@ function tokudb_test ()
 
 	if [ -f $TOKUDB_DIR/build/ft/tests/subblock-test-compression ]; then
 		echo "Percona subblock compression test..."
-		LD_PRELOAD=`pwd`/lib/libzADC.so $TOKUDB_DIR/build/ft/tests/subblock-test-compression >tokudb.log 2>&1
+		LD_PRELOAD=`pwd`/lib/libzADC.so $TOKUDB_DIR/build/ft/tests/subblock-test-compression > tokudb.log 2>&1
 		if [ $? -ne 0 ]; then
 			echo "subblock compression test failed."
 			exit 1
@@ -134,6 +134,28 @@ function tokudb_test ()
 		echo "subblock-test-compression not exist in $TOKUDB_DIR/build/ft/tests. Please check the environment."
 		exit 1
 	fi
+
+	if [ -f $TOKUDB_DIR/build/ft/tests/ft-serialize-benchmark ]; then
+		echo "Percona ft serialize benchmark..."
+		$TOKUDB_DIR/build/ft/tests/ft-serialize-benchmark 10000 5000 50 50 > tokudb.log 2>&1
+		SW_SE=`grep "^serialize leaf" tokudb.log | awk  {'print $3'}`
+		SW_DE=`grep "^deserialize leaf" tokudb.log | awk  {'print $3'}`
+
+		LD_PRELOAD=`pwd`/lib/libzADC.so $TOKUDB_DIR/build/ft/tests/ft-serialize-benchmark 10000 5000 50 50 > tokudb.log 2>&1
+		if [ $? -ne 0 ]; then
+        	echo "ft serialize benchmark test failed."
+        	exit 1
+		fi
+		HW_SE=`grep "^serialize leaf" tokudb.log | awk  {'print $3'}`
+		HW_DE=`grep "^deserialize leaf" tokudb.log | awk  {'print $3'}`
+
+		echo "serialize leaf:   SW($SW_SE ms)  -  HW($HW_SE ms)"
+		echo "deserialize leaf: SW($SW_DE ms)  -  HW($HW_DE ms)"
+		echo "OK"
+	else
+		echo "ft-serialize-benchmark not exist in $TOKUDB_DIR/build/ft/tests. Please check the environment."
+		exit 1
+    fi
 }
 
 if [ $tokudb -ne 0 ]; then
