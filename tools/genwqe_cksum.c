@@ -21,6 +21,7 @@
 #include <time.h>
 #include <signal.h>
 #include <zlib.h>
+#include <time.h>
 #include <sys/time.h>
 #include <asm/byteorder.h>
 
@@ -38,6 +39,16 @@ static int debug_flag = 0;
 #define DEFAULT_DATA_BUF_SIZE (2 * 1024 * 1024) // 2 MB Buffer
 
 static const char *version = GIT_VERSION;
+
+static uint64_t get_us(void)
+{
+	uint64_t t;
+	struct timespec now;	
+
+	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+	t = now.tv_sec * 1000000 + now.tv_nsec / 1000;
+	return t;
+}
 
 /**
  * @brief	prints valid command line options
@@ -90,7 +101,7 @@ static inline uint64_t str_to_num(char *str)
 
 static int accel_cksum(accel_t accel,
 			    struct ddcb_cmd *cmd,
-			    void *src, size_t n,
+			    void *src, void *dest, size_t n,
 			    uint32_t *crc32,
 			    uint32_t *adler32,
 			    uint32_t *inp_processed,
@@ -99,12 +110,13 @@ static int accel_cksum(accel_t accel,
 	int rc;
 	struct asiv_memcpy *asiv;
 	struct asv_memcpy *asv;
+	uint64_t ats_type;
 
 	ddcb_cmd_init(cmd);
 	cmd->ddata_addr = 0ull;
 	cmd->acfunc	= DDCB_ACFUNC_APP;	/* goto accelerator */
 	cmd->cmd	= ZCOMP_CMD_ZEDC_MEMCOPY;
-	cmd->cmdopts	= 0x0001;		/* discard output for cksum */
+	cmd->cmdopts	= 0x0000;		/* use memcopy */
 	cmd->asiv_length= 0x40 - 0x20;
 	cmd->asv_length	= 0xC0 - 0x80;		/* try to absorb all */
 
@@ -112,22 +124,38 @@ static int accel_cksum(accel_t accel,
 	asiv = (struct asiv_memcpy *)&cmd->asiv;
 	asiv->inp_buff      = __cpu_to_be64((unsigned long)src);
 	asiv->inp_buff_len  = __cpu_to_be32((uint32_t)n);
-	asiv->outp_buff     = __cpu_to_be64(0);
-	asiv->outp_buff_len = __cpu_to_be32(0);
+	asiv->outp_buff     = __cpu_to_be64((unsigned long)dest);
+	asiv->outp_buff_len = __cpu_to_be32((uint32_t)n);
 	asiv->in_adler32    = __cpu_to_be32(*adler32);
 	asiv->in_crc32      = __cpu_to_be32(*crc32);
 
-	if (use_sglist) {
-		cmd->ats = __cpu_to_be64(
-			ATS_SET_FLAGS(struct asiv_memcpy, inp_buff,
-				      ATS_TYPE_SGL_RD));
-	} else {
-		cmd->ats = __cpu_to_be64(
-			ATS_SET_FLAGS(struct asiv_memcpy, inp_buff,
-				      ATS_TYPE_FLAT_RD));
+	if (use_sglist)
+		ats_type = ATS_TYPE_SGL_RD;
+	else	ats_type = ATS_TYPE_FLAT_RD;
+	cmd->ats = ATS_SET_FLAGS(struct asiv_memcpy, inp_buff, ats_type);
+	if (use_sglist)
+		ats_type = ATS_TYPE_SGL_RDWR;
+	else	ats_type = ATS_TYPE_FLAT_RDWR;
+	cmd->ats |= ATS_SET_FLAGS(struct asiv_memcpy, outp_buff, ats_type);
+
+	if (verbose_flag) {
+		fprintf(stderr, "ATS: 0x%llx use_sglist: %d\n", (long long)cmd->ats, use_sglist);
+		fprintf(stderr, "Src:  %p\n", src);
+		fprintf(stderr, "Dest: %p\n", dest);
+		fprintf(stderr, "Len: 0x%x\n", (uint32_t)n);
 	}
 
+	if (verbose_flag > 1) {
+		fprintf(stderr, "\n Dump Data @ %p\n", cmd);
+		ddcb_hexdump(stderr, cmd, sizeof(struct ddcb_cmd));
+	}
+	cmd->disp_ts    = get_us();             /* @ 0x30 SW Usage */
 	rc = accel_ddcb_execute(accel, cmd, NULL, NULL);
+	cmd->disp_ts    = get_us() - cmd->disp_ts;
+	if (verbose_flag > 1) {
+		fprintf(stderr, "\n Dump Data @ %p\n", cmd);
+		ddcb_hexdump(stderr, cmd, sizeof(struct ddcb_cmd));
+	}
 
 	asv = (struct asv_memcpy *)&cmd->asv;
 	*crc32	       = __be32_to_cpu(asv->out_crc32);
@@ -135,14 +163,14 @@ static int accel_cksum(accel_t accel,
 	*inp_processed = __be32_to_cpu(asv->inp_processed);
 
 	if (verbose_flag)
-		fprintf(stderr, "  crc32=%u adler32=%u inp_processed=%u\n",
-			*crc32, *adler32, *inp_processed);
+		fprintf(stderr, "  crc32=%u adler32=%u inp_processed=%u in %lld usec\n",
+			*crc32, *adler32, *inp_processed, (long long)cmd->disp_ts);
 
 	return rc;
 }
 
 static int process_in_file(accel_t accel, const char *in_f,
-			   uint8_t *ibuf, int ibuf_size,
+			   uint8_t *ibuf, void *obuf, int ibuf_size,
 			   int check_result,
 			   int use_sglist,
                            int use_adler)
@@ -187,7 +215,7 @@ static int process_in_file(accel_t accel, const char *in_f,
 		if (check_result)
 			crc = crc32(crc, ibuf, tocopy); /* software */
 
-		rc = accel_cksum(accel, &cmd, ibuf, tocopy, /* hardware */
+		rc = accel_cksum(accel, &cmd, ibuf, obuf, tocopy, /* hardware */
 				      &m_crc32, &m_adler32, &m_inp_processed,
 				      use_sglist);
 		xerrno = errno;
@@ -229,7 +257,15 @@ static int process_in_file(accel_t accel, const char *in_f,
 			}
 			ddcb_hexdump(stderr, cmd.asv, sizeof(cmd.asv));
 			exit(EXIT_FAILURE);
-		}
+		} else
+			pr_info("  RETC: %03x %s ATTN: %x PROGR: %x\n"
+				"  from card CRC32: %08x ADLER: %08x\n"
+				"  DEQUEUE=%016llx CMPLT=%016llx DISP=%016llx\n",
+				cmd.retc, retc_strerror(cmd.retc),
+				cmd.attn, cmd.progress, m_crc32, m_adler32,
+				(long long)cmd.deque_ts,
+				(long long)cmd.cmplt_ts,
+				(long long)cmd.disp_ts);
 
 		size_f -= tocopy;
 	}
@@ -253,7 +289,7 @@ int main(int argc, char *argv[])
 {
 	int card_no = 0, err_code;
 	accel_t accel;
-	uint8_t *ibuf;
+	uint8_t *ibuf, *obuf;
 	unsigned int page_size = sysconf(_SC_PAGESIZE);
 	const char *in_f = NULL;
 	int cpu = -1;
@@ -356,6 +392,7 @@ int main(int argc, char *argv[])
 
 	switch_cpu(cpu, verbose_flag);
 	ddcb_debug(verbose_flag - 1);
+	genwqe_card_lib_debug(verbose_flag);
 	if (ACCEL_REDUNDANT == card_no) {
 		if (1 != use_sglist) {
 			pr_info("I have to set Option -G set when in "
@@ -375,26 +412,38 @@ int main(int argc, char *argv[])
 
 	if (use_sglist) {
 		ibuf = memalign(page_size, data_buf_size);
-		if (use_sglist > 1)
+		obuf = memalign(page_size, data_buf_size);
+		if (use_sglist > 1) {
 			accel_pin_memory(accel, ibuf, data_buf_size, 0);
-	} else ibuf = accel_malloc(accel, data_buf_size);
+			accel_pin_memory(accel, obuf, data_buf_size, 0);
+		}
+	} else {
+		ibuf = accel_malloc(accel, data_buf_size);
+		obuf = accel_malloc(accel, data_buf_size);
+	}
 
-	if (data_buf_size != 0 && ibuf == NULL) {
+	if ((ibuf == NULL) || (obuf == NULL)) {
 		pr_err("cannot allocate memory\n");
 		exit(EXIT_FAILURE);
 	}
 
 	while (optind < argc) {	/* input file */
 		in_f = argv[optind++];
-		process_in_file(accel, in_f, ibuf, data_buf_size,
+		process_in_file(accel, in_f, ibuf, obuf, data_buf_size,
 			check_result, use_sglist, use_adler);
 	}
 
 	if (use_sglist) {
-		if (use_sglist > 1)
+		if (use_sglist > 1) {
 			accel_unpin_memory(accel, ibuf, data_buf_size);
+			accel_unpin_memory(accel, obuf, data_buf_size);
+		}
 		free(ibuf);
-	} else accel_free(accel, ibuf, data_buf_size);
+		free(obuf);
+	} else {
+		accel_free(accel, ibuf, data_buf_size);
+		accel_free(accel, obuf, data_buf_size);
+	}
 
 	accel_close(accel);
 	exit(EXIT_SUCCESS);
