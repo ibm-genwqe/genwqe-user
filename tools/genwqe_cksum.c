@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, International Business Machines
+ * Copyright 2017, International Business Machines
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,11 +21,13 @@
 #include <time.h>
 #include <signal.h>
 #include <zlib.h>
+#include <time.h>
 #include <sys/time.h>
 #include <asm/byteorder.h>
 
 #include <sched.h>
 
+#include "libddcb.h"
 #include "genwqe_tools.h"
 #include "force_cpu.h"
 #include "libcard.h"
@@ -34,11 +36,19 @@
 int verbose_flag = 0;
 static int debug_flag = 0;
 
-static int DATA_BUF_SIZE = 4096 * 512;
-static int use_sglist = 0;
-static int use_adler32 = 0;
-static int check_result = 0;
-static const char *version = GENWQE_LIB_VERS_STRING;
+#define DEFAULT_DATA_BUF_SIZE (2 * 1024 * 1024) // 2 MB Buffer
+
+static const char *version = GIT_VERSION;
+
+static uint64_t get_us(void)
+{
+	uint64_t t;
+	struct timespec now;	
+
+	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+	t = now.tv_sec * 1000000 + now.tv_nsec / 1000;
+	return t;
+}
 
 /**
  * @brief	prints valid command line options
@@ -48,15 +58,16 @@ static const char *version = GENWQE_LIB_VERS_STRING;
 static void usage(const char *prog)
 {
 	printf("Usage: %s [-h] [-v, --verbose] [-C, --card <cardno>|RED]\n"
-	       "\t[-V, --version]\n"
-	       "\t[-X, --cpu <only run on this CPU number>]\n"
-	       "\t[-D, --debug <create extended debug data on failure>]\n"
-	       "\t[-G, --use-sglist use the scatter gather list support]\n"
-	       "\t[-c, --check-result] check result against the software\n"
-	       "\t[-s, --bufsize <bufsize/default is 4KiB>]\n"
-	       "\t[-a, --adler32] use adler32 instead of crc32\n"
-	       "\t[-i, --pgoffs_i <offs>] byte offset for input buffer\n"
-	       "\t[FILE]...\n"
+	       "\t-C, --card <cardno> use cardno for operation (default 0)\n"
+               "\t-A, --accel = GENWQE | CAPI. (CAPI only for ppc64le)\n"
+	       "\t-V, --version show Software Version\n"
+	       "\t-X, --cpu <only run on this CPU number>\n"
+	       "\t-D, --debug <create extended debug data on failure>\n"
+	       "\t-G, --use-sglist use the scatter gather list support\n"
+	       "\t-c, --check-result] check result against the software\n"
+	       "\t-s, --bufsize <bufsize/default is 4KiB>\n"
+	       "\t-a, --adler32 use adler32 instead of crc32\n"
+	       "\tFILE...\n"
 	       "\n"
 	       "This utility sends memcopy/checksum DDCBs to the application\n"
 	       "chip unit. The CRC32 is compatible to zlib. The UNIX program\n"
@@ -88,23 +99,24 @@ static inline uint64_t str_to_num(char *str)
 	return num;
 }
 
-static int genwqe_card_cksum(card_handle_t card,
-			    struct genwqe_ddcb_cmd *cmd,
-			    void *src, size_t n,
+static int accel_cksum(accel_t accel,
+			    struct ddcb_cmd *cmd,
+			    void *src, void *dest, size_t n,
 			    uint32_t *crc32,
 			    uint32_t *adler32,
 			    uint32_t *inp_processed,
-			    struct genwqe_debug_data *debug_data)
+			    int use_sglist)
 {
 	int rc;
 	struct asiv_memcpy *asiv;
 	struct asv_memcpy *asv;
+	uint64_t ats_type;
 
-	genwqe_ddcb_cmd_init(cmd);
-	cmd->ddata_addr = (unsigned long)debug_data;
+	ddcb_cmd_init(cmd);
+	cmd->ddata_addr = 0ull;
 	cmd->acfunc	= DDCB_ACFUNC_APP;	/* goto accelerator */
 	cmd->cmd	= ZCOMP_CMD_ZEDC_MEMCOPY;
-	cmd->cmdopts	= 0x0001;		/* discard output for cksum */
+	cmd->cmdopts	= 0x0000;		/* use memcopy */
 	cmd->asiv_length= 0x40 - 0x20;
 	cmd->asv_length	= 0xC0 - 0x80;		/* try to absorb all */
 
@@ -112,22 +124,38 @@ static int genwqe_card_cksum(card_handle_t card,
 	asiv = (struct asiv_memcpy *)&cmd->asiv;
 	asiv->inp_buff      = __cpu_to_be64((unsigned long)src);
 	asiv->inp_buff_len  = __cpu_to_be32((uint32_t)n);
-	asiv->outp_buff     = __cpu_to_be64(0);
-	asiv->outp_buff_len = __cpu_to_be32(0);
+	asiv->outp_buff     = __cpu_to_be64((unsigned long)dest);
+	asiv->outp_buff_len = __cpu_to_be32((uint32_t)n);
 	asiv->in_adler32    = __cpu_to_be32(*adler32);
 	asiv->in_crc32      = __cpu_to_be32(*crc32);
 
-	if (use_sglist) {
-		cmd->ats = __cpu_to_be64(
-			ATS_SET_FLAGS(struct asiv_memcpy, inp_buff,
-				      ATS_TYPE_SGL_RD));
-	} else {
-		cmd->ats = __cpu_to_be64(
-			ATS_SET_FLAGS(struct asiv_memcpy, inp_buff,
-				      ATS_TYPE_FLAT_RD));
+	if (use_sglist)
+		ats_type = ATS_TYPE_SGL_RD;
+	else	ats_type = ATS_TYPE_FLAT_RD;
+	cmd->ats = ATS_SET_FLAGS(struct asiv_memcpy, inp_buff, ats_type);
+	if (use_sglist)
+		ats_type = ATS_TYPE_SGL_RDWR;
+	else	ats_type = ATS_TYPE_FLAT_RDWR;
+	cmd->ats |= ATS_SET_FLAGS(struct asiv_memcpy, outp_buff, ats_type);
+
+	if (verbose_flag) {
+		fprintf(stderr, "ATS: 0x%llx use_sglist: %d\n", (long long)cmd->ats, use_sglist);
+		fprintf(stderr, "Src:  %p\n", src);
+		fprintf(stderr, "Dest: %p\n", dest);
+		fprintf(stderr, "Len: 0x%x\n", (uint32_t)n);
 	}
 
-	rc = genwqe_card_execute_ddcb(card, cmd);
+	if (verbose_flag > 1) {
+		fprintf(stderr, "\n Dump Data @ %p\n", cmd);
+		ddcb_hexdump(stderr, cmd, sizeof(struct ddcb_cmd));
+	}
+	cmd->disp_ts    = get_us();             /* @ 0x30 SW Usage */
+	rc = accel_ddcb_execute(accel, cmd, NULL, NULL);
+	cmd->disp_ts    = get_us() - cmd->disp_ts;
+	if (verbose_flag > 1) {
+		fprintf(stderr, "\n Dump Data @ %p\n", cmd);
+		ddcb_hexdump(stderr, cmd, sizeof(struct ddcb_cmd));
+	}
 
 	asv = (struct asv_memcpy *)&cmd->asv;
 	*crc32	       = __be32_to_cpu(asv->out_crc32);
@@ -135,14 +163,17 @@ static int genwqe_card_cksum(card_handle_t card,
 	*inp_processed = __be32_to_cpu(asv->inp_processed);
 
 	if (verbose_flag)
-		fprintf(stderr, "  crc32=%u adler32=%u inp_processed=%u\n",
-			*crc32, *adler32, *inp_processed);
+		fprintf(stderr, "  crc32=%u adler32=%u inp_processed=%u in %lld usec\n",
+			*crc32, *adler32, *inp_processed, (long long)cmd->disp_ts);
 
 	return rc;
 }
 
-static int process_in_file(card_handle_t card, const char *in_f,
-			   uint8_t *ibuf, int ibuf_size)
+static int process_in_file(accel_t accel, const char *in_f,
+			   uint8_t *ibuf, void *obuf, int ibuf_size,
+			   int check_result,
+			   int use_sglist,
+                           int use_adler)
 {
 	int rc, size_f;
 	struct stat st;
@@ -150,26 +181,24 @@ static int process_in_file(card_handle_t card, const char *in_f,
 	uint32_t crc = 0, m_crc32 = 0; /* defined start value of 0 */
 	uint32_t m_adler32 = 1;	       /* defined start value of 1 */
 	uint32_t m_inp_processed;
-	struct genwqe_ddcb_cmd cmd;
-	struct genwqe_debug_data debug_data;
+	struct ddcb_cmd cmd;
 	int xerrno;
 
 	if (check_result)
 		crc = crc32(0L, Z_NULL, 0); /* start value */
 
-	memset(&debug_data, 0, sizeof(debug_data));
 
 	if (stat(in_f, &st) == -1) {
 		fprintf(stderr, "err: stat on input file (%s)\n",
 			strerror(errno));
-		exit(EX_ERRNO);
+			exit(EX_ERRNO);
 	}
 	size_f = st.st_size;
 
 	i_fp = fopen(in_f, "r");
 	if (!i_fp) {
 		pr_err("err: can't open input file %s: %s\n", in_f,
-		       strerror(errno));
+			strerror(errno));
 		exit(EX_ERRNO);
 	}
 
@@ -179,34 +208,26 @@ static int process_in_file(card_handle_t card, const char *in_f,
 		rc = fread(ibuf, tocopy, 1, i_fp);
 		if (rc != 1) {
 			pr_err("err: can't read input file %s: %s\n", in_f,
-			       strerror(errno));
+				strerror(errno));
 			exit(EX_ERRNO);
 		}
 
 		if (check_result)
-			crc = crc32(crc, ibuf, tocopy);	/* software */
+			crc = crc32(crc, ibuf, tocopy); /* software */
 
-		rc = genwqe_card_cksum(card, &cmd, ibuf, tocopy, /* hardware */
+		rc = accel_cksum(accel, &cmd, ibuf, obuf, tocopy, /* hardware */
 				      &m_crc32, &m_adler32, &m_inp_processed,
-				      debug_flag ? &debug_data : NULL);
+				      use_sglist);
 		xerrno = errno;
 
-		if (debug_flag && verbose_flag)
-			genwqe_print_debug_data(stdout, &debug_data,
-						GENWQE_DD_ALL);
-
 		/* Did the ioctl succeed? */
-		if (rc != GENWQE_OK) {
+		if (rc != DDCB_OK) {
 			struct asv_runtime_dma_error *d;
 
 			fprintf(stderr,
 				"\nerr: CKSUM DDCB failed, %s (%d)\n"
 				"     errno=%d %s\n", card_strerror(rc),
 				rc, xerrno, strerror(xerrno));
-
-			if (debug_flag && !verbose_flag)
-				genwqe_print_debug_data(stdout, &debug_data,
-							GENWQE_DD_ALL);
 
 			fprintf(stderr, "  RETC: %03x %s ATTN: %x PROGR: %x\n"
 				"  from card CRC32: %08x ADLER: %08x\n"
@@ -234,14 +255,22 @@ static int process_in_file(card_handle_t card, const char *in_f,
 					__be16_to_cpu(d->wdmae_be16),
 					__be16_to_cpu(d->wsge_be16));
 			}
-			genwqe_hexdump(stderr, cmd.asv, sizeof(cmd.asv));
+			ddcb_hexdump(stderr, cmd.asv, sizeof(cmd.asv));
 			exit(EXIT_FAILURE);
-		}
+		} else
+			pr_info("  RETC: %03x %s ATTN: %x PROGR: %x\n"
+				"  from card CRC32: %08x ADLER: %08x\n"
+				"  DEQUEUE=%016llx CMPLT=%016llx DISP=%016llx\n",
+				cmd.retc, retc_strerror(cmd.retc),
+				cmd.attn, cmd.progress, m_crc32, m_adler32,
+				(long long)cmd.deque_ts,
+				(long long)cmd.cmplt_ts,
+				(long long)cmd.disp_ts);
 
 		size_f -= tocopy;
 	}
 
-	if (use_adler32)
+	if (use_adler)
 		printf("%u %llu %s\n", m_adler32, (long long)st.st_size, in_f);
 	else
 		printf("%u %llu %s\n", m_crc32, (long long)st.st_size, in_f);
@@ -259,12 +288,16 @@ static int process_in_file(card_handle_t card, const char *in_f,
 int main(int argc, char *argv[])
 {
 	int card_no = 0, err_code;
-	card_handle_t card;
-	uint8_t *ibuf, *ibuf4k;
+	accel_t accel;
+	uint8_t *ibuf, *obuf;
 	unsigned int page_size = sysconf(_SC_PAGESIZE);
 	const char *in_f = NULL;
 	int cpu = -1;
-	int pgoffs_i = 0;
+	int card_type = DDCB_TYPE_GENWQE;
+	int check_result = 0;
+	int use_sglist = 0;
+	int use_adler = 0;
+	int data_buf_size = DEFAULT_DATA_BUF_SIZE;
 
 	while (1) {
 		int ch;
@@ -275,13 +308,13 @@ int main(int argc, char *argv[])
 
 			/* options */
 			{ "card",	   required_argument, NULL, 'C' },
+			{ "accel",         required_argument, NULL, 'A' },
 			{ "cpu",	   required_argument, NULL, 'X' },
 			{ "use-sglist",	   no_argument,       NULL, 'G' },
 			{ "use-adler32",   no_argument,       NULL, 'a' },
 			{ "check-result",  no_argument,       NULL, 'c' },
 
 			{ "bufsize",	   required_argument, NULL, 's' },
-			{ "pgoffs_i",      required_argument, NULL, 'i' },
 
 			/* misc/support */
 			{ "version",       no_argument,       NULL, 'V' },
@@ -291,7 +324,7 @@ int main(int argc, char *argv[])
 			{ 0,		   no_argument,       NULL, 0   },
 		};
 
-		ch = getopt_long(argc, argv, "acC:X:Gs:i:vDVh",
+		ch = getopt_long(argc, argv, "acC:X:Gs:A:vDVh",
 				 long_options, &option_index);
 		if (ch == -1)	/* all params processed ? */
 			break;
@@ -305,6 +338,23 @@ int main(int argc, char *argv[])
 			}
 			card_no = strtol(optarg, (char **)NULL, 0);
 			break;
+		case 'A':
+			if (strcmp(optarg, "GENWQE") == 0) {
+				card_type = DDCB_TYPE_GENWQE;
+				break;
+			}
+			if (strcmp(optarg, "CAPI") == 0) {
+				card_type = DDCB_TYPE_CAPI;
+				break;
+			}
+			/* use numeric card_type value */
+			card_type = strtol(optarg, (char **)NULL, 0);
+			if ((DDCB_TYPE_GENWQE != card_type) &&
+				(DDCB_TYPE_CAPI != card_type)) {
+				usage(argv[0]);
+				exit(EXIT_FAILURE);
+			}
+			break;
 		case 'X':
 			cpu = strtoul(optarg, (char **)NULL, 0);
 			break;
@@ -312,17 +362,13 @@ int main(int argc, char *argv[])
 			use_sglist++;
 			break;
 		case 'a':
-			use_adler32 = 1;
+			use_adler = 1;
 			break;
 		case 'c':
 			check_result++;
 			break;
-
-		case 'i':
-			pgoffs_i = strtol(optarg, (char **)NULL, 0);
-			break;
 		case 's':
-			DATA_BUF_SIZE = str_to_num(optarg);
+			data_buf_size = str_to_num(optarg);
 			break;
 
 		case 'h':
@@ -345,46 +391,60 @@ int main(int argc, char *argv[])
 	}
 
 	switch_cpu(cpu, verbose_flag);
+	ddcb_debug(verbose_flag - 1);
 	genwqe_card_lib_debug(verbose_flag);
+	if (ACCEL_REDUNDANT == card_no) {
+		if (1 != use_sglist) {
+			pr_info("I have to set Option -G set when in "
+				"redundant card mode!\n");
+			use_sglist = 1;
+		}
+	}
 
-	card = genwqe_card_open(card_no, GENWQE_MODE_RDWR, &err_code,
-				0x475a4950, GENWQE_APPL_ID_MASK);
-	if (card == NULL) {
-		printf("err: genwqe card: %s/%d; %s\n",
-		       card_strerror(err_code), err_code, strerror(errno));
+	accel = accel_open(card_no, card_type, DDCB_MODE_RDWR | DDCB_MODE_ASYNC,
+		&err_code, 0, DDCB_APPL_ID_IGNORE);
+	if (accel == NULL) {
+		printf("Err: (card: %d type: %d) Faild to open card:%s/%d; %s\n",
+			card_no, card_type,
+			card_strerror(err_code), err_code, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
 	if (use_sglist) {
-		ibuf4k = memalign(page_size, DATA_BUF_SIZE + pgoffs_i);
+		ibuf = memalign(page_size, data_buf_size);
+		obuf = memalign(page_size, data_buf_size);
 		if (use_sglist > 1) {
-			genwqe_pin_memory(card, ibuf4k, DATA_BUF_SIZE +
-					 pgoffs_i, 0);
+			accel_pin_memory(accel, ibuf, data_buf_size, 0);
+			accel_pin_memory(accel, obuf, data_buf_size, 0);
 		}
 	} else {
-		ibuf4k = genwqe_card_malloc(card, DATA_BUF_SIZE + pgoffs_i);
+		ibuf = accel_malloc(accel, data_buf_size);
+		obuf = accel_malloc(accel, data_buf_size);
 	}
-	if (DATA_BUF_SIZE != 0 && ibuf4k == NULL) {
+
+	if ((ibuf == NULL) || (obuf == NULL)) {
 		pr_err("cannot allocate memory\n");
 		exit(EXIT_FAILURE);
 	}
-	ibuf = ibuf4k + pgoffs_i;
 
 	while (optind < argc) {	/* input file */
 		in_f = argv[optind++];
-		process_in_file(card, in_f, ibuf, DATA_BUF_SIZE);
+		process_in_file(accel, in_f, ibuf, obuf, data_buf_size,
+			check_result, use_sglist, use_adler);
 	}
 
 	if (use_sglist) {
 		if (use_sglist > 1) {
-			genwqe_unpin_memory(card, ibuf4k, DATA_BUF_SIZE +
-					   pgoffs_i);
+			accel_unpin_memory(accel, ibuf, data_buf_size);
+			accel_unpin_memory(accel, obuf, data_buf_size);
 		}
-		free(ibuf4k);
+		free(ibuf);
+		free(obuf);
 	} else {
-		genwqe_card_free(card, ibuf4k, DATA_BUF_SIZE + pgoffs_i);
+		accel_free(accel, ibuf, data_buf_size);
+		accel_free(accel, obuf, data_buf_size);
 	}
 
-	genwqe_card_close(card);
+	accel_close(accel);
 	exit(EXIT_SUCCESS);
 }
