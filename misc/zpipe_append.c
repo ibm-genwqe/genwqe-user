@@ -279,7 +279,10 @@ static int inf(FILE *source, FILE *dest, int window_bits, int _flush,
 
 			switch (ret) {
 			case Z_NEED_DICT:
-				ret = Z_DATA_ERROR;	/* and fall through */
+				(void)inflateEnd(&strm);
+				free(in);
+				free(out);
+				return Z_DATA_ERROR;
 			case Z_DATA_ERROR:
 			case Z_MEM_ERROR:
 				(void)inflateEnd(&strm);

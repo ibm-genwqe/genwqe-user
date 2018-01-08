@@ -227,7 +227,7 @@ __more_inf:
 				break;
 			case Z_NEED_DICT:
 				fprintf(stderr, "NEED Dict........\n");
-				ret = Z_DATA_ERROR;	/* and fall through */
+				return Z_DATA_ERROR;
 			case Z_DATA_ERROR:
 			case Z_MEM_ERROR:
 				fprintf(stderr, "Fault..... %d\n", ret);
