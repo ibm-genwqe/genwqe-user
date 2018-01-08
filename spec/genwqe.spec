@@ -148,6 +148,8 @@ ln -sf %{_bindir}/genwqe_gzip   %{buildroot}/%{_libdir}/genwqe/gzip
 %{_mandir}/man1/genwqe_csv2vpd.1.gz
 %{_mandir}/man1/genwqe_vpdconv.1.gz
 %{_mandir}/man1/genwqe_vpdupdate.1.gz
+%{_mandir}/man1/genwqe_mt_perf.1.gz
+%{_mandir}/man1/genwqe_test_gz.1.gz
 
 %files devel
 %defattr(-,root,root,-)
@@ -159,7 +161,10 @@ ln -sf %{_bindir}/genwqe_gzip   %{buildroot}/%{_libdir}/genwqe/gzip
 * Mon Jan 08 2018 Eberhard Amann <esa@de.ibm.com> - 4.0.19
 - Fix compressBound
 - Add Debug tools
-- Fix genwqe_cksum tool 
+- Fix genwqe_cksum tool
+- Fix missing manpages in spec file
+- Fix new compiler warnings
+- Improve Z_STREAM_END detection circumvention
 * Wed Nov 29 2017 Frank Haverkamp <haver@linux.vnet.ibm.com> - 4.0.18
 - Many fixes. (see git log)
 * Thu Jan 05 2017 Frank Haverkamp <haver@linux.vnet.ibm.com> - 4.0.17
