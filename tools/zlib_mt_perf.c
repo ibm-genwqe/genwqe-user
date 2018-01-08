@@ -367,7 +367,10 @@ static int infl(struct thread_data *d, FILE *source)
 			/* assert(ret != Z_STREAM_ERROR); *//* not clobbered */
 			switch (ret) {
 			case Z_NEED_DICT:
-				ret = Z_DATA_ERROR;	/* and fall through */
+				(void)inflateEnd(&strm);
+				__free(in);
+				__free(out);
+				return Z_DATA_ERROR;
 			case Z_STREAM_ERROR:
 			case Z_DATA_ERROR:
 			case Z_MEM_ERROR:

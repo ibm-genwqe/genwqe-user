@@ -232,6 +232,10 @@ static int inf(FILE *source, FILE *dest, int windowBits,
 					}
 					goto try_again;	/* try again */
 				}
+				(void)inflateEnd(&strm);
+				free(in);
+				free(out);
+				return ret;
 			case Z_DATA_ERROR: /* and fall through */
 			case Z_MEM_ERROR:
 				(void)inflateEnd(&strm);
