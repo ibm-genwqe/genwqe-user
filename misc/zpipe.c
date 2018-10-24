@@ -126,7 +126,8 @@ static int inf(FILE *source, FILE *dest)
             assert(ret != Z_STREAM_ERROR);  /* state not clobbered */
             switch (ret) {
             case Z_NEED_DICT:
-                ret = Z_DATA_ERROR;     /* and fall through */
+                (void)inflateEnd(&strm);
+                return Z_DATA_ERROR;
             case Z_DATA_ERROR:
             case Z_MEM_ERROR:
                 (void)inflateEnd(&strm);

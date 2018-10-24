@@ -227,7 +227,7 @@ __more_inf:
 				break;
 			case Z_NEED_DICT:
 				fprintf(stderr, "NEED Dict........\n");
-				ret = Z_DATA_ERROR;	/* and fall through */
+				return Z_DATA_ERROR;
 			case Z_DATA_ERROR:
 			case Z_MEM_ERROR:
 				fprintf(stderr, "Fault..... %d\n", ret);
@@ -310,7 +310,7 @@ static inline uint64_t str_to_num(char *str)
 
 static void userinfo(FILE *fp, char *prog, const char *version)
 {
-	fprintf(fp, "%s %s\n(c) Copyright IBM Corp. 2015\n",
+	fprintf(fp, "%s %s\n(c) Copyright IBM Corp. 2015, 2017\n",
 		basename(prog), version);
 }
 
@@ -321,6 +321,15 @@ static void print_args(FILE *fp, int argc, char **argv)
 	fprintf(fp, "Called with:\n");
 	for (i = 0; i < argc; i++)
 		fprintf(fp, "  ARGV[%d]: \"%s\"\n", i, argv[i]);
+	fprintf(fp, "\n");
+}
+
+static void print_version(FILE *fp)
+{
+	fprintf(fp, "Code: zlibVersion()=%s Header: ZLIB_VERSION=%s %s\n\n",
+		zlibVersion(), ZLIB_VERSION,
+		strcmp(zlibVersion(), ZLIB_VERSION) == 0 ?
+		"consistent" : "inconsistent");
 }
 
 static void usage(FILE *fp, char *prog, int argc, char *argv[])
@@ -363,6 +372,7 @@ static void usage(FILE *fp, char *prog, int argc, char *argv[])
 		"Report bugs via https://github.com/ibm-genwqe/genwqe-user.\n"
 		"\n", prog, CHUNK_i/1024, CHUNK_o/1024);
 
+	print_version(fp);
 	print_args(fp, argc, argv);
 }
 
