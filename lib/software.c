@@ -345,7 +345,7 @@ static int (* p_gzclose)(gzFile file);
 int gzclose(gzFile file)
 {
 	zlib_stats_inc(&zlib_stats.gzclose);
-	check_sym(p_gzread, Z_STREAM_ERROR);
+	check_sym(p_gzclose, Z_STREAM_ERROR);
 	return (* p_gzclose)(file);
 }
 
