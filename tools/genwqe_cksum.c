@@ -36,7 +36,7 @@
 int verbose_flag = 0;
 static int debug_flag = 0;
 
-#define DEFAULT_DATA_BUF_SIZE (2 * 1024 * 1024) // 2 MB Buffer
+#define DEFAULT_DATA_BUF_SIZE (1 * 1024 * 1024) // 1 MiB Buffer
 
 static const char *version = GIT_VERSION;
 
@@ -65,14 +65,14 @@ static void usage(const char *prog)
 	       "\t-D, --debug <create extended debug data on failure>\n"
 	       "\t-G, --use-sglist use the scatter gather list support\n"
 	       "\t-c, --check-result] check result against the software\n"
-	       "\t-s, --bufsize <bufsize/default is 4KiB>\n"
+	       "\t-s, --bufsize <bufsize/default is %dKiB>\n"
 	       "\t-a, --adler32 use adler32 instead of crc32\n"
 	       "\tFILE...\n"
 	       "\n"
 	       "This utility sends memcopy/checksum DDCBs to the application\n"
 	       "chip unit. The CRC32 is compatible to zlib. The UNIX program\n"
 	       "cksum is using a different variation of the algorithm.\n\n",
-	       prog);
+	       prog, DEFAULT_DATA_BUF_SIZE / 1024);
 }
 
 /**
