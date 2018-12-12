@@ -39,6 +39,16 @@ card=0
 echo "Testing fallback to software if there is no card available"
 echo "TESTING ${accel} CARD ${card}"
 
+echo "Print version numbers"
+genwqe_cksum --version
+genwqe_gzip --version
+genwqe_gunzip --version
+
+echo "See if help messages are nice"
+genwqe_cksum --help
+genwqe_gzip --help
+genwqe_gunzip --help
+
 zlib_git.sh  -A${accel} -C${card}
 if [ $? -ne 0 ]; then
 	echo "FAILED ${accel} CARD ${card}"
