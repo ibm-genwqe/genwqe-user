@@ -61,10 +61,22 @@ static unsigned int CHUNK_i = 16 * 1024; /* 16384; */
 static unsigned int CHUNK_o = 16 * 1024; /* 16384; */
 static int _pattern = 0;
 
+#ifdef __BIONIC__
+  #define OVERRIDE_GETTID 0
+#elif !defined(__GLIBC_PREREQ)
+  #define OVERRIDE_GETTID 1
+#elif !__GLIBC_PREREQ(2,30)
+  #define OVERRIDE_GETTID 1
+#else
+  #define OVERRIDE_GETTID 0
+#endif
+
+#if OVERRIDE_GETTID
 static inline pid_t gettid(void)
 {
 	return (pid_t)syscall(SYS_gettid);
 }
+#endif
 
 static int figure_out_window_bits(const char *format)
 {
