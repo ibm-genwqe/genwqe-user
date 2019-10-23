@@ -32,10 +32,22 @@
 #include <unistd.h>
 #include <sys/syscall.h>   /* For SYS_xxx definitions */
 
+#ifdef __BIONIC__
+  #define OVERRIDE_GETTID 0
+#elif !defined(__GLIBC_PREREQ)
+  #define OVERRIDE_GETTID 1
+#elif !__GLIBC_PREREQ(2,30)
+  #define OVERRIDE_GETTID 1
+#else
+  #define OVERRIDE_GETTID 0
+#endif
+
+#if OVERRIDE_GETTID
 static inline pid_t gettid(void)
 {
 	return (pid_t)syscall(SYS_gettid);
 }
+#endif
 
 #define pr_err(fmt, ...)						\
 	fprintf(stderr, "%08x.%08x %s:%u: Error: " fmt,			\

@@ -33,10 +33,22 @@
 #  define ABS(a)	 (((a) < 0) ? -(a) : (a))
 #endif
 
+#ifdef __BIONIC__
+  #define OVERRIDE_GETTID 0
+#elif !defined(__GLIBC_PREREQ)
+  #define OVERRIDE_GETTID 1
+#elif !__GLIBC_PREREQ(2,30)
+  #define OVERRIDE_GETTID 1
+#else
+  #define OVERRIDE_GETTID 0
+#endif
+
+#if OVERRIDE_GETTID
 static inline pid_t gettid(void)
 {
 	return (pid_t)syscall(SYS_gettid);
 }
+#endif
 
 extern int zedc_dbg;
 extern FILE *zedc_log;
